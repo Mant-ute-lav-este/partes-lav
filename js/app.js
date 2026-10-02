@@ -9,7 +9,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast,
 } from './util.js';
 
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.2.1';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -241,6 +241,7 @@ function vMenu() {
     <h2>Menú</h2>
     <button class="btn secundario" data-action="elegir-config">Cargar lista de la oficina</button>
     ${inputConfig}
+    <button class="btn secundario" data-action="cambiar-capataz">Cambiar de capataz</button>
     <button class="btn secundario" data-action="cambiar-pin">Cambiar PIN</button>
     <button class="btn secundario" data-action="bloquear">Bloquear la app</button>
     <p class="nota">Lista de la oficina: ${esc(c.nombre || 'sin nombre')}${c.fecha ? ` (${esc(c.fecha)})` : ''} ·
@@ -987,6 +988,12 @@ async function onClick(e) {
     case 'menu': estado.menu = true; render(); break;
     case 'cerrar-menu': estado.menu = false; render(); break;
     case 'cambiar-pin': estado.cambiandoPin = true; ir('setup-pin'); break;
+    case 'cambiar-capataz':
+      if (confirm('Vas a elegir otro capataz y crear su PIN. Los partes ya hechos no se borran. ¿Seguir?')) {
+        estado.cambiandoPin = false;
+        ir('setup-capataz');
+      }
+      break;
     case 'bloquear': ir('pin'); break;
     case 'ir-inicio': ir('inicio'); break;
     case 'nuevo': nuevoParte(el.dataset.tipo); break;
