@@ -96,14 +96,73 @@ export function textoReferencia(t) {
 
 function contarFotos(t) {
   const n = (f) => t.fotos.filter((x) => x.fase === f).length;
-  return `Fotos: ${n('antes')} antes · ${n('durante')} durante · ${n('despues')} después`;
+  return `Fotos: ${n('antes')} antes · ${n('durante')} durante · ${n('despues')} después${t.fotos.length ? ' (ver anexo)' : ''}`;
+}
+
+const FASE_TXT = { antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS' };
+
+/** Reduce la foto para el anexo del PDF (las originales van aparte, a tamaño completo). */
+async function reducir(blob, lado = 1100, calidad = 0.72) {
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, lado / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * k);
+  const h = Math.round(bmp.height * k);
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  if (bmp.close) bmp.close();
+  const b = await new Promise((res, rej) => cv.toBlob((x) => (x ? res(x) : rej(new Error('No se pudo preparar una foto'))), 'image/jpeg', calidad));
+  cv.width = 0;
+  cv.height = 0;
+  return { datos: new Uint8Array(await b.arrayBuffer()), w, h };
+}
+
+/** Anexo fotográfico: dos fotos por página, en orden de trabajo y fase. */
+async function anexoFotos(c, parte, leerFoto) {
+  const lista = [];
+  parte.trabajos.forEach((t, i) => ['antes', 'durante', 'despues'].forEach((f) => {
+    t.fotos.filter((x) => x.fase === f).forEach((x) => lista.push({ t, i, x }));
+  }));
+  if (!lista.length) return;
+  const { doc } = c;
+  const hueco = 6;
+  const anchoCelda = (AN - hueco) / 2;
+  const tituloAnexo = `ANEXO FOTOGRÁFICO  ·  Ref. ${parte.ref}${parte.rev > 1 ? ` rev. ${parte.rev}` : ''}  ·  ` +
+    `${parte.tipo === 'INFRA' ? 'Infraestructura' : 'Superestructura'}  ·  Jornada ${fmtFecha(parte.fecha)}  ·  ${parte.capataz}`;
+  for (let k = 0; k < lista.length; k += 2) {
+    nuevaPagina(c);
+    fila(c, [{ w: AN, t: tituloAnexo, b: true, s: 9, fill: GRIS }], { minH: 8 });
+    const y0 = c.y + 3;
+    const altoMax = FONDO - y0 - 12;   // deja sitio al pie de foto
+    for (let j = 0; j < 2 && k + j < lista.length; j++) {
+      const { t, i, x } = lista[k + j];
+      const x0 = M + j * (anchoCelda + hueco);
+      let yPie = y0;
+      const blob = await leerFoto(x.id);
+      if (blob) {
+        const img = await reducir(blob);
+        const e = Math.min(anchoCelda / img.w, altoMax / img.h);
+        const w = img.w * e;
+        const h = img.h * e;
+        doc.addImage(img.datos, 'JPEG', x0 + (anchoCelda - w) / 2, y0, w, h);
+        doc.rect(x0 + (anchoCelda - w) / 2, y0, w, h, 'S');
+        yPie = y0 + h + 2;
+      }
+      const pie = `Trabajo ${i + 1} · ${textoReferencia(t)} · ${FASE_TXT[x.fase] || x.fase} · ` +
+        `${x.origen === 'galeria' ? 'Galería' : 'Cámara'} · ${fmtFechaHora(x.fechaFoto)}`;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(doc.splitTextToSize(limpia(pie), anchoCelda), x0 + anchoCelda / 2, yPie, { baseline: 'top', align: 'center' });
+    }
+  }
 }
 
 /**
- * Genera el PDF del parte.
+ * Genera el PDF del parte. Si se pasa leerFoto(id) → Blob, añade el anexo fotográfico.
  * @returns {Promise<Blob>}
  */
-export async function generarPDF(parte, config, versionApp = '') {
+export async function generarPDF(parte, config, versionApp = '', leerFoto = null) {
   const J = window.jspdf && window.jspdf.jsPDF;
   if (!J) throw new Error('Falta el generador de PDF. Abre la app una vez con cobertura y vuelve a intentarlo.');
   const doc = new J({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
@@ -189,11 +248,12 @@ export async function generarPDF(parte, config, versionApp = '') {
     `${t.descripcion || ''}\n${contarFotos(t)}`,
   ]), { vacio: 'Sin trabajos' });
 
-  // Vehículos y maquinaria
-  const vs = parte.vehiculos.filter((v) => (v.descripcion || '').trim() || (v.matricula || '').trim());
-  seccion(c, 'VEHÍCULOS Y MAQUINARIA');
-  tabla(c, [{ t: 'Nº', w: 10, a: 'center' }, { t: 'VEHÍCULO / MÁQUINA', w: 181 }, { t: 'MATRÍCULA', w: AN - 191 }],
-    vs.map((v, i) => [String(i + 1), v.descripcion, v.matricula]), { vacio: 'Sin vehículos ni maquinaria' });
+  // Maquinaria y vehículos
+  const vs = parte.usaMaquinaria === false ? []
+    : parte.vehiculos.filter((v) => (v.descripcion || '').trim() || (v.matricula || '').trim());
+  seccion(c, 'MAQUINARIA Y VEHÍCULOS');
+  tabla(c, [{ t: 'Nº', w: 10, a: 'center' }, { t: 'MÁQUINA / VEHÍCULO', w: 181 }, { t: 'MATRÍCULA', w: AN - 191 }],
+    vs.map((v, i) => [String(i + 1), v.descripcion, v.matricula]), { vacio: 'No se ha usado maquinaria ni vehículos' });
 
   // Medidas antiincendios y observaciones
   seccion(c, 'MEDIDAS ANTIINCENDIOS');
@@ -202,6 +262,8 @@ export async function generarPDF(parte, config, versionApp = '') {
     seccion(c, 'OBSERVACIONES');
     fila(c, [{ w: AN, t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
   }
+
+  if (leerFoto) await anexoFotos(c, parte, leerFoto);
 
   // Pie en todas las páginas
   const n = doc.getNumberOfPages();

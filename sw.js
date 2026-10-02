@@ -1,7 +1,7 @@
 // Service worker: guarda la app en el móvil para que abra y funcione sin cobertura.
 // IMPORTANTE: al publicar cambios, sube VERSION; si no, los móviles seguirán con la copia antigua.
 
-const VERSION = 'v0.1.0';
+const VERSION = 'v0.2.0';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [

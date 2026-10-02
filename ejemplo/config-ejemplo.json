@@ -3,7 +3,7 @@
   "version": 1,
   "nombre": "Datos de ejemplo (inventados)",
   "fecha": "2026-10-02",
-  "destinatario": "partes@ejemplo.com",
+  "destinatario": "",
   "cabecera": {
     "jefatura": "LAV EJEMPLO",
     "ambito": "BASE EJEMPLO",

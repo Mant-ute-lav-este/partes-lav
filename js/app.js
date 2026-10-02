@@ -9,7 +9,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast,
 } from './util.js';
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -274,6 +274,7 @@ async function nuevoParte(tipo) {
     capataz: estado.perfil.capataz,
     personal: [capatazComoPersona()],
     trabajos: [],
+    usaMaquinaria: null,
     vehiculos: [],
     antiincendios: '',
     observaciones: '',
@@ -306,6 +307,7 @@ function refParte(p) {
 
 function vParte() {
   const p = estado.parte;
+  const um = p.usaMaquinaria === true ? 'si' : p.usaMaquinaria === false ? 'no' : '';
   return `
   ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
   <main class="contenido con-pie">
@@ -334,21 +336,24 @@ function vParte() {
     </section>
 
     <section class="tarjeta">
-      <h2>Trabajos <span class="contador">${p.trabajos.length}</span></h2>
-      ${p.trabajos.map(resumenTrabajo).join('')}
-      <button class="btn secundario" data-action="nuevo-trabajo">+ Añadir trabajo</button>
+      <h2>Maquinaria y vehículos <span class="oblig">obligatorio</span></h2>
+      <div class="campo"><span>¿Se ha usado maquinaria o vehículos?</span>
+        <div class="segmentado">${radio('usaMaquinaria', 'si', 'Sí', um, 'data-tipo="bool" data-rerender')}${radio('usaMaquinaria', 'no', 'No', um, 'data-tipo="bool" data-rerender')}</div></div>
+      ${p.usaMaquinaria ? `
+      ${p.vehiculos.map((v, i) => `
+      <div class="fila-vehiculo">
+        <input list="dl-vehiculos" placeholder="Máquina o vehículo" data-bind="vehiculos.${i}.descripcion" data-vehiculo="${i}" value="${esc(v.descripcion)}" autocomplete="off">
+        <input placeholder="Matrícula" data-bind="vehiculos.${i}.matricula" value="${esc(v.matricula)}" autocapitalize="characters" autocomplete="off">
+        <button class="btn-quitar" data-action="quitar-vehiculo" data-i="${i}" aria-label="Quitar máquina o vehículo">✕</button>
+      </div>`).join('')}
+      <datalist id="dl-vehiculos">${vehiculosCfg().map((v) => `<option value="${esc(v.descripcion)}">${esc(v.matricula || '')}</option>`).join('')}</datalist>
+      <button class="btn secundario" data-action="nuevo-vehiculo">+ Añadir otra máquina o vehículo</button>` : ''}
     </section>
 
     <section class="tarjeta">
-      <h2>Vehículos y maquinaria</h2>
-      ${p.vehiculos.map((v, i) => `
-      <div class="fila-vehiculo">
-        <input list="dl-vehiculos" placeholder="Vehículo o máquina" data-bind="vehiculos.${i}.descripcion" data-vehiculo="${i}" value="${esc(v.descripcion)}" autocomplete="off">
-        <input placeholder="Matrícula" data-bind="vehiculos.${i}.matricula" value="${esc(v.matricula)}" autocapitalize="characters" autocomplete="off">
-        <button class="btn-quitar" data-action="quitar-vehiculo" data-i="${i}" aria-label="Quitar vehículo">✕</button>
-      </div>`).join('')}
-      <datalist id="dl-vehiculos">${vehiculosCfg().map((v) => `<option value="${esc(v.descripcion)}">${esc(v.matricula || '')}</option>`).join('')}</datalist>
-      <button class="btn secundario" data-action="nuevo-vehiculo">+ Añadir vehículo o máquina</button>
+      <h2>Trabajos <span class="contador">${p.trabajos.length}</span></h2>
+      ${p.trabajos.map(resumenTrabajo).join('')}
+      <button class="btn secundario" data-action="nuevo-trabajo">+ Añadir trabajo</button>
     </section>
 
     <section class="tarjeta">
@@ -722,6 +727,10 @@ function validar(p) {
     if (!t.fotos.some((f) => f.fase === 'antes')) add(`${n} falta al menos una foto de ANTES.`, i);
     if (!t.fotos.some((f) => f.fase === 'despues')) add(`${n} falta al menos una foto de DESPUÉS.`, i);
   });
+  if (p.usaMaquinaria == null) add('Indica si se ha usado maquinaria o vehículos (Sí o No).');
+  else if (p.usaMaquinaria && !p.vehiculos.some((v) => !vacio(v.descripcion))) {
+    add('Has marcado que se ha usado maquinaria: indica cuál (o marca «No»).');
+  }
   if (vacio(p.antiincendios)) add('Rellena las medidas antiincendios.');
   return e;
 }
@@ -781,7 +790,7 @@ function vEnvio() {
       <ol class="pasos">
         <li>Pulsa <strong>Enviar por correo</strong>.</li>
         <li>Elige <strong>Gmail</strong>.</li>
-        <li>En «Para» escribe ${dest ? `<strong>${esc(dest)}</strong> (ya está copiada: mantén pulsado y pega)` : 'la dirección que te ha dado la oficina'}.</li>
+        <li>En «Para» escribe ${dest ? `<strong>${esc(dest)}</strong> (ya está copiada: mantén pulsado y pega)` : 'la dirección de correo de la oficina (en pruebas, tu propio correo de Rover)'}.</li>
         <li>Pulsa enviar ➤. Si no hay cobertura, Gmail lo mandará solo cuando vuelva.</li>
       </ol>
       ${e.error ? `<p class="error">${esc(e.error)}</p><button class="btn secundario" data-action="reintentar-envio">Reintentar</button>` : ''}
@@ -903,6 +912,9 @@ async function onChange(e) {
   }
   if (!el.matches('[data-bind]')) return;
   aplicarBind(el);
+  if (el.dataset.bind === 'usaMaquinaria' && estado.parte.usaMaquinaria && !estado.parte.vehiculos.length) {
+    estado.parte.vehiculos.push({ descripcion: '', matricula: '' });
+  }
   if (el.dataset.vehiculo != null) {
     const v = estado.parte.vehiculos[Number(el.dataset.vehiculo)];
     const m = vehiculosCfg().find((x) => x.descripcion === v.descripcion);

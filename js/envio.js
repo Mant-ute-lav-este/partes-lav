@@ -20,7 +20,7 @@ export function carpetaDestino(p) {
 export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   const base = nombreBase(parte);
   const sufijo = parte.rev > 1 ? `_v${parte.rev}` : '';
-  const pdf = await generarPDF(parte, config, versionApp);
+  const pdf = await generarPDF(parte, config, versionApp, leerFoto);
 
   const datos = structuredClone(parte);
   const fotos = [];
