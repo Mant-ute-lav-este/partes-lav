@@ -34,6 +34,24 @@ El repositorio es **público**: aquí solo hay código y datos inventados. Los n
 - `cabecera`: textos de la cabecera del PDF (jefatura, ámbito, empresa, líneas).
 - `capataces`, `trabajadores` (nombre, empresa, habilitación, categoría), `vehiculos` y `motivos`.
 
+## Servidor de envío (Google Apps Script)
+
+`servidor/Code.gs` vive en la cuenta de Gmail de la UTE. Hace tres cosas:
+
+- **Registra a los capataces:** Gmail, código por correo, nombre elegido de la lista y PIN. Cada registro queda **pendiente** hasta que la oficina lo aprueba desde el enlace que le llega por correo.
+- **Sirve a la app la lista de la oficina:** trabajadores, vehículos, motivos y cabecera del PDF.
+- **Recibe los partes y los manda por correo a la oficina** con el asunto «PARTE LAV …» y los 3 adjuntos de siempre. El flujo de Power Automate los guarda en la carpeta de Teams.
+
+En la app, cuando el capataz pulsa **Enviar**, el parte entra en una cola. Si no hay cobertura, sale solo en cuanto vuelve la señal (en Android, aunque la app esté cerrada). El servidor no repite un envío que ya recibió.
+
+Los datos están en la hoja «Partes LAV · Datos» de esa cuenta: usuarios, sesiones, envíos, trabajadores, vehículos, motivos y ajustes. **La lista de trabajadores se mantiene editando esa hoja.**
+
+Instalación (una vez):
+1. En script.google.com, con la cuenta de la UTE, crear un proyecto y pegar `Code.gs`.
+2. Ejecutar `configurar()` y dar permisos. El registro muestra la URL de la hoja y la clave de administración.
+3. *Implementar → Nueva implementación → Aplicación web*, con «Ejecutar como: yo» y «Quién tiene acceso: cualquier usuario». Copiar la URL en `SERVIDOR_URL` (`js/servidor.js`).
+4. Subir la lista con la acción `cargarLista` y la clave de administración.
+
 ## Publicar cambios
 
 La app se publica con GitHub Pages desde la rama `main`. **Al publicar cambios hay que subir `VERSION` en `sw.js`**; si no, los móviles seguirán usando la copia guardada.

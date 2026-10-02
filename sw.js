@@ -1,7 +1,10 @@
-// Service worker: guarda la app en el móvil para que abra y funcione sin cobertura.
+// Service worker (módulo): guarda la app para que funcione sin cobertura y envía los
+// partes pendientes en segundo plano cuando vuelve la señal (Background Sync, Android).
 // IMPORTANTE: al publicar cambios, sube VERSION; si no, los móviles seguirán con la copia antigua.
 
-const VERSION = 'v0.2.1';
+import { procesarSalida } from './js/salida.js';
+
+const VERSION = 'v0.3.0';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -13,6 +16,8 @@ const ARCHIVOS = [
   './js/envio.js',
   './js/fotos.js',
   './js/pdf.js',
+  './js/salida.js',
+  './js/servidor.js',
   './js/util.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -37,6 +42,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  const host = new URL(req.url).hostname;
+  if (host.endsWith('google.com') || host.endsWith('googleusercontent.com')) return;   // servidor: siempre a la red
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const hit = await cache.match(req, { ignoreSearch: true });
@@ -51,4 +58,14 @@ self.addEventListener('fetch', (e) => {
       throw err;
     }
   })());
+});
+
+self.addEventListener('sync', (e) => {
+  if (e.tag !== 'partes-salida') return;
+  e.waitUntil(procesarSalida().then(async (r) => {
+    const clientes = await self.clients.matchAll({ includeUncontrolled: true });
+    clientes.forEach((c) => c.postMessage({ tipo: 'salida', ...r }));
+    // Si quedan pendientes, el error hace que Chrome lo vuelva a intentar más tarde.
+    if (r.pendientes) throw new Error('Quedan partes pendientes de enviar');
+  }));
 });

@@ -1,15 +1,19 @@
 // Partes LAV: app del capataz. Todo se guarda en el móvil y funciona sin cobertura.
-// Al cerrar el parte se envía por correo (menú Compartir → Gmail).
+// El capataz se registra con su Gmail; al pulsar Enviar, el parte va al servidor
+// (servidor/Code.gs), que lo manda por correo a la oficina. Si no hay cobertura se queda
+// en cola y sale solo al volver la señal. Sin registro (datos de ejemplo) se envía con Gmail.
 
 import * as db from './db.js';
 import { procesarFoto } from './fotos.js';
 import { textoReferencia } from './pdf.js';
 import { prepararEnvio, compartir } from './envio.js';
+import { api, hayServidor } from './servidor.js';
+import { procesarSalida } from './salida.js';
 import {
-  esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast,
+  esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.2.1';
+const APP_VERSION = '0.3.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -17,7 +21,8 @@ const app = document.getElementById('app');
 const estado = {
   vista: 'cargando',
   config: null,          // lista de la oficina
-  perfil: null,          // { capataz, pin: { salt, hash, iter } }
+  perfil: null,          // { capataz, pin: { salt, hash, iter } } + con registro: { email, token, cuenta }
+  reg: {},               // datos del registro en curso: { email, codigo, nombres, nombre, filtro }
   otros: [],             // personas añadidas a mano, para no reescribirlas
   lista: [],             // partes (pantalla de inicio)
   parte: null,           // parte abierto
@@ -38,8 +43,14 @@ const urls = new Map();   // id de foto → URL para las miniaturas
 // ---------- Arranque y navegación ----------
 
 async function iniciar() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js', { type: 'module' }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data && e.data.tipo === 'salida') refrescarVista();
+    });
+  }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  window.addEventListener('online', () => { if (estado.perfil && estado.perfil.token && estado.vista !== 'pin') sincronizar(); });
   app.addEventListener('click', onClick);
   app.addEventListener('input', onInput);
   app.addEventListener('change', onChange);
@@ -52,9 +63,61 @@ async function iniciar() {
     app.innerHTML = `<p class="error">No se puede usar el almacenamiento del móvil: ${esc(e.message)}</p>`;
     return;
   }
+  if (estado.perfil) return ir('pin');
+  if (hayServidor()) return ir('bienvenida');
   if (!estado.config) return ir('setup-datos');
-  if (!estado.perfil) return ir('setup-capataz');
-  return ir('pin');
+  return ir('setup-capataz');
+}
+
+/** Tras desbloquear con el PIN: inicio y, si hay registro, sincroniza con el servidor. */
+async function entrarApp() {
+  await ir('inicio');
+  if (estado.perfil && estado.perfil.token) sincronizar();
+}
+
+/** Comprueba la cuenta, actualiza la lista de la oficina y envía lo que esté en cola. */
+async function sincronizar({ avisar = false } = {}) {
+  const perfil = estado.perfil;
+  if (!perfil || !perfil.token) return;
+  try {
+    const r = await api('estado', { token: perfil.token });
+    if (r.estado !== perfil.cuenta) {
+      perfil.cuenta = r.estado;
+      await db.kvSet('perfil', perfil);
+      if (r.estado === 'activo') toast('La oficina ha aprobado tu registro ✓', 4000);
+    }
+    await cargarConfigServidor();
+  } catch (e) {
+    if (avisar || !e.red) toast(e.message, 5000);
+    if (e.red) return;
+  }
+  const r = await procesarSalida();
+  if (r.enviados) toast(r.enviados === 1 ? 'Parte recibido en la oficina ✓' : `${r.enviados} partes recibidos en la oficina ✓`, 4000);
+  refrescarVista();
+}
+
+async function cargarConfigServidor() {
+  const r = await api('config', { token: estado.perfil.token });
+  estado.config = r.config;
+  await db.kvSet('config', r.config);
+}
+
+/** Vuelve a pintar inicio o envío con los datos guardados (p. ej. tras un envío en segundo plano). */
+async function refrescarVista() {
+  if (estado.vista === 'inicio') {
+    estado.lista = await db.listarPartes();
+    render();
+  } else if (estado.vista === 'envio' && estado.parte) {
+    const p = await db.getParte(estado.parte.id);
+    if (p) { estado.parte = p; render(); }
+  }
+}
+
+function registrarSync() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready
+    .then((reg) => (reg.sync ? reg.sync.register('partes-salida') : null))
+    .catch(() => {});
 }
 
 async function ir(vista) {
@@ -80,27 +143,189 @@ async function ir(vista) {
 
 function render() {
   const vistas = {
+    bienvenida: vBienvenida, 'reg-email': vRegEmail, 'reg-codigo': vRegCodigo, 'reg-nombre': vRegNombre,
+    'reg-pin': vRegPin, login: vLogin,
     'setup-datos': vSetupDatos, 'setup-capataz': vSetupCapataz, 'setup-pin': vSetupPin, pin: vPin,
     inicio: vInicio, parte: vParte, trabajo: vTrabajo, envio: vEnvio,
   };
   const y = window.scrollY;
-  app.innerHTML = (vistas[estado.vista] || (() => '<p class="cargando">Cargando…</p>'))();
+  app.innerHTML = (vistas[estado.vista] || (() => '<p class="cargando">Cargando…</p>'))() +
+    (estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : '');
   window.scrollTo(0, y);
   document.body.classList.toggle('sin-scroll',
     Boolean(estado.menu || estado.fotoVista || estado.errores.length || estado.procesando));
   pintarResultados();
+  pintarNombres();
   cargarMiniaturas();
   const auto = app.querySelector('[data-autofocus]');
   if (auto) auto.focus();
 }
 
-// ---------- Pantallas de configuración y PIN ----------
+// ---------- Registro con Gmail ----------
 
-const inputConfig = '<input type="file" id="in-config" accept=".json,application/json,text/plain" hidden>';
+function barraSimple(titulo, volver) {
+  return `
+  <header class="barra">
+    ${volver ? `<button class="btn-volver" data-action="ir" data-vista="${volver}">‹ Atrás</button>` : ''}
+    <div class="barra-titulo">${titulo}</div>
+  </header>`;
+}
+
+function vBienvenida() {
+  return `
+  ${barraSimple('Partes LAV')}
+  <main class="contenido">
+    <section class="tarjeta">
+      <h2>Bienvenido</h2>
+      <p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p>
+      <button class="btn primario grande" data-action="ir" data-vista="reg-email">Registrarme</button>
+      <button class="btn secundario" data-action="ir" data-vista="login">Ya tengo cuenta</button>
+    </section>
+    <button class="btn enlace" data-action="ir" data-vista="setup-datos">Probar con datos de ejemplo, sin registrarme</button>
+  </main>`;
+}
+
+function vRegEmail() {
+  return `
+  ${barraSimple('Registro · 1 de 4', 'bienvenida')}
+  <main class="contenido">
+    <section class="tarjeta">
+      <h2>Tu correo de Gmail</h2>
+      <p>Te mandaremos un código para comprobar que el correo es tuyo.</p>
+      <form data-form="reg-email">
+        <label class="campo"><span>Correo</span>
+          <input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" required value="${esc(estado.reg.email || '')}" data-autofocus></label>
+        <button class="btn primario grande">Enviarme el código</button>
+      </form>
+    </section>
+  </main>`;
+}
+
+function vRegCodigo() {
+  return `
+  ${barraSimple('Registro · 2 de 4', 'reg-email')}
+  <main class="contenido">
+    <section class="tarjeta">
+      <h2>Escribe el código</h2>
+      <p>Te hemos enviado un código de 6 cifras a <strong>${esc(estado.reg.email)}</strong>.
+        Si no lo ves, mira en «Spam» o en «Promociones».</p>
+      <form data-form="reg-codigo">
+        <label class="campo"><span>Código</span>
+          <input name="codigo" class="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required data-autofocus></label>
+        <button class="btn primario grande">Comprobar</button>
+      </form>
+      <button class="btn enlace" data-action="reenviar-codigo">No me ha llegado: enviar otro</button>
+    </section>
+  </main>`;
+}
+
+function vRegNombre() {
+  return `
+  ${barraSimple('Registro · 3 de 4', 'reg-codigo')}
+  <main class="contenido">
+    <section class="tarjeta">
+      <h2>¿Quién eres?</h2>
+      <label class="campo"><span>Busca tu nombre en la lista</span>
+        <input type="search" id="buscar-nombre" placeholder="Escribe tu nombre o apellido" autocomplete="off" value="${esc(estado.reg.filtro || '')}"></label>
+      <div id="lista-nombres" class="resultados"></div>
+      <p class="nota">Si no sales en la lista, habla con la oficina para que te añadan.</p>
+    </section>
+  </main>`;
+}
+
+function pintarNombres() {
+  const cont = document.getElementById('lista-nombres');
+  if (!cont) return;
+  const q = normaliza(estado.reg.filtro);
+  const nombres = (estado.reg.nombres || []).filter((n) => !q || normaliza(n).includes(q));
+  cont.innerHTML = nombres.length
+    ? nombres.map((n) => `<button class="resultado" data-action="elegir-nombre" data-nombre="${esc(n)}"><strong>${esc(n)}</strong></button>`).join('')
+    : '<p class="vacio">No hay nadie con ese nombre.</p>';
+}
+
+function vRegPin() {
+  return `
+  ${barraSimple('Registro · 4 de 4', 'reg-nombre')}
+  <main class="contenido">
+    <section class="tarjeta">
+      <h2>${esc(estado.reg.nombre)}</h2>
+      <p>Crea tu PIN de 4 a 6 cifras. Es tu contraseña: te lo pedirá la app al abrirla y
+        para entrar desde otro móvil.</p>
+      <form data-form="reg-pin">
+        <label class="campo"><span>PIN</span>
+          <input name="pin1" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" required data-autofocus></label>
+        <label class="campo"><span>Repite el PIN</span>
+          <input name="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" required></label>
+        <button class="btn primario grande">Terminar el registro</button>
+      </form>
+    </section>
+  </main>`;
+}
+
+function vLogin() {
+  return `
+  ${barraSimple('Entrar', 'bienvenida')}
+  <main class="contenido">
+    <section class="tarjeta">
+      <h2>Ya tengo cuenta</h2>
+      <form data-form="login">
+        <label class="campo"><span>Correo de Gmail</span>
+          <input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" required data-autofocus></label>
+        <label class="campo"><span>PIN</span>
+          <input name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" required></label>
+        <button class="btn primario grande">Entrar</button>
+      </form>
+      <p class="nota">Si no recuerdas el PIN, habla con la oficina.</p>
+    </section>
+  </main>`;
+}
+
+/** Ejecuta una llamada al servidor mostrando «procesando»; si falla, avisa y devuelve null. */
+async function conEspera(texto, fn) {
+  estado.procesando = texto;
+  render();
+  try {
+    return await fn();
+  } catch (e) {
+    toast(e.message, 5000);
+    return null;
+  } finally {
+    estado.procesando = '';
+    render();
+  }
+}
+
+async function guardarPerfilServidor({ email, nombre, token, cuenta }, pin) {
+  const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+  estado.perfil = { email, capataz: nombre, token, cuenta, pin: { salt, hash: await hashPin(pin, salt, ITER_PIN), iter: ITER_PIN } };
+  await db.kvSet('perfil', estado.perfil);
+  await db.kvSet('fallos', null);
+}
+
+async function terminarAcceso(r, email, pin) {
+  await guardarPerfilServidor({ email, nombre: r.nombre, token: r.token, cuenta: r.estado }, pin);
+  estado.reg = {};
+  const cfg = await conEspera('Descargando la lista de la oficina…', () => cargarConfigServidor().then(() => true));
+  if (!cfg && !estado.config) toast('No se ha podido descargar la lista. Se intentará al volver a abrir la app.', 5000);
+  await ir('inicio');
+  if (r.estado !== 'activo') toast('Registro hecho. Falta que la oficina lo apruebe.', 5000);
+  sincronizar();
+}
+
+async function cerrarSesion() {
+  estado.perfil = null;
+  await db.kvSet('perfil', null);
+  await db.kvSet('fallos', null);
+  ir(hayServidor() ? 'bienvenida' : 'setup-capataz');
+}
+
+// ---------- Pantallas de configuración y PIN (sin registro / datos de ejemplo) ----------
+
+const inputConfig ='<input type="file" id="in-config" accept=".json,application/json,text/plain" hidden>';
 
 function vSetupDatos() {
   return `
-  <header class="barra"><div class="barra-titulo">Partes LAV</div></header>
+  ${barraSimple('Partes LAV', hayServidor() ? 'bienvenida' : null)}
   <main class="contenido">
     <section class="tarjeta">
       <h2>Bienvenido</h2>
@@ -193,10 +418,16 @@ async function guardarConfig(cfg) {
 
 // ---------- Inicio ----------
 
+function ultimoEnvio(p) {
+  const x = (p.envios || [])[(p.envios || []).length - 1];
+  return typeof x === 'string' ? x : (x && (x.recibido || x.fecha)) || '';
+}
+
 function estadoTexto(p) {
   if (p.estado === 'borrador') return 'Borrador';
   if (p.estado === 'cerrado') return 'Pendiente de enviar';
-  return `Enviado ${fmtFechaHora(p.envios[p.envios.length - 1])}`;
+  if (p.estado === 'en-cola') return p.errorEnvio ? 'No se ha podido enviar: ábrelo' : 'En cola: se enviará solo';
+  return p.recibido ? `Recibido en la oficina ${fmtFechaHora(p.recibido)}` : `Enviado ${fmtFechaHora(ultimoEnvio(p))}`;
 }
 
 function itemParte(p) {
@@ -222,11 +453,18 @@ function vInicio() {
     <button class="btn-icono" data-action="menu" aria-label="Menú">⋮</button>
   </header>
   <main class="contenido">
+    ${estado.perfil.token && estado.perfil.cuenta === 'pendiente' ? `
+    <div class="aviso">Tu registro está pendiente de que lo apruebe la oficina. Puedes ir haciendo partes:
+      se enviarán solos en cuanto te aprueben.
+      <button class="btn secundario" data-action="comprobar-cuenta">Comprobar ahora</button></div>` : ''}
+    ${!estado.perfil.token && hayServidor() ? `
+    <div class="aviso">Regístrate con tu Gmail para que los partes se envíen solos al pulsar «Enviar».
+      <button class="btn secundario" data-action="ir" data-vista="bienvenida">Registrarme</button></div>` : ''}
     <div class="tipos">
       <button class="btn-tipo infra" data-action="nuevo" data-tipo="INFRA"><span class="tipo-grande">INFRA</span><span>Infraestructura</span></button>
       <button class="btn-tipo super" data-action="nuevo" data-tipo="SUPER"><span class="tipo-grande">SUPER</span><span>Superestructura</span></button>
     </div>
-    ${grupo('Pendientes de enviar', ps.filter((p) => p.estado === 'cerrado'))}
+    ${grupo('Pendientes de enviar', ps.filter((p) => p.estado === 'cerrado' || p.estado === 'en-cola'))}
     ${grupo('Borradores', ps.filter((p) => p.estado === 'borrador'))}
     ${grupo('Enviados', ps.filter((p) => p.estado === 'enviado').slice(0, 30))}
     ${ps.length ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA o SUPER para empezar.</p>'}
@@ -236,15 +474,20 @@ function vInicio() {
 
 function vMenu() {
   const c = estado.config || {};
+  const srv = Boolean(estado.perfil && estado.perfil.token);
   return `
   <div class="capa" data-action="cerrar-menu"><div class="hoja" data-stop>
     <h2>Menú</h2>
-    <button class="btn secundario" data-action="elegir-config">Cargar lista de la oficina</button>
-    ${inputConfig}
-    <button class="btn secundario" data-action="cambiar-capataz">Cambiar de capataz</button>
+    ${srv
+    ? '<button class="btn secundario" data-action="actualizar-lista">Actualizar la lista de la oficina</button>'
+    : `<button class="btn secundario" data-action="elegir-config">Cargar lista de la oficina</button>${inputConfig}
+       ${hayServidor() ? '<button class="btn secundario" data-action="ir" data-vista="bienvenida">Registrarme con mi Gmail</button>' : ''}
+       <button class="btn secundario" data-action="cambiar-capataz">Cambiar de capataz</button>`}
     <button class="btn secundario" data-action="cambiar-pin">Cambiar PIN</button>
     <button class="btn secundario" data-action="bloquear">Bloquear la app</button>
-    <p class="nota">Lista de la oficina: ${esc(c.nombre || 'sin nombre')}${c.fecha ? ` (${esc(c.fecha)})` : ''} ·
+    ${srv ? '<button class="btn secundario" data-action="cerrar-sesion">Cerrar sesión en este móvil</button>' : ''}
+    <p class="nota">${srv ? `Cuenta: ${esc(estado.perfil.email)}${estado.perfil.cuenta === 'pendiente' ? ' (pendiente de aprobar)' : ''}<br>` : ''}
+      Lista de la oficina: ${esc(c.nombre || 'sin nombre')}${c.fecha ? ` (${esc(c.fecha)})` : ''} ·
       ${(c.trabajadores || []).length} trabajadores<br>Versión de la app: ${APP_VERSION}</p>
     <button class="btn" data-action="cerrar-menu">Cerrar</button>
   </div></div>`;
@@ -617,8 +860,7 @@ function vTrabajo() {
   <footer class="pie"><button class="btn primario grande" data-action="volver-parte">Listo</button></footer>
   <input type="file" id="in-camara" accept="image/*" capture="environment" hidden>
   <input type="file" id="in-galeria" accept="image/*" multiple hidden>
-  ${estado.fotoVista ? vFotoGrande() : ''}
-  ${estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : ''}`;
+  ${estado.fotoVista ? vFotoGrande() : ''}`;
 }
 
 function vFotoGrande() {
@@ -773,6 +1015,108 @@ async function borrarTrabajo() {
 // ---------- Envío ----------
 
 function vEnvio() {
+  if (estado.perfil && estado.perfil.token) return vEnvioServidor();
+  return vEnvioGmail();
+}
+
+function resumenEnvio(p) {
+  const envios = (p.envios || []).map((x) => (typeof x === 'string' ? fmtFechaHora(x) : fmtFechaHora(x.recibido || x.fecha)));
+  return `
+      <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${p.trabajos.length} trabajo(s) · ${p.personal.length} persona(s)</p>
+      <p><small>Cerrado en el móvil: ${fmtFechaHora(p.cierre)}${envios.length ? `<br>Envíos: ${envios.join(', ')}` : ''}</small></p>`;
+}
+
+function seccionCorregir() {
+  return `
+    <section class="tarjeta">
+      <h2>¿Hay algo mal?</h2>
+      <p class="nota">Puedes corregirlo: se crea una copia para editar y, al enviarla, la oficina guarda las dos versiones.</p>
+      <button class="btn secundario" data-action="corregir">Corregir el parte</button>
+    </section>`;
+}
+
+function vEnvioServidor() {
+  const p = estado.parte;
+  const e = estado.envio || {};
+  let tarjeta;
+  if (p.estado === 'enviado') {
+    tarjeta = `
+    <section class="tarjeta ok">
+      <h2>Recibido en la oficina ✓</h2>
+      <p><strong>${fmtFechaHora(p.recibido || ultimoEnvio(p))}</strong></p>
+      ${resumenEnvio(p)}
+    </section>`;
+  } else if (p.estado === 'en-cola') {
+    tarjeta = `
+    <section class="tarjeta pendiente">
+      <h2>${p.errorEnvio ? 'No se ha podido enviar' : 'Enviando…'}</h2>
+      <p>${p.errorEnvio ? esc(p.errorEnvio) : 'Si no hay cobertura, se enviará solo en cuanto vuelva, aunque cierres la app.'}</p>
+      ${resumenEnvio(p)}
+      <button class="btn primario" data-action="reintentar-salida">Intentarlo ahora</button>
+    </section>`;
+  } else {
+    tarjeta = `
+    <section class="tarjeta pendiente">
+      <h2>Cerrado · falta enviarlo</h2>
+      ${resumenEnvio(p)}
+      ${e.error ? `<p class="error">${esc(e.error)}</p><button class="btn secundario" data-action="reintentar-envio">Reintentar</button>` : ''}
+      <button class="btn primario grande" data-action="enviar" ${e.listo ? '' : 'disabled'}>${e.listo ? 'Enviar a la oficina' : (e.error ? 'No se ha podido preparar' : 'Preparando…')}</button>
+    </section>`;
+  }
+  return `
+  ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
+  <main class="contenido">
+    ${tarjeta}
+    <section class="tarjeta">
+      <button class="btn secundario" data-action="ver-pdf" ${e.listo ? '' : 'disabled'}>Ver el PDF</button>
+      ${p.estado !== 'enviado' ? `<button class="btn enlace" data-action="enviar-gmail" ${e.listo ? '' : 'disabled'}>¿No funciona el envío? Mandarlo por Gmail</button>` : ''}
+    </section>
+    ${seccionCorregir()}
+  </main>`;
+}
+
+async function enviarServidor() {
+  const p = estado.parte;
+  const e = estado.envio;
+  if (!e || !e.listo) return;
+  const archivos = [];
+  for (const f of e.archivos) {
+    if (f.type === 'application/pdf') archivos.push({ nombre: f.name, tipo: f.type, base64: await blobABase64(f) });
+    else archivos.push({ nombre: f.name, tipo: 'text/plain', texto: await f.text() });
+  }
+  await db.putSalida({ id: uuid(), parteId: p.id, creado: isoLocal(), datos: { ref: p.ref, asunto: e.asunto, cuerpo: e.cuerpo, archivos } });
+  p.estado = 'en-cola';
+  delete p.errorEnvio;
+  await guardarYa();
+  render();
+  registrarSync();
+  await procesarYMostrar(p.id);
+}
+
+/** Procesa la cola y avisa de cómo ha ido con el parte abierto. */
+async function procesarYMostrar(parteId) {
+  await procesarSalida();
+  const p = await db.getParte(parteId);
+  if (p && estado.parte && estado.parte.id === parteId) {
+    estado.parte = p;
+    render();
+    if (p.estado === 'enviado') toast('Recibido en la oficina ✓', 4000);
+    else if (p.errorEnvio) toast(`No se ha podido enviar: ${p.errorEnvio}`, 6000);
+    else toast('Sin cobertura: se enviará solo en cuanto vuelva.', 5000);
+  }
+}
+
+/** Envío alternativo con Gmail. Si estaba en la cola automática, lo quita para no mandarlo dos veces. */
+async function enviarPorGmail() {
+  const p = estado.parte;
+  const cola = (await db.listarSalida()).filter((x) => x.parteId === p.id);
+  if (cola.length && !confirm('Se quitará de la cola de envío automático y lo mandarás tú con Gmail. ¿Seguir?')) return;
+  for (const x of cola) await db.borrarSalida(x.id);
+  if (cola.length) { p.estado = 'cerrado'; delete p.errorEnvio; await guardarYa(); }
+  await enviar();
+}
+
+function vEnvioGmail() {
   const p = estado.parte;
   const e = estado.envio || {};
   const dest = (estado.config && estado.config.destinatario) || '';
@@ -782,8 +1126,7 @@ function vEnvio() {
   <main class="contenido">
     <section class="tarjeta ${enviado ? 'ok' : 'pendiente'}">
       <h2>${enviado ? 'Enviado ✓' : 'Cerrado · falta enviarlo'}</h2>
-      <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${p.trabajos.length} trabajo(s) · ${p.personal.length} persona(s)</p>
-      <p><small>Cerrado en el móvil: ${fmtFechaHora(p.cierre)}${p.envios.length ? `<br>Enviado: ${p.envios.map(fmtFechaHora).join(', ')}` : ''}</small></p>
+      ${resumenEnvio(p)}
     </section>
 
     <section class="tarjeta">
@@ -798,12 +1141,7 @@ function vEnvio() {
       <button class="btn primario grande" data-action="enviar" ${e.listo ? '' : 'disabled'}>${e.listo ? 'Enviar por correo' : (e.error ? 'No se ha podido preparar' : 'Preparando…')}</button>
       <button class="btn secundario" data-action="ver-pdf" ${e.listo ? '' : 'disabled'}>Ver el PDF</button>
     </section>
-
-    <section class="tarjeta">
-      <h2>¿Hay algo mal?</h2>
-      <p class="nota">Puedes corregirlo: se crea una copia para editar y, al enviarla, la oficina guarda las dos versiones.</p>
-      <button class="btn secundario" data-action="corregir">Corregir el parte</button>
-    </section>
+    ${seccionCorregir()}
   </main>`;
 }
 
@@ -835,7 +1173,7 @@ async function enviar() {
   try {
     const modo = await compartir(e);
     if (modo === 'compartido') {
-      p.envios.push(isoLocal());
+      p.envios = (p.envios || []).concat([isoLocal()]);
       p.estado = 'enviado';
       await guardarYa();
       render();
@@ -857,6 +1195,8 @@ async function corregir() {
     id: uuid(), rev: p.rev + 1, rectificaA: { id: p.id, rev: p.rev, cierre: p.cierre },
     estado: 'borrador', cierre: null, envios: [], creado: isoLocal(),
   });
+  delete nuevo.recibido;
+  delete nuevo.errorEnvio;
   for (const t of nuevo.trabajos) {
     for (const f of t.fotos) {
       const reg = await db.getFoto(f.id);
@@ -892,6 +1232,11 @@ function onInput(e) {
   if (el.id === 'buscar-persona') {
     estado.busqueda = el.value;
     pintarResultados();
+    return;
+  }
+  if (el.id === 'buscar-nombre') {
+    estado.reg.filtro = el.value;
+    pintarNombres();
     return;
   }
   if (el.matches('[data-bind]') && el.type !== 'radio' && el.type !== 'checkbox') aplicarBind(el);
@@ -940,13 +1285,43 @@ async function onSubmit(e) {
     if (pin1 !== pin2) return toast('Los dos PIN no coinciden');
     const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
     const hash = await hashPin(pin1, salt, ITER_PIN);
-    const capataz = estado.cambiandoPin ? estado.perfil.capataz : estado.setupCapataz;
-    estado.perfil = { capataz, pin: { salt, hash, iter: ITER_PIN } };
+    const nuevoPin = { salt, hash, iter: ITER_PIN };
+    if (estado.cambiandoPin) {
+      if (estado.perfil.token) {
+        // Con registro, el PIN también es la contraseña del servidor: se cambia en los dos sitios.
+        const ok = await conEspera('Guardando el PIN…', () => api('pin', { token: estado.perfil.token, pin: pin1 }));
+        if (!ok) return toast('No se ha podido cambiar el PIN: hace falta cobertura.', 5000);
+      }
+      estado.perfil = { ...estado.perfil, pin: nuevoPin };
+    } else {
+      estado.perfil = { capataz: estado.setupCapataz, pin: nuevoPin };
+    }
     await db.kvSet('perfil', estado.perfil);
     await db.kvSet('fallos', null);
     estado.cambiandoPin = false;
     toast('PIN guardado');
     ir('inicio');
+  } else if (tipo === 'reg-email') {
+    const email = f.email.value.trim().toLowerCase();
+    const ok = await conEspera('Enviando el código…', () => api('codigo', { email }));
+    if (ok) { estado.reg = { email }; ir('reg-codigo'); }
+  } else if (tipo === 'reg-codigo') {
+    const codigo = f.codigo.value.trim();
+    const r = await conEspera('Comprobando…', () => api('verificar', { email: estado.reg.email, codigo }));
+    if (r) { Object.assign(estado.reg, { codigo, nombres: r.nombres, filtro: '' }); ir('reg-nombre'); }
+  } else if (tipo === 'reg-pin') {
+    const pin1 = f.pin1.value.trim();
+    const pin2 = f.pin2.value.trim();
+    if (!/^\d{4,6}$/.test(pin1)) return toast('El PIN tiene que tener de 4 a 6 cifras');
+    if (pin1 !== pin2) return toast('Los dos PIN no coinciden');
+    const { email, codigo, nombre } = estado.reg;
+    const r = await conEspera('Registrando…', () => api('registro', { email, codigo, nombre, pin: pin1 }));
+    if (r) await terminarAcceso(r, email, pin1);
+  } else if (tipo === 'login') {
+    const email = f.email.value.trim().toLowerCase();
+    const pin = f.pin.value.trim();
+    const r = await conEspera('Entrando…', () => api('login', { email, pin }));
+    if (r) await terminarAcceso(r, email, pin);
   } else if (tipo === 'pin') {
     const fallos = (await db.kvGet('fallos')) || { n: 0, hasta: 0 };
     if (Date.now() < fallos.hasta) {
@@ -955,7 +1330,7 @@ async function onSubmit(e) {
     const { salt, hash, iter } = estado.perfil.pin;
     if ((await hashPin(f.pin.value.trim(), salt, iter)) === hash) {
       await db.kvSet('fallos', null);
-      return ir('inicio');
+      return entrarApp();
     }
     fallos.n += 1;
     if (fallos.n >= 5) fallos.hasta = Date.now() + 60000 * (fallos.n - 4);
@@ -980,11 +1355,33 @@ async function onClick(e) {
       break;
     case 'elegir-capataz': estado.setupCapataz = el.dataset.nombre; ir('setup-pin'); break;
     case 'olvido-pin':
-      if (confirm('Vas a crear un PIN nuevo. Tus partes no se borran. ¿Seguir?')) {
+      if (estado.perfil.token) {
+        if (confirm('Para recuperar el acceso, la oficina tiene que borrar tu registro y vuelves a registrarte. '
+          + 'Los partes de este móvil no se borran. ¿Cerrar la sesión ahora?')) cerrarSesion();
+      } else if (confirm('Vas a crear un PIN nuevo. Tus partes no se borran. ¿Seguir?')) {
         estado.setupCapataz = estado.perfil.capataz;
         ir('setup-pin');
       }
       break;
+    case 'ir': ir(el.dataset.vista); break;
+    case 'reenviar-codigo': {
+      const ok = await conEspera('Enviando otro código…', () => api('codigo', { email: estado.reg.email }));
+      if (ok) toast('Te hemos enviado otro código', 3500);
+      break;
+    }
+    case 'elegir-nombre': estado.reg.nombre = el.dataset.nombre; ir('reg-pin'); break;
+    case 'comprobar-cuenta': await conEspera('Comprobando…', () => sincronizar({ avisar: true })); break;
+    case 'actualizar-lista': {
+      estado.menu = false;
+      const ok = await conEspera('Descargando la lista…', () => cargarConfigServidor().then(() => true));
+      if (ok) toast(`Lista actualizada: ${estado.config.trabajadores.length} trabajadores`);
+      break;
+    }
+    case 'cerrar-sesion':
+      if (confirm('Se cerrará la sesión en este móvil. Los partes no se borran. ¿Seguir?')) cerrarSesion();
+      break;
+    case 'reintentar-salida': registrarSync(); await procesarYMostrar(p.id); break;
+    case 'enviar-gmail': enviarPorGmail(); break;
     case 'menu': estado.menu = true; render(); break;
     case 'cerrar-menu': estado.menu = false; render(); break;
     case 'cambiar-pin': estado.cambiandoPin = true; ir('setup-pin'); break;
@@ -1037,7 +1434,7 @@ async function onClick(e) {
     case 'cerrar-parte': cerrarParte(); break;
     case 'cerrar-errores': estado.errores = []; render(); break;
     case 'reintentar-envio': prepararEnvioActual(); break;
-    case 'enviar': enviar(); break;
+    case 'enviar': if (estado.perfil.token) enviarServidor(); else enviar(); break;
     case 'ver-pdf': {
       const url = URL.createObjectURL(estado.envio.pdf);
       window.open(url, '_blank');

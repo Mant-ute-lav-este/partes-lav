@@ -261,7 +261,9 @@ function usuarioDeSesion_(token, exigirActivo) {
 // ---------- Lista de la oficina ----------
 
 function config_(d) {
-  usuarioDeSesion_(d.token, true);
+  // También para registros pendientes: pueden ir haciendo partes, que se enviarán al aprobarlos.
+  const u = usuarioDeSesion_(d.token, false);
+  if (u.Estado === 'rechazado') throw new Error('Tu cuenta no está activa. Habla con la oficina.');
   const aj = ajustes_();
   const motivos = { infra: [], super: [] };
   tabla_('Motivos').filas.forEach((m) => {

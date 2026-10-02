@@ -2,7 +2,7 @@
 // Nada sale del móvil hasta que el capataz envía el parte.
 
 const NOMBRE = 'partes-lav';
-const VERSION = 1;
+const VERSION = 2;   // 2: cola de salida
 let dbp = null;
 
 function abrir() {
@@ -16,6 +16,7 @@ function abrir() {
         if (!d.objectStoreNames.contains('fotos')) {
           d.createObjectStore('fotos', { keyPath: 'id' }).createIndex('parteId', 'parteId');
         }
+        if (!d.objectStoreNames.contains('salida')) d.createObjectStore('salida', { keyPath: 'id' });
       };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
@@ -49,3 +50,7 @@ export const getFoto = (id) => tx('fotos', 'readonly', (s) => s.get(id));
 export const putFoto = (f) => tx('fotos', 'readwrite', (s) => s.put(f));
 export const borrarFoto = (id) => tx('fotos', 'readwrite', (s) => s.delete(id));
 export const fotosDeParte = (parteId) => tx('fotos', 'readonly', (s) => s.index('parteId').getAll(parteId));
+
+export const putSalida = (it) => tx('salida', 'readwrite', (s) => s.put(it));
+export const listarSalida = () => tx('salida', 'readonly', (s) => s.getAll());
+export const borrarSalida = (id) => tx('salida', 'readwrite', (s) => s.delete(id));
