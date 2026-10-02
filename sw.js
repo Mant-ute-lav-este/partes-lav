@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.3.1';
+const VERSION = 'v0.4.0';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -119,11 +119,9 @@ async function procesarSalida() {
   for (const it of items.sort((a, b) => (a.creado || '').localeCompare(b.creado || ''))) {
     let j;
     try {
-      const r = await fetch(url, {
-        method: 'POST', redirect: 'follow',
-        body: JSON.stringify({ accion: 'enviar', token: perfil.token, envioId: it.id, ...it.datos }),
-      });
-      j = await r.json();
+      j = await llamar(url, JSON.stringify({
+        accion: 'enviar', peticion: crypto.randomUUID(), token: perfil.token, envioId: it.id, ...it.datos,
+      }));
     } catch {
       break;   // sin cobertura: se reintenta más tarde
     }
@@ -150,4 +148,18 @@ async function procesarSalida() {
   }
   const quedan = (await op('salida', 'readonly', (s) => s.getAll())) || [];
   return { enviados, pendientes: quedan.length };
+}
+
+// Google a veces pierde la respuesta aunque el parte haya llegado: se repite con el mismo
+// identificador de petición y el servidor contesta lo mismo sin mandarlo otra vez.
+async function llamar(url, cuerpo) {
+  for (let i = 0; i < 3; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 2000 * i));
+    try {
+      const r = await fetch(url, { method: 'POST', redirect: 'follow', body: cuerpo });
+      const j = await r.json();
+      if (!j.reintentar) return j;
+    } catch { /* sin cobertura o respuesta perdida */ }
+  }
+  throw new Error('Sin respuesta del servidor');
 }

@@ -4,11 +4,12 @@ App web instalable (PWA) para que los capataces de mantenimiento LAV hagan el pa
 
 ## Cómo funciona
 
-1. El capataz entra con su PIN y pulsa **INFRA** o **SUPER**.
-2. Rellena la jornada, el personal, la maquinaria y los vehículos (hay que contestar Sí o No), los trabajos (con fotos de antes y después) y las medidas antiincendios. Todo se guarda en el móvil según escribe.
-3. Al **cerrar** el parte se registra la hora de cierre del móvil y se genera el PDF A4.
-4. **Enviar por correo** abre el menú Compartir de Android: el capataz elige Gmail y lo manda a la dirección de la oficina. Sin cobertura, Gmail lo envía cuando vuelve la señal.
-5. En la oficina, un flujo de Power Automate guarda los adjuntos en la carpeta del equipo de Teams «Partes LAV Este»: `General/Partes/AAAA-MM-DD/Infra|Super/REF_Capataz/`.
+1. La primera vez, el capataz **se registra**: su Gmail, un código que le llega a ese correo, su nombre elegido de la lista de la oficina y un PIN. La oficina aprueba el registro desde un enlace que le llega por correo. Si olvida el PIN, crea otro con un código al correo.
+2. Entra con su PIN y pulsa **INFRA** o **SUPER**. La lista de trabajadores ya viene cargada y se actualiza sola.
+3. Rellena la jornada, el personal, la maquinaria y los vehículos (hay que contestar Sí o No), los trabajos (con fotos de antes y después) y las medidas antiincendios. Todo se guarda en el móvil según escribe.
+4. Al **cerrar** el parte se registra la hora de cierre del móvil y se genera el PDF A4.
+5. **Enviar a la oficina** lo manda al servidor, que lo reenvía por correo a la oficina. Sin cobertura, se queda en cola y sale solo cuando vuelve la señal. Si el servidor fallara, queda el botón «Mandarlo por Gmail».
+6. En la oficina, un flujo de Power Automate guarda los adjuntos en la carpeta del equipo de Teams «Partes LAV Este»: `General/Partes/AAAA-MM-DD/Infra|Super/REF_Capataz/`.
 
 ### Adjuntos del correo
 
@@ -28,7 +29,7 @@ Siempre son 3 archivos porque Android puede fallar al compartir muchos de golpe.
 
 ## Lista de la oficina (no va en este repositorio)
 
-El repositorio es **público**: aquí solo hay código y datos inventados. Los nombres reales van en un archivo JSON que la oficina pasa a cada capataz y que este carga desde la app con «Cargar archivo de la oficina». Su formato es el de [`ejemplo/config-ejemplo.json`](ejemplo/config-ejemplo.json):
+El repositorio es **público**: aquí solo hay código y datos inventados. Los nombres reales están en la hoja del servidor (ver más abajo) y la app los descarga al entrar. Para subir una lista completa de golpe se usa un JSON con el formato de [`ejemplo/config-ejemplo.json`](ejemplo/config-ejemplo.json):
 
 - `destinatario`: correo al que se envían los partes.
 - `cabecera`: textos de la cabecera del PDF (jefatura, ámbito, empresa, líneas).
@@ -44,6 +45,10 @@ El repositorio es **público**: aquí solo hay código y datos inventados. Los n
 
 En la app, cuando el capataz pulsa **Enviar**, el parte entra en una cola. Si no hay cobertura, sale solo en cuanto vuelve la señal (en Android, aunque la app esté cerrada). El servidor no repite un envío que ya recibió.
 
+Google a veces pierde la respuesta de una petición aunque la haya hecho (la app recibe una página de error). Por eso cada petición lleva un identificador: la app la repite sola con el mismo identificador y el servidor devuelve la respuesta que guardó, sin mandar otra vez el código, registrar dos veces ni enviar el parte repetido.
+
+Sin servidor configurado (`SERVIDOR_URL` vacío, para copias de prueba), la app funciona como al principio: la lista se carga desde un archivo y el parte se manda con Gmail.
+
 Los datos están en la hoja «Partes LAV · Datos» de esa cuenta: usuarios, sesiones, envíos, trabajadores, vehículos, motivos y ajustes. **La lista de trabajadores se mantiene editando esa hoja.**
 
 Instalación (una vez):
@@ -51,6 +56,8 @@ Instalación (una vez):
 2. Ejecutar `configurar()` y dar permisos. El registro muestra la URL de la hoja y la clave de administración.
 3. *Implementar → Nueva implementación → Aplicación web*, con «Ejecutar como: yo» y «Quién tiene acceso: cualquier usuario». Copiar la URL en `SERVIDOR_URL` (`js/servidor.js`).
 4. Subir la lista con la acción `cargarLista` y la clave de administración.
+
+Para publicar cambios en `Code.gs` sin cambiar la URL: pegar el código, guardar y *Implementar → Gestionar implementaciones → editar (lápiz) → Versión: nueva versión → Implementar*.
 
 ## Publicar cambios
 

@@ -3,6 +3,7 @@
  *
  * - Registra a los capataces (Gmail + código por correo + nombre de la lista + PIN).
  *   Cada registro queda pendiente hasta que la oficina lo aprueba desde un enlace.
+ *   Si alguien olvida el PIN, crea otro con un código que le llega al correo.
  * - Sirve a la app la lista de la oficina (trabajadores, vehículos, motivos y cabecera).
  * - Recibe los partes y los manda por correo a la oficina, donde Power Automate los
  *   guarda en la carpeta de Teams.
@@ -27,26 +28,55 @@ const ACCIONES = {
   config: config_,
   enviar: enviar_,
   pin: cambiarPin_,
+  nuevoPin: nuevoPin_,
   cargarLista: cargarLista_,
 };
 
 // ---------- Entrada ----------
 
 function doPost(e) {
-  let respuesta;
+  let texto;
   const lock = LockService.getScriptLock();
   try {
     const datos = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const accion = ACCIONES[datos.accion];
     if (!accion) throw new Error('Acción desconocida.');
-    lock.waitLock(30000);
-    respuesta = Object.assign({ ok: true }, accion(datos));
+    texto = lock.tryLock(30000)
+      ? responder_(datos, accion)
+      : JSON.stringify({ ok: false, reintentar: true, error: 'El servidor está ocupado. Se reintentará.' });
   } catch (err) {
-    respuesta = { ok: false, error: String((err && err.message) || err) };
+    texto = JSON.stringify({ ok: false, error: String((err && err.message) || err) });
   } finally {
     try { lock.releaseLock(); } catch (x) { /* no estaba bloqueado */ }
   }
-  return ContentService.createTextOutput(JSON.stringify(respuesta)).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(texto).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Hace cada petición una sola vez. A veces Google pierde la respuesta por el camino (la app
+ * recibe una página de error aunque la acción se haya hecho) y la app repite la petición con
+ * el mismo identificador: entonces se devuelve la respuesta guardada, sin volver a mandar el
+ * código, registrar a nadie ni enviar el parte otra vez.
+ */
+function responder_(datos, accion) {
+  const id = String(datos.peticion || '');
+  const clave = /^[0-9a-f-]{36}$/i.test(id)
+    ? 'p:' + sha256_([id, datos.accion, datos.token || '', datos.email || ''].join('|'))
+    : '';
+  const cache = CacheService.getScriptCache();
+  const guardada = clave ? cache.get(clave) : null;
+  if (guardada) return guardada;
+  let respuesta;
+  try {
+    respuesta = Object.assign({ ok: true }, accion(datos));
+  } catch (err) {
+    respuesta = { ok: false, error: String((err && err.message) || err) };
+  }
+  const texto = JSON.stringify(respuesta);
+  if (clave) {
+    try { cache.put(clave, texto, 1800); } catch (x) { /* demasiado grande para la caché: no se guarda */ }
+  }
+  return texto;
 }
 
 function doGet(e) {
@@ -104,9 +134,17 @@ function crearHoja_(libro, nombre, cabeceras) {
 
 // ---------- Registro y acceso ----------
 
+/** Código por correo para registrarse o, con para: 'pin', para crear un PIN nuevo. */
 function pedirCodigo_(d) {
   const email = email_(d.email);
-  if (buscarUsuario_(email)) throw new Error('Este correo ya está registrado. Usa «Ya tengo cuenta».');
+  const paraPin = d.para === 'pin';
+  const u = buscarUsuario_(email);
+  if (paraPin) {
+    if (!u) throw new Error('No hay ninguna cuenta con ese correo. Regístrate primero.');
+    if (u.Estado === 'rechazado') throw new Error('Esta cuenta no está activa. Habla con la oficina.');
+  } else if (u) {
+    throw new Error('Este correo ya está registrado. Usa «Ya tengo cuenta».');
+  }
   const cache = CacheService.getScriptCache();
   const kn = 'n:' + email;
   const kg = 'g:' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd');
@@ -122,7 +160,7 @@ function pedirCodigo_(d) {
     to: email,
     name: 'Partes LAV',
     subject: 'Tu código para la app Partes LAV: ' + codigo,
-    body: 'Tu código para registrarte en la app Partes LAV es: ' + codigo +
+    body: 'Tu código para ' + (paraPin ? 'crear un PIN nuevo' : 'registrarte') + ' en la app Partes LAV es: ' + codigo +
       '\n\nCaduca en 10 minutos.\nSi no lo has pedido tú, ignora este correo.',
   });
   return {};
@@ -235,6 +273,21 @@ function cambiarPin_(d) {
   return {};
 }
 
+/** «He olvidado el PIN»: con el código que llega al correo se crea un PIN nuevo y se entra. */
+function nuevoPin_(d) {
+  const email = email_(d.email);
+  const pin = String(d.pin || '');
+  if (!/^\d{4,6}$/.test(pin)) throw new Error('El PIN tiene que tener de 4 a 6 cifras.');
+  comprobarCodigo_(email, d.codigo, false);
+  const t = tabla_('Usuarios');
+  const u = t.filas.find((f) => String(f.Email).toLowerCase() === email);
+  if (!u) throw new Error('No hay ninguna cuenta con ese correo. Regístrate primero.');
+  if (u.Estado === 'rechazado') throw new Error('Esta cuenta no está activa. Habla con la oficina.');
+  escribir_(t, u._fila, { PinHash: 'h' + firma_(u.Sal + ':' + pin), Intentos: '0', BloqueadoHasta: '0' });
+  comprobarCodigo_(email, d.codigo, true);
+  return { token: crearSesion_(email), estado: String(u.Estado), nombre: String(u.Nombre) };
+}
+
 function crearSesion_(email) {
   const token = sha256_(Utilities.getUuid() + ':' + Utilities.getUuid() + ':' + Date.now());
   hoja_('Sesiones').appendRow(['h' + sha256_(token), email, ahora_(), '']);
@@ -271,11 +324,14 @@ function config_(d) {
     if (motivos[tipo] && m.Motivo) motivos[tipo].push(String(m.Motivo));
   });
   return {
+    estado: String(u.Estado),
+    nombre: String(u.Nombre),
     config: {
       formato: 'config-partes-lav',
       version: 1,
       nombre: aj.nombre || 'Lista de la oficina',
       fecha: aj.fecha || '',
+      destinatario: aj.destinatario || '',   // para el envío alternativo por Gmail
       cabecera: {
         jefatura: aj.jefatura || '', ambito: aj.ambito || '', empresa: aj.empresa || '',
         lineaInfra: aj.lineaInfra || '', lineaSuper: aj.lineaSuper || '',
