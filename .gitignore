@@ -1,0 +1,8 @@
+# Datos reales de la oficina: NUNCA al repositorio (es público)
+config*.json
+!ejemplo/config-ejemplo.json
+privado/
+*.xlsx
+*.pdf
+*.jpg
+*.jpeg

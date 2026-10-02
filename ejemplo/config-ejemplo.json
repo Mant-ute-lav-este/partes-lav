@@ -1,0 +1,34 @@
+{
+  "formato": "config-partes-lav",
+  "version": 1,
+  "nombre": "Datos de ejemplo (inventados)",
+  "fecha": "2026-10-02",
+  "destinatario": "partes@ejemplo.com",
+  "cabecera": {
+    "jefatura": "LAV EJEMPLO",
+    "ambito": "BASE EJEMPLO",
+    "empresa": "UTE EJEMPLO",
+    "lineaInfra": "L000 - L001",
+    "lineaSuper": "L000 - L002"
+  },
+  "capataces": ["Andrés Ejemplo Ruiz", "Marta Prueba Gil"],
+  "trabajadores": [
+    { "nombre": "Andrés Ejemplo Ruiz", "empresa": "UTE Ejemplo", "habilitacion": "Encargado de trabajos", "categoria": "Capataz" },
+    { "nombre": "Marta Prueba Gil", "empresa": "UTE Ejemplo", "habilitacion": "Encargado de trabajos", "categoria": "Capataz" },
+    { "nombre": "Luis Ficticio Mora", "empresa": "UTE Ejemplo", "habilitacion": "Piloto de seguridad", "categoria": "Oficial 1ª" },
+    { "nombre": "Sara Inventada López", "empresa": "UTE Ejemplo", "habilitacion": "", "categoria": "Oficial 2ª" },
+    { "nombre": "Pedro Muestra Sanz", "empresa": "UTE Ejemplo", "habilitacion": "Operador de maquinaria", "categoria": "Oficial 1ª" },
+    { "nombre": "Juan Supuesto Vidal", "empresa": "Subcontrata Ejemplo S.L.", "habilitacion": "", "categoria": "Peón especialista" },
+    { "nombre": "Elena Modelo Ferrer", "empresa": "Subcontrata Ejemplo S.L.", "habilitacion": "", "categoria": "Peón" },
+    { "nombre": "Carlos Simulado Peña", "empresa": "Subcontrata Ejemplo S.L.", "habilitacion": "Piloto de seguridad", "categoria": "Oficial 2ª" }
+  ],
+  "vehiculos": [
+    { "descripcion": "Furgoneta de equipo", "matricula": "0000-AAA" },
+    { "descripcion": "Camión grúa", "matricula": "1111-BBB" },
+    { "descripcion": "Mini retroexcavadora", "matricula": "E-2222-CCC" }
+  ],
+  "motivos": {
+    "infra": ["DESBROCE, HERBICIDA", "TALA Y PODA", "DESCASTE", "TRABAJOS EN BASE", "LIMPIEZA DE CUNETAS", "REVISIÓN DE CERRAMIENTO"],
+    "super": ["BATEO", "PERFILADO", "ESTABILIZADO", "SOLDADURA", "SUSTITUCIÓN DE MATERIAL", "REVISIÓN DE APARATOS DE VÍA"]
+  }
+}
