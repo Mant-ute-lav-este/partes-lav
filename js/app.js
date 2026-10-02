@@ -7,13 +7,13 @@ import * as db from './db.js';
 import { procesarFoto } from './fotos.js';
 import { textoReferencia } from './pdf.js';
 import { prepararEnvio, compartir } from './envio.js';
-import { api, hayServidor } from './servidor.js';
+import { api, hayServidor, SERVIDOR_URL } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.3.1';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -44,7 +44,7 @@ const urls = new Map();   // id de foto → URL para las miniaturas
 
 async function iniciar() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js', { type: 'module' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
     navigator.serviceWorker.addEventListener('message', (e) => {
       if (e.data && e.data.tipo === 'salida') refrescarVista();
     });
@@ -59,6 +59,7 @@ async function iniciar() {
     estado.config = await db.kvGet('config');
     estado.perfil = await db.kvGet('perfil');
     estado.otros = (await db.kvGet('otros')) || [];
+    await db.kvSet('servidorUrl', SERVIDOR_URL);   // el service worker la lee para enviar en segundo plano
   } catch (e) {
     app.innerHTML = `<p class="error">No se puede usar el almacenamiento del móvil: ${esc(e.message)}</p>`;
     return;

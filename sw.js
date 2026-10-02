@@ -1,10 +1,12 @@
-// Service worker (módulo): guarda la app para que funcione sin cobertura y envía los
-// partes pendientes en segundo plano cuando vuelve la señal (Background Sync, Android).
+// Service worker: guarda la app para que funcione sin cobertura y envía los partes
+// pendientes en segundo plano cuando vuelve la señal (Background Sync, Android).
 // IMPORTANTE: al publicar cambios, sube VERSION; si no, los móviles seguirán con la copia antigua.
+//
+// Es un script clásico (sin import) a propósito: los móviles con la app ya instalada lo
+// actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
+// en segundo plano repite aquí la lógica de js/salida.js.
 
-import { procesarSalida } from './js/salida.js';
-
-const VERSION = 'v0.3.0';
+const VERSION = 'v0.3.1';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -69,3 +71,83 @@ self.addEventListener('sync', (e) => {
     if (r.pendientes) throw new Error('Quedan partes pendientes de enviar');
   }));
 });
+
+// ---------- Cola de salida (misma lógica que js/salida.js) ----------
+
+function abrirDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('partes-lav', 2);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      if (!d.objectStoreNames.contains('partes')) d.createObjectStore('partes', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('fotos')) d.createObjectStore('fotos', { keyPath: 'id' }).createIndex('parteId', 'parteId');
+      if (!d.objectStoreNames.contains('salida')) d.createObjectStore('salida', { keyPath: 'id' });
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+
+async function op(almacen, modo, fn) {
+  const d = await abrirDB();
+  return new Promise((res, rej) => {
+    const t = d.transaction(almacen, modo);
+    let salida;
+    const req = fn(t.objectStore(almacen));
+    if (req) req.onsuccess = () => { salida = req.result; };
+    t.oncomplete = () => res(salida);
+    t.onerror = () => rej(t.error);
+    t.onabort = () => rej(t.error);
+  });
+}
+
+function isoLocal(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  const off = -d.getTimezoneOffset();
+  const a = Math.abs(off);
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}` +
+    `${off >= 0 ? '+' : '-'}${p(Math.floor(a / 60))}:${p(a % 60)}`;
+}
+
+async function procesarSalida() {
+  const perfil = await op('kv', 'readonly', (s) => s.get('perfil'));
+  const url = await op('kv', 'readonly', (s) => s.get('servidorUrl'));
+  const items = (await op('salida', 'readonly', (s) => s.getAll())) || [];
+  if (!perfil || !perfil.token || !url || !items.length) return { enviados: 0, pendientes: items.length };
+  let enviados = 0;
+  for (const it of items.sort((a, b) => (a.creado || '').localeCompare(b.creado || ''))) {
+    let j;
+    try {
+      const r = await fetch(url, {
+        method: 'POST', redirect: 'follow',
+        body: JSON.stringify({ accion: 'enviar', token: perfil.token, envioId: it.id, ...it.datos }),
+      });
+      j = await r.json();
+    } catch {
+      break;   // sin cobertura: se reintenta más tarde
+    }
+    const p = await op('partes', 'readonly', (s) => s.get(it.parteId));
+    if (j.ok) {
+      if (p) {
+        p.envios = (p.envios || []).concat([{ fecha: isoLocal(), recibido: j.recibido }]);
+        p.estado = 'enviado';
+        p.recibido = j.recibido;
+        delete p.errorEnvio;
+        await op('partes', 'readwrite', (s) => s.put(p));
+      }
+      await op('salida', 'readwrite', (s) => s.delete(it.id));
+      enviados++;
+    } else {
+      it.error = j.error;
+      it.intentos = (it.intentos || 0) + 1;
+      await op('salida', 'readwrite', (s) => s.put(it));
+      if (p) {
+        p.errorEnvio = j.error;
+        await op('partes', 'readwrite', (s) => s.put(p));
+      }
+    }
+  }
+  const quedan = (await op('salida', 'readonly', (s) => s.getAll())) || [];
+  return { enviados, pendientes: quedan.length };
+}
