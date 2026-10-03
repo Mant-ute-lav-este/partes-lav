@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -38,6 +38,7 @@ const estado = {
   envio: null,
   setupCapataz: '',
   cambiandoPin: false,
+  preguntaOtro: false,   // «¿Has hecho otro trabajo?» al terminar el último trabajo
 };
 const urls = new Map();   // id de foto → URL para las miniaturas
 
@@ -142,6 +143,7 @@ async function ir(vista) {
   estado.errores = [];
   estado.menu = false;
   estado.fotoVista = null;
+  estado.preguntaOtro = false;
   render();
   window.scrollTo(0, 0);
   if (vista === 'envio') prepararEnvioActual();
@@ -159,7 +161,7 @@ function render() {
     (estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : '');
   window.scrollTo(0, y);
   document.body.classList.toggle('sin-scroll',
-    Boolean(estado.menu || estado.fotoVista || estado.errores.length || estado.procesando));
+    Boolean(estado.menu || estado.fotoVista || estado.preguntaOtro || estado.errores.length || estado.procesando));
   pintarResultados();
   pintarNombres();
   cargarMiniaturas();
@@ -343,7 +345,7 @@ async function conEspera(texto, fn) {
   } finally {
     capa.remove();
     document.body.classList.toggle('sin-scroll',
-      Boolean(estado.menu || estado.fotoVista || estado.errores.length || estado.procesando));
+      Boolean(estado.menu || estado.fotoVista || estado.preguntaOtro || estado.errores.length || estado.procesando));
   }
 }
 
@@ -644,8 +646,9 @@ function vParte() {
 
     <section class="tarjeta">
       <h2>Trabajos <span class="contador">${p.trabajos.length}</span></h2>
+      ${p.trabajos.length ? '' : '<p class="nota">Añade cada trabajo de la jornada por separado, con sus fotos.</p>'}
       ${p.trabajos.map(resumenTrabajo).join('')}
-      <button class="btn secundario" data-action="nuevo-trabajo">+ Añadir trabajo</button>
+      <button class="btn anadir" data-action="nuevo-trabajo">${p.trabajos.length ? '+ Añadir otro trabajo' : '+ Añadir trabajo'}</button>
     </section>
 
     <section class="tarjeta">
@@ -684,12 +687,16 @@ function resumenTrabajo(t, i) {
     t.pkInicio && `PK ${t.pkInicio}${t.pkFin ? ` – ${t.pkFin}` : ''}`].filter(Boolean).join(' · ');
   const n = (f) => t.fotos.filter((x) => x.fase === f).length;
   const fin = t.finalizado === true ? 'Finalizado' : t.finalizado === false ? 'Sin finalizar' : '¿Finalizado?';
+  const faltas = faltasTrabajo(t);
   return `
-  <button class="item item-trabajo" data-action="editar-trabajo" data-i="${i}">
-    <span class="num">${i + 1}</span>
-    <span class="item-info"><strong>${esc(textoReferencia(t) || 'Falta la referencia')}</strong>
-      <br><small>${esc(ubic || 'Falta la ubicación')}</small>
-      <br><small>${fin} · fotos: ${n('antes')} antes, ${n('durante')} durante, ${n('despues')} después</small></span>
+  <button class="item item-trabajo ${faltas.length ? 'incompleto' : 'completo'}" data-action="editar-trabajo" data-i="${i}">
+    <span class="num">${faltas.length ? i + 1 : '✓'}</span>
+    <span class="item-info"><strong>${esc(textoReferencia(t) || 'Sin referencia todavía')}</strong>
+      ${ubic ? `<br><small>${esc(ubic)}</small>` : ''}
+      <br><small>${fin} · fotos: ${n('antes')} antes, ${n('durante')} durante, ${n('despues')} después</small>
+      <br>${faltas.length
+    ? `<small class="falta">Falta: ${esc(faltas.map((f) => f.corto).join(', '))}</small>`
+    : '<small class="listo">Completo</small>'}</span>
     <span class="flecha">›</span>
   </button>`;
 }
@@ -818,6 +825,22 @@ function nuevoTrabajo() {
   ir('trabajo');
 }
 
+/** Mismo corte que el trabajo anterior: copia línea, vía, horas, telefonema y PIDAME (se pueden cambiar). */
+function copiarTrabajoAnterior() {
+  const p = estado.parte;
+  const i = estado.trabajoIdx;
+  const t = p.trabajos[i];
+  const a = p.trabajos[i - 1];
+  if (!t || !a) return;
+  Object.assign(t, {
+    linea: a.linea, via: a.via, sinVia: a.sinVia, entradaVia: a.entradaVia, salidaVia: a.salidaVia,
+    telefonema: { ...a.telefonema }, pidame: a.pidame,
+  });
+  guardarPronto();
+  render();
+  toast(`Copiado del trabajo ${i}. Revisa los PK.`);
+}
+
 /** Texto que va en el sello de las fotos. */
 function etiquetaFoto(t) {
   const r = t.referencia || {};
@@ -842,9 +865,17 @@ function vTrabajo() {
   const r = t.referencia;
   const rr = `${b}.referencia.tipo`;
   const fin = t.finalizado === true ? 'si' : t.finalizado === false ? 'no' : '';
+  const previo = i > 0 ? p.trabajos[i - 1] : null;
+  const sinTocar = !t.via && !t.entradaVia && !t.salidaVia && !t.telefonema.numero && !t.pidame;
+  const sinTerminar = t.finalizado === false;
   return `
   ${cabeceraParte('volver-parte', 'Parte', `Trabajo ${i + 1} · ${esc(p.ref)}`)}
   <main class="contenido con-pie">
+    ${previo && sinTocar ? `
+    <section class="tarjeta copiar">
+      <p>¿Es del mismo corte que el trabajo ${i}?</p>
+      <button class="btn secundario" data-action="copiar-trabajo-anterior">Copiar línea, vía, horas, telefonema y PIDAME del trabajo ${i}</button>
+    </section>` : ''}
     <section class="tarjeta">
       <h2>Referencia</h2>
       <div class="segmentado">
@@ -881,18 +912,24 @@ function vTrabajo() {
       ${campo('Metros lineales <small>(opcional)</small>', `${b}.metrosLineales`, t.metrosLineales, 'type="number" inputmode="decimal" min="0" step="any"')}
       <label class="campo"><span>Descripción</span><textarea data-bind="${b}.descripcion" rows="3">${esc(t.descripcion)}</textarea></label>
       <div class="campo"><span>¿Trabajo finalizado?</span>
-        <div class="segmentado">${radio(`${b}.finalizado`, 'si', 'Sí', fin, 'data-tipo="bool"')}${radio(`${b}.finalizado`, 'no', 'No', fin, 'data-tipo="bool"')}</div></div>
+        <div class="segmentado">${radio(`${b}.finalizado`, 'si', 'Sí', fin, 'data-tipo="bool" data-rerender')}${radio(`${b}.finalizado`, 'no', 'No', fin, 'data-tipo="bool" data-rerender')}</div></div>
     </section>
 
     <section class="tarjeta">
       <h2>Fotos</h2>
-      <p class="nota">Obligatorio: al menos una de <strong>antes</strong> y una de <strong>después</strong>.
+      <p class="nota">${sinTerminar
+    ? 'Trabajo sin terminar: al menos una de <strong>antes</strong> y una de <strong>durante</strong> o de <strong>después</strong>.'
+    : 'Obligatorio: al menos una de <strong>antes</strong> y una de <strong>después</strong>.'}
         Cada foto lleva fecha, hora y referencia, y se le quita la ubicación.</p>
       ${FASES.map(([f, txt]) => {
     const fs = t.fotos.filter((x) => x.fase === f);
+    let marca = '';
+    if (f === 'antes') marca = '<span class="oblig">mín. 1</span>';
+    else if (sinTerminar) marca = '<span class="oblig">esta o la otra</span>';
+    else if (f === 'despues') marca = '<span class="oblig">mín. 1</span>';
     return `
       <div class="fase">
-        <div class="fase-cab"><strong>${txt}</strong> <span class="contador">${fs.length}</span>${f === 'durante' ? '' : '<span class="oblig">mín. 1</span>'}</div>
+        <div class="fase-cab"><strong>${txt}</strong> <span class="contador">${fs.length}</span>${marca}</div>
         <div class="fila-botones">
           <button class="btn secundario" data-action="foto" data-fase="${f}" data-origen="camara">📷 Cámara</button>
           <button class="btn secundario" data-action="foto" data-fase="${f}" data-origen="galeria">🖼️ Galería</button>
@@ -905,10 +942,23 @@ function vTrabajo() {
 
     <button class="btn peligro-texto" data-action="borrar-trabajo">Eliminar este trabajo</button>
   </main>
-  <footer class="pie"><button class="btn primario grande" data-action="volver-parte">Listo</button></footer>
+  <footer class="pie"><button class="btn primario grande" data-action="trabajo-listo">Listo</button></footer>
   <input type="file" id="in-camara" accept="image/*" capture="environment" hidden>
   <input type="file" id="in-galeria" accept="image/*" multiple hidden>
-  ${estado.fotoVista ? vFotoGrande() : ''}`;
+  ${estado.fotoVista ? vFotoGrande() : ''}
+  ${estado.preguntaOtro ? vPreguntaOtro(t) : ''}`;
+}
+
+/** Al pulsar «Listo» en el último trabajo: ¿hay otro trabajo en la jornada? */
+function vPreguntaOtro(t) {
+  const faltas = faltasTrabajo(t);
+  return `
+  <div class="capa" data-action="cerrar-pregunta"><div class="hoja" data-stop>
+    <h2>¿Has hecho otro trabajo en esta jornada?</h2>
+    ${faltas.length ? `<p class="falta">A este trabajo aún le falta: ${esc(faltas.map((f) => f.corto).join(', '))}. Puedes completarlo luego.</p>` : ''}
+    <button class="btn primario grande" data-action="nuevo-trabajo">Sí, añadir otro trabajo</button>
+    <button class="btn secundario grande" data-action="volver-parte">No, volver al parte</button>
+  </div></div>`;
 }
 
 function vFotoGrande() {
@@ -992,6 +1042,39 @@ async function guardarYa() {
 }
 const guardarPronto = debounce(guardarYa, 500);
 
+/**
+ * Lo que le falta a un trabajo para poder cerrar el parte: { corto } para la lista de trabajos
+ * y { largo } para el aviso al cerrar. Fotos: antes y después; si el trabajo no está terminado,
+ * basta con una de durante o de después.
+ */
+function faltasTrabajo(t) {
+  const e = [];
+  const add = (corto, largo) => e.push({ corto, largo });
+  const vacio = (s) => !String(s == null ? '' : s).trim();
+  const r = t.referencia || {};
+  if (!r.tipo) add('referencia', 'elige la referencia (SIOS, incidencia o sin referencia).');
+  else if (r.tipo === 'SIN_REF' && vacio(r.motivo)) add('motivo sin referencia', 'explica por qué no tiene referencia.');
+  else if (r.tipo !== 'SIN_REF' && vacio(r.codigo)) add(`nº de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}`, `falta el número de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}.`);
+  if (!t.sinVia) {
+    if (!t.entradaVia) add('entrada en vía', 'falta la hora de entrada en vía.');
+    if (!t.salidaVia) add('salida de vía', 'falta la hora de salida de vía.');
+    if (vacio(t.via)) add('vía', 'falta la vía.');
+    if (vacio(t.pkInicio)) add('PK inicio', 'falta el PK de inicio.');
+    if (vacio(t.pkFin)) add('PK fin', 'falta el PK de fin.');
+  }
+  if (vacio(t.linea)) add('línea', 'falta la línea.');
+  if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');
+  if (vacio(t.descripcion)) add('descripción', 'falta la descripción.');
+  const hay = (fase) => t.fotos.some((f) => f.fase === fase);
+  if (!hay('antes')) add('foto de antes', 'falta al menos una foto de ANTES.');
+  if (t.finalizado === false) {
+    if (!hay('durante') && !hay('despues')) add('foto de durante o después', 'falta al menos una foto de DURANTE o de DESPUÉS.');
+  } else if (!hay('despues')) {
+    add('foto de después', 'falta al menos una foto de DESPUÉS.');
+  }
+  return e;
+}
+
 function validar(p) {
   const e = [];
   const add = (msg, trabajo = null) => e.push({ msg, trabajo });
@@ -1000,23 +1083,7 @@ function validar(p) {
   if (!p.personal.length) add('Añade al menos una persona en «Personal».');
   if (!p.trabajos.length) add('Añade al menos un trabajo.');
   p.trabajos.forEach((t, i) => {
-    const n = `Trabajo ${i + 1}:`;
-    const r = t.referencia || {};
-    if (!r.tipo) add(`${n} elige la referencia (SIOS, incidencia o sin referencia).`, i);
-    else if (r.tipo === 'SIN_REF' && vacio(r.motivo)) add(`${n} explica por qué no tiene referencia.`, i);
-    else if (r.tipo !== 'SIN_REF' && vacio(r.codigo)) add(`${n} falta el número de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}.`, i);
-    if (!t.sinVia) {
-      if (!t.entradaVia) add(`${n} falta la hora de entrada en vía.`, i);
-      if (!t.salidaVia) add(`${n} falta la hora de salida de vía.`, i);
-      if (vacio(t.via)) add(`${n} falta la vía.`, i);
-      if (vacio(t.pkInicio)) add(`${n} falta el PK de inicio.`, i);
-      if (vacio(t.pkFin)) add(`${n} falta el PK de fin.`, i);
-    }
-    if (vacio(t.linea)) add(`${n} falta la línea.`, i);
-    if (t.finalizado == null) add(`${n} indica si está finalizado (Sí o No).`, i);
-    if (vacio(t.descripcion)) add(`${n} falta la descripción.`, i);
-    if (!t.fotos.some((f) => f.fase === 'antes')) add(`${n} falta al menos una foto de ANTES.`, i);
-    if (!t.fotos.some((f) => f.fase === 'despues')) add(`${n} falta al menos una foto de DESPUÉS.`, i);
+    for (const f of faltasTrabajo(t)) add(`Trabajo ${i + 1}: ${f.largo}`, i);
   });
   if (p.usaMaquinaria == null) add('Indica si se ha usado maquinaria o vehículos (Sí o No).');
   else if (p.usaMaquinaria && !p.vehiculos.some((v) => !vacio(v.descripcion))) {
@@ -1478,6 +1545,12 @@ async function onClick(e) {
     case 'editar-trabajo':
     case 'ir-trabajo': estado.trabajoIdx = i; ir('trabajo'); break;
     case 'volver-parte': ir('parte'); break;
+    case 'trabajo-listo':
+      // Solo se pregunta al terminar el último; si edita uno anterior, vuelve directo al parte.
+      if (estado.trabajoIdx === p.trabajos.length - 1) { estado.preguntaOtro = true; render(); } else ir('parte');
+      break;
+    case 'cerrar-pregunta': estado.preguntaOtro = false; render(); break;
+    case 'copiar-trabajo-anterior': copiarTrabajoAnterior(); break;
     case 'borrar-trabajo': borrarTrabajo(); break;
     case 'nuevo-vehiculo': p.vehiculos.push({ descripcion: '', matricula: '' }); guardarPronto(); render(); break;
     case 'quitar-vehiculo': p.vehiculos.splice(i, 1); guardarPronto(); render(); break;
