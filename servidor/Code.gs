@@ -4,7 +4,7 @@
  * - Registra a los capataces (Gmail + código por correo + nombre de la lista + PIN).
  *   Cada registro queda pendiente hasta que la oficina lo aprueba desde un enlace.
  *   Si alguien olvida el PIN, crea otro con un código que le llega al correo.
- * - Sirve a la app la lista de la oficina (trabajadores, vehículos, motivos y cabecera).
+ * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, motivos y cabecera).
  * - Recibe los partes y los manda por correo a la oficina, donde Power Automate los
  *   guarda en la carpeta de Teams.
  *
@@ -111,6 +111,7 @@ function configurar() {
   crearHoja_(libro, 'Sesiones', ['TokenHash', 'Email', 'Creado', 'UltimoUso']);
   crearHoja_(libro, 'Envios', ['EnvioId', 'Email', 'Nombre', 'Ref', 'Asunto', 'Bytes', 'Recibido']);
   crearHoja_(libro, 'Trabajadores', ['Nombre', 'Empresa', 'Habilitacion', 'Categoria']);
+  crearHoja_(libro, 'Maquinas', ['Descripcion']);
   crearHoja_(libro, 'Vehiculos', ['Descripcion', 'Matricula']);
   crearHoja_(libro, 'Motivos', ['Tipo', 'Motivo']);
   crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
@@ -341,6 +342,9 @@ function config_(d) {
         nombre: String(t.Nombre), empresa: String(t.Empresa || ''),
         habilitacion: String(t.Habilitacion || ''), categoria: String(t.Categoria || ''),
       })),
+      maquinas: tabla_('Maquinas').filas.filter((v) => v.Descripcion).map((v) => ({
+        descripcion: String(v.Descripcion),
+      })),
       vehiculos: tabla_('Vehiculos').filas.filter((v) => v.Descripcion).map((v) => ({
         descripcion: String(v.Descripcion), matricula: String(v.Matricula || ''),
       })),
@@ -349,27 +353,54 @@ function config_(d) {
   };
 }
 
-/** Sube la lista de la oficina (mismo formato que config-partes-lav.json). Requiere la clave de administración. */
+/**
+ * Sube la lista de la oficina (mismo formato que config-partes-lav.json). Requiere la clave de
+ * administración. Solo cambia lo que venga: trabajadores, maquinas, vehiculos, motivos y, si
+ * viene la cabecera, los ajustes.
+ */
 function cargarLista_(d) {
   const clave = props_().getProperty('CLAVE_ADMIN');
   if (!clave || String(d.clave || '') !== clave) throw new Error('Clave de administración incorrecta.');
   const c = d.config || {};
-  if (c.formato !== 'config-partes-lav' || !Array.isArray(c.trabajadores)) throw new Error('No es una lista de Partes LAV.');
-  reemplazar_('Trabajadores', c.trabajadores.map((t) => [t.nombre, t.empresa || '', t.habilitacion || '', t.categoria || '']));
-  reemplazar_('Vehiculos', (c.vehiculos || []).map((v) => [v.descripcion, v.matricula || '']));
-  const m = c.motivos || {};
-  reemplazar_('Motivos', [].concat(
-    (m.infra || []).map((x) => ['infra', x]),
-    (m.super || []).map((x) => ['super', x]),
-  ));
-  const cab = c.cabecera || {};
-  const aj = {
-    nombre: c.nombre || '', fecha: c.fecha || '', destinatario: c.destinatario || '', admin: c.admin || c.destinatario || '',
-    jefatura: cab.jefatura || '', ambito: cab.ambito || '', empresa: cab.empresa || '',
-    lineaInfra: cab.lineaInfra || '', lineaSuper: cab.lineaSuper || '',
-  };
-  reemplazar_('Ajustes', Object.keys(aj).map((k) => [k, aj[k]]));
-  return { trabajadores: c.trabajadores.length };
+  if (c.formato !== 'config-partes-lav') throw new Error('No es una lista de Partes LAV.');
+  const hecho = {};
+  if (Array.isArray(c.trabajadores)) {
+    reemplazar_('Trabajadores', c.trabajadores.map((t) => [t.nombre, t.empresa || '', t.habilitacion || '', t.categoria || '']));
+    hecho.trabajadores = c.trabajadores.length;
+  }
+  if (Array.isArray(c.maquinas)) {
+    asegurarHoja_('Maquinas', ['Descripcion']);
+    reemplazar_('Maquinas', c.maquinas.map((v) => [v.descripcion]));
+    hecho.maquinas = c.maquinas.length;
+  }
+  if (Array.isArray(c.vehiculos)) {
+    reemplazar_('Vehiculos', c.vehiculos.map((v) => [v.descripcion, v.matricula || '']));
+    hecho.vehiculos = c.vehiculos.length;
+  }
+  if (c.motivos) {
+    const m = c.motivos;
+    reemplazar_('Motivos', [].concat(
+      (m.infra || []).map((x) => ['infra', x]),
+      (m.super || []).map((x) => ['super', x]),
+    ));
+    hecho.motivos = true;
+  }
+  if (c.cabecera) {
+    const cab = c.cabecera;
+    const aj = {
+      nombre: c.nombre || '', fecha: c.fecha || '', destinatario: c.destinatario || '', admin: c.admin || c.destinatario || '',
+      jefatura: cab.jefatura || '', ambito: cab.ambito || '', empresa: cab.empresa || '',
+      lineaInfra: cab.lineaInfra || '', lineaSuper: cab.lineaSuper || '',
+    };
+    reemplazar_('Ajustes', Object.keys(aj).map((k) => [k, aj[k]]));
+    hecho.ajustes = true;
+  }
+  return hecho;
+}
+
+function asegurarHoja_(nombre, cabeceras) {
+  const libro = libro_();
+  return libro.getSheetByName(nombre) || crearHoja_(libro, nombre, cabeceras);
 }
 
 // ---------- Envío de partes ----------
@@ -431,6 +462,7 @@ function email_(s) {
 /** Lee una hoja como lista de objetos { Columna: valor, _fila: nº de fila }. */
 function tabla_(nombre) {
   const h = hoja_(nombre);
+  if (!h) return { h: null, cab: [], filas: [] };   // hoja aún sin crear (p. ej. Maquinas)
   const valores = h.getDataRange().getValues();
   const cab = (valores.shift() || []).map(String);
   const filas = valores.map((v, i) => {

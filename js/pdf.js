@@ -228,9 +228,10 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
   tabla(c, [
     { t: 'Nº', w: 7, a: 'center' }, { t: 'REFERENCIA', w: 30 }, { t: 'Nº PIDAME', w: 18 },
     { t: 'TELEFONEMA', w: 20 }, { t: 'ENTRADA\nVÍA', w: 15, a: 'center' }, { t: 'SALIDA\nVÍA', w: 13, a: 'center' },
-    { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' }, { t: 'P.K. INICIO', w: 16, a: 'center' },
+    { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' }, { t: 'APARATO', w: 16 },
+    { t: 'P.K. INICIO', w: 16, a: 'center' },
     { t: 'P.K. FIN', w: 16, a: 'center' }, { t: 'M. LIN', w: 11, a: 'center' }, { t: 'MOTIVO ACTUACIÓN', w: 26 },
-    { t: '¿FIN?', w: 10, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 202 },
+    { t: '¿FIN?', w: 10, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 218 },
   ], parte.trabajos.map((t, i) => [
     String(i + 1),
     textoReferencia(t),
@@ -240,6 +241,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     t.sinVia ? '-' : t.salidaVia,
     t.linea,
     t.sinVia && !t.via ? '-' : t.via,
+    t.aparato || '',
     t.pkInicio,
     t.pkFin,
     t.metrosLineales == null ? '' : String(t.metrosLineales),
@@ -248,12 +250,23 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     `${t.descripcion || ''}\n${contarFotos(t)}`,
   ]), { vacio: 'Sin trabajos' });
 
-  // Maquinaria y vehículos
-  const vs = parte.usaMaquinaria === false ? []
-    : parte.vehiculos.filter((v) => (v.descripcion || '').trim() || (v.matricula || '').trim());
-  seccion(c, 'MAQUINARIA Y VEHÍCULOS');
-  tabla(c, [{ t: 'Nº', w: 10, a: 'center' }, { t: 'MÁQUINA / VEHÍCULO', w: 181 }, { t: 'MATRÍCULA', w: AN - 191 }],
-    vs.map((v, i) => [String(i + 1), v.descripcion, v.matricula]), { vacio: 'No se ha usado maquinaria ni vehículos' });
+  // Maquinaria y vehículos (los partes de antes de v0.6.0 los llevan juntos en una tabla)
+  const conDatos = (xs) => (xs || []).filter((v) => (v.descripcion || '').trim() || (v.matricula || '').trim());
+  if (parte.maquinas) {
+    const ms = parte.usaMaquinaria === false ? [] : conDatos(parte.maquinas);
+    seccion(c, 'MAQUINARIA');
+    tabla(c, [{ t: 'Nº', w: 10, a: 'center' }, { t: 'MÁQUINA', w: AN - 10 }],
+      ms.map((v, i) => [String(i + 1), v.descripcion]), { vacio: 'No se ha usado maquinaria' });
+    const vs = parte.usaVehiculos === false ? [] : conDatos(parte.vehiculos);
+    seccion(c, 'VEHÍCULOS');
+    tabla(c, [{ t: 'Nº', w: 10, a: 'center' }, { t: 'VEHÍCULO', w: 181 }, { t: 'MATRÍCULA', w: AN - 191 }],
+      vs.map((v, i) => [String(i + 1), v.descripcion, v.matricula]), { vacio: 'No se han usado vehículos' });
+  } else {
+    const vs = parte.usaMaquinaria === false ? [] : conDatos(parte.vehiculos);
+    seccion(c, 'MAQUINARIA Y VEHÍCULOS');
+    tabla(c, [{ t: 'Nº', w: 10, a: 'center' }, { t: 'MÁQUINA / VEHÍCULO', w: 181 }, { t: 'MATRÍCULA', w: AN - 191 }],
+      vs.map((v, i) => [String(i + 1), v.descripcion, v.matricula]), { vacio: 'No se ha usado maquinaria ni vehículos' });
+  }
 
   // Medidas antiincendios y observaciones
   seccion(c, 'MEDIDAS ANTIINCENDIOS');

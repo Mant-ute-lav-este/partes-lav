@@ -33,14 +33,14 @@ El repositorio es **público**: aquí solo hay código y datos inventados. Los n
 
 - `destinatario`: correo al que se envían los partes.
 - `cabecera`: textos de la cabecera del PDF (jefatura, ámbito, empresa, líneas).
-- `capataces`, `trabajadores` (nombre, empresa, habilitación, categoría), `vehiculos` y `motivos`.
+- `capataces`, `trabajadores` (nombre, empresa, habilitación, categoría), `maquinas` (descripción), `vehiculos` (descripción y matrícula) y `motivos`. Para cambiar solo una parte, basta con subir esa lista: lo que no venga no se toca.
 
 ## Servidor de envío (Google Apps Script)
 
 `servidor/Code.gs` vive en la cuenta de Gmail de la UTE. Hace tres cosas:
 
 - **Registra a los capataces:** Gmail, código por correo, nombre elegido de la lista y PIN. Cada registro queda **pendiente** hasta que la oficina lo aprueba desde el enlace que le llega por correo.
-- **Sirve a la app la lista de la oficina:** trabajadores, vehículos, motivos y cabecera del PDF.
+- **Sirve a la app la lista de la oficina:** trabajadores, máquinas, vehículos (con matrícula), motivos y cabecera del PDF.
 - **Recibe los partes y los manda por correo a la oficina** con el asunto «PARTE LAV …» y los 3 adjuntos de siempre. El flujo de Power Automate los guarda en la carpeta de Teams.
 
 En la app, cuando el capataz pulsa **Enviar**, el parte entra en una cola. Si no hay cobertura, sale solo en cuanto vuelve la señal (en Android, aunque la app esté cerrada). El servidor no repite un envío que ya recibió.
@@ -49,7 +49,7 @@ Google a veces pierde la respuesta de una petición aunque la haya hecho (la app
 
 Sin servidor configurado (`SERVIDOR_URL` vacío, para copias de prueba), la app funciona como al principio: la lista se carga desde un archivo y el parte se manda con Gmail.
 
-Los datos están en la hoja «Partes LAV · Datos» de esa cuenta: usuarios, sesiones, envíos, trabajadores, vehículos, motivos y ajustes. **La lista de trabajadores se mantiene editando esa hoja.**
+Los datos están en la hoja «Partes LAV · Datos» de esa cuenta: usuarios, sesiones, envíos, trabajadores, máquinas, vehículos, motivos y ajustes. **Las listas de trabajadores, máquinas y vehículos se mantienen editando esa hoja**; la app las descarga sola. La línea que se ofrece en botones sale de la cabecera (`lineaInfra`, `lineaSuper`).
 
 Instalación (una vez):
 1. En script.google.com, con la cuenta de la UTE, crear un proyecto y pegar `Code.gs`.

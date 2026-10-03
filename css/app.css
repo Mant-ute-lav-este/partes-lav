@@ -191,7 +191,13 @@ input.pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; }
   padding: 10px 12px; min-height: 52px; border: 1.5px dashed var(--borde); border-radius: 10px;
   background: var(--superficie-2); font: inherit; color: var(--texto); cursor: pointer;
 }
-.fila-vehiculo { display: grid; grid-template-columns: 1fr 9.5em 44px; gap: 8px; align-items: center; margin-top: 10px; }
+.fila-equipo { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; }
+.equipo-campos { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.equipo-campos select, .equipo-campos input { width: 100%; }
+.segmentado.compacto label { min-width: 0; }
+.pk { display: flex; align-items: center; gap: 6px; }
+.pk input { min-width: 0; flex: 1 1 0; text-align: center; }
+.pk b { font-size: 1.3rem; }
 
 /* Fotos */
 .fase { border-top: 1px solid var(--borde); padding-top: 12px; margin-top: 12px; }

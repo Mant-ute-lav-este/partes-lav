@@ -22,10 +22,15 @@
     { "nombre": "Elena Modelo Ferrer", "empresa": "Subcontrata Ejemplo S.L.", "habilitacion": "", "categoria": "Peón" },
     { "nombre": "Carlos Simulado Peña", "empresa": "Subcontrata Ejemplo S.L.", "habilitacion": "Piloto de seguridad", "categoria": "Oficial 2ª" }
   ],
+  "maquinas": [
+    { "descripcion": "Bateadora de ejemplo" },
+    { "descripcion": "Perfiladora de ejemplo" },
+    { "descripcion": "Mini retroexcavadora" }
+  ],
   "vehiculos": [
     { "descripcion": "Furgoneta de equipo", "matricula": "0000-AAA" },
     { "descripcion": "Camión grúa", "matricula": "1111-BBB" },
-    { "descripcion": "Mini retroexcavadora", "matricula": "E-2222-CCC" }
+    { "descripcion": "Todoterreno", "matricula": "2222-CCC" }
   ],
   "motivos": {
     "infra": ["DESBROCE, HERBICIDA", "TALA Y PODA", "DESCASTE", "TRABAJOS EN BASE", "LIMPIEZA DE CUNETAS", "REVISIÓN DE CERRAMIENTO"],

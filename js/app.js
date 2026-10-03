@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -569,6 +569,8 @@ async function nuevoParte(tipo) {
     personal: [capatazComoPersona()],
     trabajos: [],
     usaMaquinaria: null,
+    maquinas: [],
+    usaVehiculos: null,
     vehiculos: [],
     antiincendios: '',
     observaciones: '',
@@ -600,8 +602,7 @@ function refParte(p) {
 }
 
 function vParte() {
-  const p = estado.parte;
-  const um = p.usaMaquinaria === true ? 'si' : p.usaMaquinaria === false ? 'no' : '';
+  const p = normalizarParte(estado.parte);
   return `
   ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
   <main class="contenido con-pie">
@@ -629,20 +630,8 @@ function vParte() {
       ${estado.otroAbierto ? vOtroForm() : '<button class="btn secundario" data-action="abrir-otro">+ Añadir a alguien que no está en la lista</button>'}
     </section>
 
-    <section class="tarjeta">
-      <h2>Maquinaria y vehículos <span class="oblig">obligatorio</span></h2>
-      <div class="campo"><span>¿Se ha usado maquinaria o vehículos?</span>
-        <div class="segmentado">${radio('usaMaquinaria', 'si', 'Sí', um, 'data-tipo="bool" data-rerender')}${radio('usaMaquinaria', 'no', 'No', um, 'data-tipo="bool" data-rerender')}</div></div>
-      ${p.usaMaquinaria ? `
-      ${p.vehiculos.map((v, i) => `
-      <div class="fila-vehiculo">
-        <input list="dl-vehiculos" placeholder="Máquina o vehículo" data-bind="vehiculos.${i}.descripcion" data-vehiculo="${i}" value="${esc(v.descripcion)}" autocomplete="off">
-        <input placeholder="Matrícula" data-bind="vehiculos.${i}.matricula" value="${esc(v.matricula)}" autocapitalize="characters" autocomplete="off">
-        <button class="btn-quitar" data-action="quitar-vehiculo" data-i="${i}" aria-label="Quitar máquina o vehículo">✕</button>
-      </div>`).join('')}
-      <datalist id="dl-vehiculos">${vehiculosCfg().map((v) => `<option value="${esc(v.descripcion)}">${esc(v.matricula || '')}</option>`).join('')}</datalist>
-      <button class="btn secundario" data-action="nuevo-vehiculo">+ Añadir otra máquina o vehículo</button>` : ''}
-    </section>
+    ${seccionEquipos('maquinas')}
+    ${seccionEquipos('vehiculos')}
 
     <section class="tarjeta">
       <h2>Trabajos <span class="contador">${p.trabajos.length}</span></h2>
@@ -683,7 +672,7 @@ function vOtroForm() {
 }
 
 function resumenTrabajo(t, i) {
-  const ubic = [t.linea && `Línea ${t.linea}`, t.via && `vía ${t.via}`,
+  const ubic = [t.linea && `Línea ${t.linea}`, t.via && `vía ${t.via}`, t.aparato,
     t.pkInicio && `PK ${t.pkInicio}${t.pkFin ? ` – ${t.pkFin}` : ''}`].filter(Boolean).join(' · ');
   const n = (f) => t.fotos.filter((x) => x.fase === f).length;
   const fin = t.finalizado === true ? 'Finalizado' : t.finalizado === false ? 'Sin finalizar' : '¿Finalizado?';
@@ -735,8 +724,77 @@ function capatazComoPersona() {
   return persona(t || { nombre: estado.perfil.capataz, categoria: 'Capataz' });
 }
 
-function vehiculosCfg() {
-  return (estado.config && estado.config.vehiculos) || [];
+// Maquinaria y vehículos: dos secciones con Sí/No obligatorio y desplegables con la lista de la
+// oficina, más la opción «Otra» para escribirla a mano.
+const EQUIPOS = {
+  maquinas: {
+    titulo: 'Maquinaria', pregunta: '¿Se ha usado maquinaria?', usa: 'usaMaquinaria',
+    elegir: 'Elige la máquina…', otra: 'Otra (escribirla)', anadir: '+ Añadir otra máquina', conMatricula: false,
+  },
+  vehiculos: {
+    titulo: 'Vehículos', pregunta: '¿Se han usado vehículos?', usa: 'usaVehiculos',
+    elegir: 'Elige el vehículo…', otra: 'Otro (escribirlo)', anadir: '+ Añadir otro vehículo', conMatricula: true,
+  },
+};
+
+function equiposCfg(lista) {
+  const c = estado.config || {};
+  // Lista de un servidor anterior a v0.6.0: lo que traía como «vehiculos» eran las máquinas.
+  if (!c.maquinas) return lista === 'maquinas' ? (c.vehiculos || []) : [];
+  return c[lista] || [];
+}
+
+const textoEquipo = (x) => [x.descripcion, x.matricula].filter(Boolean).join(' · ');
+
+/** Posición en la lista de la oficina del equipo elegido (-1 si es «otro» o no está). */
+function indiceEquipo(lista, x) {
+  if (x.otro || !x.descripcion) return -1;
+  return equiposCfg(lista).findIndex((c) => c.descripcion === x.descripcion && (c.matricula || '') === (x.matricula || ''));
+}
+
+function seccionEquipos(lista) {
+  const p = estado.parte;
+  const e = EQUIPOS[lista];
+  const usa = p[e.usa] === true ? 'si' : p[e.usa] === false ? 'no' : '';
+  const cfg = equiposCfg(lista);
+  const filas = p[e.usa] ? p[lista].map((x, i) => {
+    const k = indiceEquipo(lista, x);
+    const otro = k < 0 && (x.otro || x.descripcion);
+    return `
+      <div class="fila-equipo">
+        <div class="equipo-campos">
+          <select data-lista="${lista}" data-i="${i}" aria-label="${e.titulo} ${i + 1}">
+            <option value="">${e.elegir}</option>
+            ${cfg.map((c, j) => `<option value="${j}" ${j === k ? 'selected' : ''}>${esc(textoEquipo(c))}</option>`).join('')}
+            <option value="otro" ${otro ? 'selected' : ''}>${e.otra}</option>
+          </select>
+          ${otro ? `
+          <input placeholder="${e.conMatricula ? 'Vehículo' : 'Máquina'}" data-bind="${lista}.${i}.descripcion" value="${esc(x.descripcion)}" autocomplete="off">
+          ${e.conMatricula ? `<input placeholder="Matrícula" data-bind="${lista}.${i}.matricula" value="${esc(x.matricula)}" autocapitalize="characters" autocomplete="off">` : ''}` : ''}
+        </div>
+        <button class="btn-quitar" data-action="quitar-equipo" data-lista="${lista}" data-i="${i}" aria-label="Quitar">✕</button>
+      </div>`;
+  }).join('') : '';
+  return `
+    <section class="tarjeta">
+      <h2>${e.titulo} <span class="oblig">obligatorio</span></h2>
+      <div class="campo"><span>${e.pregunta}</span>
+        <div class="segmentado">${radio(e.usa, 'si', 'Sí', usa, 'data-tipo="bool" data-rerender')}${radio(e.usa, 'no', 'No', usa, 'data-tipo="bool" data-rerender')}</div></div>
+      ${p[e.usa] ? `${filas}<button class="btn secundario" data-action="nuevo-equipo" data-lista="${lista}">${e.anadir}</button>` : ''}
+    </section>`;
+}
+
+/**
+ * Borradores de antes de separar maquinaria y vehículos (v0.5.0 y anteriores): lo apuntado
+ * queda como vehículos y se vuelve a preguntar por la maquinaria. Los partes ya cerrados no se
+ * tocan: su PDF sale con la tabla única de antes.
+ */
+function normalizarParte(p) {
+  if (!p || p.maquinas || p.estado !== 'borrador') return p;
+  p.maquinas = [];
+  p.usaVehiculos = p.usaMaquinaria;
+  p.usaMaquinaria = null;
+  return p;
 }
 
 function motivosCfg(tipo) {
@@ -813,6 +871,7 @@ function nuevoTrabajo() {
     salidaVia: '',
     linea: previo ? previo.linea : '',
     via: '',
+    aparato: '',
     pkInicio: '',
     pkFin: '',
     metrosLineales: null,
@@ -851,6 +910,42 @@ function etiquetaFoto(t) {
 
 function campo(etq, ruta, valor, extra = '') {
   return `<label class="campo"><span>${etq}</span><input data-bind="${ruta}" value="${esc(valor == null ? '' : valor)}" ${extra}></label>`;
+}
+
+/** Líneas que se ofrecen en botones, sacadas de la cabecera de la oficina («L040 - L038»). */
+function lineasCfg(tipo) {
+  const cab = (estado.config && estado.config.cabecera) || {};
+  const texto = tipo === 'SUPER' ? cab.lineaSuper : cab.lineaInfra;
+  const ls = String(texto || '').match(/\d{3}/g);
+  return ls && ls.length ? [...new Set(ls)] : ['040', '038'];
+}
+
+/**
+ * PK en dos casillas numéricas (km + metros), porque el teclado numérico del móvil no tiene «+».
+ * Se guarda junto como «481+045».
+ */
+function campoPk(etq, ruta, valor) {
+  const [km = '', m = ''] = String(valor || '').split(/\s*[+.,/]\s*/);
+  const attrs = `inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-pk="${ruta}"`;
+  return `<div class="campo"><span>${etq}</span><div class="pk">
+    <input ${attrs} data-pk-parte="km" value="${esc(km)}" placeholder="km" aria-label="${etq}: kilómetro">
+    <b>+</b>
+    <input ${attrs} data-pk-parte="m" value="${esc(m)}" placeholder="m" maxlength="3" aria-label="${etq}: metros"></div></div>`;
+}
+
+/** Junta las dos casillas del PK; al salir de la casilla de metros los completa a 3 cifras. */
+function aplicarPk(el, final) {
+  if (!estado.parte || estado.parte.estado !== 'borrador') return;
+  const caja = el.closest('.pk');
+  const km = caja.querySelector('[data-pk-parte="km"]');
+  const m = caja.querySelector('[data-pk-parte="m"]');
+  km.value = km.value.replace(/\D/g, '');
+  m.value = m.value.replace(/\D/g, '').slice(0, 3);
+  if (final && m.value) m.value = m.value.padStart(3, '0');
+  setPath(estado.parte, el.dataset.pk, km.value || m.value ? `${km.value}+${m.value.padStart(3, '0')}` : '');
+  const g = document.getElementById('guardado');
+  if (g) g.textContent = 'Guardando…';
+  guardarPronto();
 }
 
 function radio(ruta, valor, texto, actual, extra = '') {
@@ -898,10 +993,12 @@ function vTrabajo() {
         ${campo('Hora telefonema', `${b}.telefonema.hora`, t.telefonema.hora, 'type="time"')}</div>
       <div class="dos">${campo('Entrada en vía', `${b}.entradaVia`, t.entradaVia, 'type="time"')}
         ${campo('Salida de vía', `${b}.salidaVia`, t.salidaVia, 'type="time"')}</div>`}
-      <div class="dos">${campo('Línea', `${b}.linea`, t.linea, 'inputmode="numeric" placeholder="040" autocomplete="off"')}
-        ${campo('Vía', `${b}.via`, t.via, 'placeholder="1, 2…" autocomplete="off"')}</div>
-      <div class="dos">${campo('PK inicio', `${b}.pkInicio`, t.pkInicio, 'inputmode="decimal" placeholder="481+045" autocomplete="off"')}
-        ${campo('PK fin', `${b}.pkFin`, t.pkFin, 'inputmode="decimal" placeholder="481+049" autocomplete="off"')}</div>
+      <div class="campo"><span>Línea</span>
+        <div class="segmentado">${lineasCfg(p.tipo).map((l) => radio(`${b}.linea`, l, l, t.linea)).join('')}</div></div>
+      <div class="campo"><span>Vía</span>
+        <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>
+      ${campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"')}
+      <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, t.pkFin)}</div>
     </section>
 
     <section class="tarjeta">
@@ -1047,6 +1144,8 @@ const guardarPronto = debounce(guardarYa, 500);
  * y { largo } para el aviso al cerrar. Fotos: antes y después; si el trabajo no está terminado,
  * basta con una de durante o de después.
  */
+const pkValido = (s) => /^\s*\d+\s*[+.,/]\s*\d+\s*$/.test(String(s || ''));
+
 function faltasTrabajo(t) {
   const e = [];
   const add = (corto, largo) => e.push({ corto, largo });
@@ -1059,8 +1158,8 @@ function faltasTrabajo(t) {
     if (!t.entradaVia) add('entrada en vía', 'falta la hora de entrada en vía.');
     if (!t.salidaVia) add('salida de vía', 'falta la hora de salida de vía.');
     if (vacio(t.via)) add('vía', 'falta la vía.');
-    if (vacio(t.pkInicio)) add('PK inicio', 'falta el PK de inicio.');
-    if (vacio(t.pkFin)) add('PK fin', 'falta el PK de fin.');
+    if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
+    if (!pkValido(t.pkFin)) add('PK fin', 'falta el PK de fin (km y metros).');
   }
   if (vacio(t.linea)) add('línea', 'falta la línea.');
   if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');
@@ -1085,9 +1184,13 @@ function validar(p) {
   p.trabajos.forEach((t, i) => {
     for (const f of faltasTrabajo(t)) add(`Trabajo ${i + 1}: ${f.largo}`, i);
   });
-  if (p.usaMaquinaria == null) add('Indica si se ha usado maquinaria o vehículos (Sí o No).');
-  else if (p.usaMaquinaria && !p.vehiculos.some((v) => !vacio(v.descripcion))) {
-    add('Has marcado que se ha usado maquinaria: indica cuál (o marca «No»).');
+  if (p.usaMaquinaria == null) add('Indica si se ha usado maquinaria (Sí o No).');
+  else if (p.usaMaquinaria && !p.maquinas.some((v) => !vacio(v.descripcion))) {
+    add('Has marcado que se ha usado maquinaria: elige cuál (o marca «No»).');
+  }
+  if (p.usaVehiculos == null) add('Indica si se han usado vehículos (Sí o No).');
+  else if (p.usaVehiculos && !p.vehiculos.some((v) => !vacio(v.descripcion))) {
+    add('Has marcado que se han usado vehículos: elige cuál (o marca «No»).');
   }
   if (vacio(p.antiincendios)) add('Rellena las medidas antiincendios.');
   return e;
@@ -1354,6 +1457,7 @@ function onInput(e) {
     pintarNombres();
     return;
   }
+  if (el.dataset.pk) { aplicarPk(el, false); return; }
   if (el.matches('[data-bind]') && el.type !== 'radio' && el.type !== 'checkbox') aplicarBind(el);
 }
 
@@ -1371,15 +1475,29 @@ async function onChange(e) {
     if (files.length && estado.fotoPendiente) await anadirFotos(files, estado.fotoPendiente);
     return;
   }
+  if (el.matches('select[data-lista]')) {
+    if (!estado.parte || estado.parte.estado !== 'borrador') return;
+    const lista = el.dataset.lista;
+    const c = equiposCfg(lista)[Number(el.value)];
+    estado.parte[lista][Number(el.dataset.i)] = el.value === 'otro' ? { descripcion: '', matricula: '', otro: true }
+      : c ? { descripcion: c.descripcion, matricula: c.matricula || '', otro: false }
+        : { descripcion: '', matricula: '', otro: false };
+    guardarPronto();
+    render();
+    if (el.value === 'otro') {
+      const inp = app.querySelector(`[data-bind="${lista}.${el.dataset.i}.descripcion"]`);
+      if (inp) inp.focus();
+    }
+    return;
+  }
+  if (el.dataset.pk) { aplicarPk(el, true); return; }
   if (!el.matches('[data-bind]')) return;
   aplicarBind(el);
-  if (el.dataset.bind === 'usaMaquinaria' && estado.parte.usaMaquinaria && !estado.parte.vehiculos.length) {
-    estado.parte.vehiculos.push({ descripcion: '', matricula: '' });
-  }
-  if (el.dataset.vehiculo != null) {
-    const v = estado.parte.vehiculos[Number(el.dataset.vehiculo)];
-    const m = vehiculosCfg().find((x) => x.descripcion === v.descripcion);
-    if (m && !v.matricula) { v.matricula = m.matricula || ''; render(); }
+  // Al contestar «Sí», aparece directamente la primera fila para elegir.
+  for (const [lista, e] of Object.entries(EQUIPOS)) {
+    if (el.dataset.bind === e.usa && estado.parte[e.usa] && !estado.parte[lista].length) {
+      estado.parte[lista].push({ descripcion: '', matricula: '', otro: false });
+    }
   }
   if (el.hasAttribute('data-rerender')) render();
 }
@@ -1552,8 +1670,8 @@ async function onClick(e) {
     case 'cerrar-pregunta': estado.preguntaOtro = false; render(); break;
     case 'copiar-trabajo-anterior': copiarTrabajoAnterior(); break;
     case 'borrar-trabajo': borrarTrabajo(); break;
-    case 'nuevo-vehiculo': p.vehiculos.push({ descripcion: '', matricula: '' }); guardarPronto(); render(); break;
-    case 'quitar-vehiculo': p.vehiculos.splice(i, 1); guardarPronto(); render(); break;
+    case 'nuevo-equipo': p[el.dataset.lista].push({ descripcion: '', matricula: '', otro: false }); guardarPronto(); render(); break;
+    case 'quitar-equipo': p[el.dataset.lista].splice(i, 1); guardarPronto(); render(); break;
     case 'foto': {
       const t = trabajoActual();
       const r = t.referencia;
