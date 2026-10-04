@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -912,13 +912,8 @@ function campo(etq, ruta, valor, extra = '') {
   return `<label class="campo"><span>${etq}</span><input data-bind="${ruta}" value="${esc(valor == null ? '' : valor)}" ${extra}></label>`;
 }
 
-/** Líneas que se ofrecen en botones, sacadas de la cabecera de la oficina («L040 - L038»). */
-function lineasCfg(tipo) {
-  const cab = (estado.config && estado.config.cabecera) || {};
-  const texto = tipo === 'SUPER' ? cab.lineaSuper : cab.lineaInfra;
-  const ls = String(texto || '').match(/\d{3}/g);
-  return ls && ls.length ? [...new Set(ls)] : ['040', '038'];
-}
+/** Líneas que se ofrecen en botones, en Infra y en Super (las de la cabecera del PDF no cuentan aquí). */
+const LINEAS = ['040', '038'];
 
 /**
  * PK en dos casillas numéricas (km + metros), porque el teclado numérico del móvil no tiene «+».
@@ -994,7 +989,7 @@ function vTrabajo() {
       <div class="dos">${campo('Entrada en vía', `${b}.entradaVia`, t.entradaVia, 'type="time"')}
         ${campo('Salida de vía', `${b}.salidaVia`, t.salidaVia, 'type="time"')}</div>`}
       <div class="campo"><span>Línea</span>
-        <div class="segmentado">${lineasCfg(p.tipo).map((l) => radio(`${b}.linea`, l, l, t.linea)).join('')}</div></div>
+        <div class="segmentado">${LINEAS.map((l) => radio(`${b}.linea`, l, l, t.linea)).join('')}</div></div>
       <div class="campo"><span>Vía</span>
         <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>
       ${campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"')}
