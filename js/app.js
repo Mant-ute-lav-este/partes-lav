@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.7.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -572,7 +572,10 @@ async function nuevoParte(tipo) {
     maquinas: [],
     usaVehiculos: null,
     vehiculos: [],
-    antiincendios: '',
+    medidas: [],
+    medidasOtrasSi: false,
+    medidasOtras: '',
+    antiincendios: '',   // texto para el PDF, se calcula con textoMedidas()
     observaciones: '',
     estado: 'borrador',
     creado: iso,
@@ -642,7 +645,10 @@ function vParte() {
 
     <section class="tarjeta">
       <h2>Medidas antiincendios <span class="oblig">obligatorio</span></h2>
-      <textarea data-bind="antiincendios" rows="3" placeholder="Ej.: extintor en el vehículo, batefuegos, revisión de la zona al terminar">${esc(p.antiincendios)}</textarea>
+      <p class="nota">Marca todas las que se hayan tomado.</p>
+      ${medidasCfg().map((m) => `<label class="check"><input type="checkbox" data-medida="${esc(m)}" ${p.medidas.includes(m) ? 'checked' : ''}><span>${esc(m)}</span></label>`).join('')}
+      <label class="check"><input type="checkbox" data-bind="medidasOtrasSi" data-rerender ${p.medidasOtrasSi ? 'checked' : ''}><span>Otras</span></label>
+      ${p.medidasOtrasSi ? `<textarea data-bind="medidasOtras" rows="2" placeholder="Escribe las otras medidas">${esc(p.medidasOtras)}</textarea>` : ''}
     </section>
 
     <section class="tarjeta">
@@ -790,11 +796,42 @@ function seccionEquipos(lista) {
  * tocan: su PDF sale con la tabla única de antes.
  */
 function normalizarParte(p) {
-  if (!p || p.maquinas || p.estado !== 'borrador') return p;
-  p.maquinas = [];
-  p.usaVehiculos = p.usaMaquinaria;
-  p.usaMaquinaria = null;
+  if (!p || p.estado !== 'borrador') return p;
+  if (!p.maquinas) {
+    p.maquinas = [];
+    p.usaVehiculos = p.usaMaquinaria;
+    p.usaMaquinaria = null;
+  }
+  // Antes de v0.7.0 las medidas antiincendios eran texto libre: pasa a «Otras».
+  if (!p.medidas) {
+    p.medidas = [];
+    p.medidasOtras = p.antiincendios || '';
+    p.medidasOtrasSi = Boolean(p.medidasOtras.trim());
+  }
   return p;
+}
+
+// Medidas antiincendios: casillas con la lista de la oficina (varias a la vez) más «Otras».
+// Mientras la oficina no ponga su lista en la hoja, se usa esta.
+const MEDIDAS_PROVISIONALES = [
+  'Extintor en el vehículo',
+  'Batefuegos',
+  'Mochila extintora de agua',
+  'Cuba o depósito de agua',
+  'Zona de trabajo despejada de vegetación',
+  'Vigilancia tras trabajos con riesgo de chispas',
+  'Revisión de la zona al terminar',
+];
+
+function medidasCfg() {
+  const m = estado.config && estado.config.antiincendios;
+  return m && m.length ? m : MEDIDAS_PROVISIONALES;
+}
+
+/** Texto de las medidas para el PDF y los datos: «Extintor en el vehículo; Batefuegos; Otras: …». */
+function textoMedidas(p) {
+  const otras = p.medidasOtrasSi && (p.medidasOtras || '').trim();
+  return [...p.medidas, otras && `Otras: ${otras}`].filter(Boolean).join('; ');
 }
 
 function motivosCfg(tipo) {
@@ -1187,7 +1224,8 @@ function validar(p) {
   else if (p.usaVehiculos && !p.vehiculos.some((v) => !vacio(v.descripcion))) {
     add('Has marcado que se han usado vehículos: elige cuál (o marca «No»).');
   }
-  if (vacio(p.antiincendios)) add('Rellena las medidas antiincendios.');
+  if (p.medidasOtrasSi && vacio(p.medidasOtras)) add('Has marcado «Otras» medidas antiincendios: escribe cuáles.');
+  else if (vacio(p.antiincendios)) add('Marca al menos una medida antiincendios.');
   return e;
 }
 
@@ -1435,6 +1473,7 @@ function aplicarBind(el) {
   } else if (el.type === 'number') v = el.value === '' ? null : Number(el.value);
   else v = el.value;
   setPath(estado.parte, el.dataset.bind, v);
+  if (estado.parte.medidas) estado.parte.antiincendios = textoMedidas(estado.parte);
   const g = document.getElementById('guardado');
   if (g) g.textContent = 'Guardando…';
   guardarPronto();
@@ -1486,6 +1525,17 @@ async function onChange(e) {
     return;
   }
   if (el.dataset.pk) { aplicarPk(el, true); return; }
+  if (el.dataset.medida != null) {
+    const p = estado.parte;
+    if (!p || p.estado !== 'borrador') return;
+    const m = el.dataset.medida;
+    p.medidas = el.checked ? [...new Set([...p.medidas, m])] : p.medidas.filter((x) => x !== m);
+    // Mismo orden que la lista, para que el PDF salga siempre igual.
+    p.medidas.sort((a, b) => medidasCfg().indexOf(a) - medidasCfg().indexOf(b));
+    p.antiincendios = textoMedidas(p);
+    guardarPronto();
+    return;
+  }
   if (!el.matches('[data-bind]')) return;
   aplicarBind(el);
   // Al contestar «Sí», aparece directamente la primera fila para elegir.
