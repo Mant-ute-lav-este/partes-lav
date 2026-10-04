@@ -223,6 +223,29 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     c.y += 4;
   }
 
+  // Horas extra (desde v0.8.0)
+  if (parte.extras) {
+    const hs = parte.usaExtras ? (parte.personal || [])
+      .map((x) => parte.extras.find((e) => e.nombre === x.nombre))
+      .filter((e) => e && Number(e.horas) > 0) : [];
+    const num = (n) => String(n).replace('.', ',');
+    const tipos = { normales: 'Normales', nocturnas: 'Nocturnas', festivas: 'Festivas' };
+    seccion(c, 'HORAS EXTRA');
+    tabla(c, [
+      { t: 'Nº', w: 10, a: 'center' }, { t: 'NOMBRE Y APELLIDOS', w: 85 }, { t: 'HORAS', w: 18, a: 'center' },
+      { t: 'TIPO', w: 28 }, { t: 'MOTIVO', w: AN - 141 },
+    ], hs.map((e, i) => [String(i + 1), e.nombre, num(e.horas), tipos[e.tipo] || '', e.motivo || '']),
+    { vacio: 'Sin horas extra' });
+    if (hs.length) {
+      const suma = (t) => hs.filter((e) => e.tipo === t).reduce((s, e) => s + Number(e.horas), 0);
+      const partes = Object.keys(tipos).map((t) => suma(t) && `${tipos[t].toLowerCase()} ${num(suma(t))} h`).filter(Boolean);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.text(`Total: ${num(hs.reduce((s, e) => s + Number(e.horas), 0))} h (${partes.join(', ')})`, M, c.y + 1, { baseline: 'top' });
+      c.y += 5;
+    }
+  }
+
   // Trabajos
   seccion(c, `TRABAJOS (${parte.trabajos.length})`, 20);
   tabla(c, [
