@@ -64,3 +64,7 @@ Para publicar cambios en `Code.gs` sin cambiar la URL: pegar el código, guardar
 La app se publica con GitHub Pages desde la rama `main`. **Al publicar cambios hay que subir `VERSION` en `sw.js`**; si no, los móviles seguirán usando la copia guardada.
 
 Para probar en el PC hace falta un servidor local (por ejemplo, uno de PowerShell con `HttpListener`). El navegador integrado no activa el modo sin conexión en `localhost`; en la web publicada sí.
+
+## Licencia
+
+Código propiedad de Ricardo Bel Petit. Todos los derechos reservados: no se puede usar ni copiar sin permiso. Ver [LICENSE](LICENSE).
