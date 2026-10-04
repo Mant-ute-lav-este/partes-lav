@@ -8,13 +8,13 @@ import * as db from './db.js';
 import { procesarFoto } from './fotos.js';
 import { textoReferencia } from './pdf.js';
 import { prepararEnvio, compartir } from './envio.js';
-import { api, hayServidor, SERVIDOR_URL } from './servidor.js';
+import { api, hayServidor, SERVIDOR_URL, alReintentar } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.8.1';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -338,6 +338,11 @@ async function conEspera(texto, fn) {
   capa.className = 'capa centro';
   capa.innerHTML = `<div class="hoja pequena"><div class="girando"></div><p>${esc(texto)}</p></div>`;
   document.body.append(capa);
+  // Si Google tarda o falla, la app reintenta sola: que se vea que sigue trabajando.
+  alReintentar((n, total) => {
+    const p = capa.querySelector('p');
+    if (p) p.innerHTML = `${esc(texto)}<br><small>El servidor tarda en responder. Intento ${n} de ${total}…</small>`;
+  });
   document.body.classList.add('sin-scroll');
   try {
     return await fn();
@@ -346,6 +351,7 @@ async function conEspera(texto, fn) {
     return null;
   } finally {
     capa.remove();
+    alReintentar(null);
     document.body.classList.toggle('sin-scroll',
       Boolean(estado.menu || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
   }

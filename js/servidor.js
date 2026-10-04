@@ -9,6 +9,10 @@ export const hayServidor = () => Boolean(SERVIDOR_URL);
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Quien muestra el aviso de espera puede escuchar los reintentos para decir «intento 2 de 5».
+let avisoReintento = null;
+export function alReintentar(fn) { avisoReintento = fn; }
+
 /**
  * Llama a una acción del servidor. Los errores de red llevan `red = true`
  * (el parte se queda en cola y se reintenta); los demás traen el mensaje del servidor.
@@ -17,12 +21,15 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
  * de error. Por eso se reintenta solo, con el mismo identificador de petición: el servidor
  * reconoce la repetición y contesta lo mismo sin volver a hacer nada.
  */
-export async function api(accion, datos = {}, { timeout = 60000, intentos = 3 } = {}) {
+export async function api(accion, datos = {}, { timeout = 45000, intentos = 5 } = {}) {
   if (!SERVIDOR_URL) throw new Error('La app no tiene servidor configurado.');
   const cuerpo = JSON.stringify({ accion, peticion: uuid(), ...datos });
   let error;
   for (let i = 0; i < intentos; i++) {
-    if (i) await espera(2000 * i);
+    if (i) {
+      if (avisoReintento) avisoReintento(i + 1, intentos);
+      await espera(Math.min(2000 * i, 5000));
+    }
     try {
       return await llamar(cuerpo, timeout);
     } catch (e) {
