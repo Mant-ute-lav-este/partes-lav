@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.3';
+const APP_VERSION = '0.8.4';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1045,6 +1045,25 @@ function nuevoTrabajo() {
   ir('trabajo');
 }
 
+/**
+ * Motivo de actuación: desplegable normal con la lista de la oficina (en el móvil sale como
+ * lista vertical) más «Otro» para escribirlo. Antes era un datalist, que Android muestra en fila.
+ */
+function campoMotivo(p, t, b) {
+  const lista = motivosCfg(p.tipo);
+  const m = t.motivoActuacion || '';
+  const otro = t.motivoOtro || (m && !lista.includes(m));
+  return `
+      <div class="campo"><span>Motivo de actuación <small>(opcional)</small></span>
+        <select data-motivo="${b}" aria-label="Motivo de actuación">
+          <option value="">Sin motivo</option>
+          ${lista.map((x) => `<option value="${esc(x)}" ${!otro && x === m ? 'selected' : ''}>${esc(x)}</option>`).join('')}
+          <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
+        </select>
+        ${otro ? `<input data-bind="${b}.motivoActuacion" value="${esc(m)}" placeholder="Escribe el motivo" autocomplete="off">` : ''}
+      </div>`;
+}
+
 /** Mismo corte que el trabajo anterior: copia línea, vía, horas, telefonema y PIDAME (se pueden cambiar). */
 function copiarTrabajoAnterior() {
   const p = estado.parte;
@@ -1161,9 +1180,7 @@ function vTrabajo() {
 
     <section class="tarjeta">
       <h2>Trabajo realizado</h2>
-      <label class="campo"><span>Motivo de actuación <small>(opcional)</small></span>
-        <input list="dl-motivos" data-bind="${b}.motivoActuacion" value="${esc(t.motivoActuacion)}" autocomplete="off"></label>
-      <datalist id="dl-motivos">${motivosCfg(p.tipo).map((m) => `<option value="${esc(m)}">`).join('')}</datalist>
+      ${campoMotivo(p, t, b)}
       ${campo('Metros lineales <small>(opcional)</small>', `${b}.metrosLineales`, t.metrosLineales, 'type="number" inputmode="decimal" min="0" step="any"')}
       <label class="campo"><span>Descripción</span><textarea data-bind="${b}.descripcion" rows="3">${esc(t.descripcion)}</textarea></label>
       <div class="campo"><span>¿Trabajo finalizado?</span>
@@ -1648,6 +1665,16 @@ async function onChange(e) {
     const files = [...el.files];
     el.value = '';
     if (files.length && estado.fotoPendiente) await anadirFotos(files, estado.fotoPendiente);
+    return;
+  }
+  if (el.dataset.motivo) {
+    const t = trabajoActual();
+    if (!t || estado.parte.estado !== 'borrador') return;
+    t.motivoOtro = el.value === '__otro';
+    t.motivoActuacion = t.motivoOtro ? '' : el.value;
+    guardarPronto();
+    render();
+    if (t.motivoOtro) { const inp = app.querySelector(`[data-bind="${el.dataset.motivo}.motivoActuacion"]`); if (inp) inp.focus(); }
     return;
   }
   if (el.matches('select[data-lista]')) {
