@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.4';
+const APP_VERSION = '0.8.5';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1054,9 +1054,9 @@ function campoMotivo(p, t, b) {
   const m = t.motivoActuacion || '';
   const otro = t.motivoOtro || (m && !lista.includes(m));
   return `
-      <div class="campo"><span>Motivo de actuación <small>(opcional)</small></span>
+      <div class="campo"><span>Motivo de actuación <span class="oblig">obligatorio</span></span>
         <select data-motivo="${b}" aria-label="Motivo de actuación">
-          <option value="">Sin motivo</option>
+          <option value="">Elige el motivo…</option>
           ${lista.map((x) => `<option value="${esc(x)}" ${!otro && x === m ? 'selected' : ''}>${esc(x)}</option>`).join('')}
           <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
         </select>
@@ -1182,7 +1182,7 @@ function vTrabajo() {
       <h2>Trabajo realizado</h2>
       ${campoMotivo(p, t, b)}
       ${campo('Metros lineales <small>(opcional)</small>', `${b}.metrosLineales`, t.metrosLineales, 'type="number" inputmode="decimal" min="0" step="any"')}
-      <label class="campo"><span>Descripción</span><textarea data-bind="${b}.descripcion" rows="3">${esc(t.descripcion)}</textarea></label>
+      <label class="campo"><span>Descripción <small>(opcional)</small></span><textarea data-bind="${b}.descripcion" rows="3">${esc(t.descripcion)}</textarea></label>
       <div class="campo"><span>¿Trabajo finalizado?</span>
         <div class="segmentado">${radio(`${b}.finalizado`, 'si', 'Sí', fin, 'data-tipo="bool" data-rerender')}${radio(`${b}.finalizado`, 'no', 'No', fin, 'data-tipo="bool" data-rerender')}</div></div>
     </section>
@@ -1341,7 +1341,8 @@ function faltasTrabajo(t) {
   }
   if (vacio(t.linea)) add('línea', 'falta la línea.');
   if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');
-  if (vacio(t.descripcion)) add('descripción', 'falta la descripción.');
+  if (t.motivoOtro && vacio(t.motivoActuacion)) add('motivo', 'has elegido «Otro» motivo de actuación: escríbelo.');
+  else if (vacio(t.motivoActuacion)) add('motivo', 'elige el motivo de actuación.');
   const hay = (fase) => t.fotos.some((f) => f.fase === fase);
   if (!hay('antes')) add('foto de antes', 'falta al menos una foto de ANTES.');
   if (t.finalizado === false) {
