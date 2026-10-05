@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.5';
+const APP_VERSION = '0.8.6';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -47,9 +47,21 @@ const urls = new Map();   // id de foto → URL para las miniaturas
 
 async function iniciar() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    const habiaVersion = Boolean(navigator.serviceWorker.controller);
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+      // Buscar versión nueva también al volver a la app (Android la deja abierta en segundo plano).
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch(() => {});
     navigator.serviceWorker.addEventListener('message', (e) => {
       if (e.data && e.data.tipo === 'salida') refrescarVista();
+    });
+    // Cuando entra una versión nueva: se recarga sola, salvo a mitad de un parte, que avisa.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!habiaVersion) return;   // primera instalación: no hace falta recargar
+      if (estado.parte && (estado.vista === 'parte' || estado.vista === 'trabajo')) avisoVersionNueva();
+      else location.reload();
     });
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -72,6 +84,20 @@ async function iniciar() {
   if (hayServidor()) return ir('bienvenida');
   if (!estado.config) return ir('setup-datos');
   return ir('setup-capataz');
+}
+
+/** Barra fija arriba para actualizar sin perder nada de lo que se está escribiendo. */
+function avisoVersionNueva() {
+  if (document.getElementById('version-nueva')) return;
+  const d = document.createElement('div');
+  d.id = 'version-nueva';
+  d.className = 'version-nueva';
+  d.innerHTML = '<span>Hay una versión nueva de la app.</span><button class="btn mini">Actualizar</button>';
+  d.querySelector('button').addEventListener('click', async () => {
+    await guardarYa();
+    location.reload();
+  });
+  document.body.append(d);
 }
 
 /** Tras desbloquear con el PIN: inicio y, si hay registro, sincroniza con el servidor. */
