@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.2';
+const APP_VERSION = '0.8.3';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1028,6 +1028,8 @@ function nuevoTrabajo() {
     telefonema: { numero: '', hora: '' },
     entradaVia: '',
     salidaVia: '',
+    horaInicio: '',
+    horaFin: '',
     linea: previo ? previo.linea : '',
     via: '',
     aparato: '',
@@ -1052,7 +1054,7 @@ function copiarTrabajoAnterior() {
   if (!t || !a) return;
   Object.assign(t, {
     linea: a.linea, via: a.via, sinVia: a.sinVia, entradaVia: a.entradaVia, salidaVia: a.salidaVia,
-    telefonema: { ...a.telefonema }, pidame: a.pidame,
+    telefonema: { ...a.telefonema }, pidame: a.pidame, horaInicio: a.horaInicio || '', horaFin: a.horaFin || '',
   });
   guardarPronto();
   render();
@@ -1153,6 +1155,8 @@ function vTrabajo() {
         <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>
       ${campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"')}
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, t.pkFin)}</div>
+      ${t.sinVia ? `<div class="dos">${campo('Hora de inicio', `${b}.horaInicio`, t.horaInicio, 'type="time"')}
+        ${campo('Hora de fin', `${b}.horaFin`, t.horaFin, 'type="time"')}</div>` : ''}
     </section>
 
     <section class="tarjeta">
@@ -1314,6 +1318,9 @@ function faltasTrabajo(t) {
     if (vacio(t.via)) add('vía', 'falta la vía.');
     if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
     if (!pkValido(t.pkFin)) add('PK fin', 'falta el PK de fin (km y metros).');
+  } else {
+    if (!t.horaInicio) add('hora de inicio', 'falta la hora de inicio.');
+    if (!t.horaFin) add('hora de fin', 'falta la hora de fin.');
   }
   if (vacio(t.linea)) add('línea', 'falta la línea.');
   if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');

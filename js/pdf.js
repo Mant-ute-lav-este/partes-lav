@@ -260,8 +260,9 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     textoReferencia(t),
     t.pidame,
     t.sinVia ? 'No ocupa vía' : [t.telefonema?.numero && `Nº ${t.telefonema.numero}`, t.telefonema?.hora].filter(Boolean).join('\n'),
-    t.sinVia ? '-' : t.entradaVia,
-    t.sinVia ? '-' : t.salidaVia,
+    // Sin ocupar la vía: en esas columnas van la hora de inicio y la de fin del trabajo.
+    t.sinVia ? (t.horaInicio ? `Inicio\n${t.horaInicio}` : '-') : t.entradaVia,
+    t.sinVia ? (t.horaFin ? `Fin\n${t.horaFin}` : '-') : t.salidaVia,
     t.linea,
     t.sinVia && !t.via ? '-' : t.via,
     t.aparato || '',
