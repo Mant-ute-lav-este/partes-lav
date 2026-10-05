@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.1';
+const APP_VERSION = '0.8.2';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -669,7 +669,10 @@ function vParte() {
 
     <button class="btn peligro-texto" data-action="borrar-parte">Borrar este borrador</button>
   </main>
-  <footer class="pie"><button class="btn primario grande" data-action="cerrar-parte">Cerrar parte</button></footer>
+  <footer class="pie"><div class="fila-botones">
+    <button class="btn secundario grande" data-action="guardar-salir">Guardar y salir</button>
+    <button class="btn primario grande" data-action="cerrar-parte">Cerrar parte</button>
+  </div></footer>
   ${estado.errores.length ? vErrores() : ''}
   ${estado.preguntaExtras ? vPreguntaExtras() : ''}`;
 }
@@ -1870,6 +1873,11 @@ async function onClick(e) {
     case 'borrar-foto': borrarFoto(el.dataset.id); break;
     case 'borrar-parte': borrarParte(); break;
     case 'cerrar-parte': cerrarParte(); break;
+    case 'guardar-salir':
+      await guardarYa();
+      await ir('inicio');
+      toast('Parte guardado. Puedes seguir con él desde «Borradores».', 4000);
+      break;
     case 'cerrar-errores': estado.errores = []; render(); break;
     case 'reintentar-envio': prepararEnvioActual(); break;
     case 'enviar': if (estado.perfil.token) enviarServidor(); else enviar(); break;

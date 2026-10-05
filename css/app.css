@@ -223,6 +223,8 @@ input.pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; }
   background: var(--superficie); border-top: 1px solid var(--borde);
 }
 .pie .btn { max-width: 688px; margin: 0 auto; }
+.pie .fila-botones { max-width: 688px; margin: 0 auto; }
+.pie .fila-botones .btn { margin: 0; }
 
 /* Capas (menú, avisos, foto) */
 .capa { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .55); display: flex; align-items: flex-end; justify-content: center; }
