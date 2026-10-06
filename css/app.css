@@ -262,3 +262,6 @@ input.pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; }
   box-shadow: var(--sombra);
 }
 .version-nueva .btn { background: #fff; color: var(--acento); border-color: #fff; }
+
+/* Hora mal escrita (p. ej. 25:70) */
+input.mal { border-color: var(--peligro); outline: 2px solid color-mix(in srgb, var(--peligro) 35%, transparent); }

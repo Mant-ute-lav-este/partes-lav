@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.6';
+const APP_VERSION = '0.8.7';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1122,6 +1122,32 @@ function campo(etq, ruta, valor, extra = '') {
 const LINEAS = ['040', '038'];
 
 /**
+ * Horas con el teclado numérico en vez del reloj: se escriben las cifras («2330») y los dos
+ * puntos salen solos. Al salir de la casilla se completa: «8» → 08:00, «830» → 08:30.
+ */
+const horaValida = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(s || ''));
+
+function campoHora(etq, ruta, valor) {
+  return `<label class="campo"><span>${etq}</span><input inputmode="numeric" maxlength="5" placeholder="hh:mm"
+    autocomplete="off" data-hora="${ruta}" value="${esc(valor || '')}"></label>`;
+}
+
+function aplicarHora(el, final) {
+  if (!estado.parte || estado.parte.estado !== 'borrador') return;
+  let d = el.value.replace(/\D/g, '').slice(0, 4);
+  if (final && d) {
+    if (d.length <= 2) d = d.padStart(2, '0') + '00';
+    else if (d.length === 3) d = `0${d}`;
+  }
+  el.value = d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d;
+  el.classList.toggle('mal', final && Boolean(el.value) && !horaValida(el.value));
+  setPath(estado.parte, el.dataset.hora, el.value);
+  const g = document.getElementById('guardado');
+  if (g) g.textContent = 'Guardando…';
+  guardarPronto();
+}
+
+/**
  * PK en dos casillas numéricas (km + metros), porque el teclado numérico del móvil no tiene «+».
  * Se guarda junto como «481+045».
  */
@@ -1191,17 +1217,17 @@ function vTrabajo() {
         <span>No se ocupa la vía <small>(p. ej. trabajos en base)</small></span></label>
       ${t.sinVia ? '' : `
       <div class="dos">${campo('Telefonema nº', `${b}.telefonema.numero`, t.telefonema.numero, 'inputmode="numeric" autocomplete="off"')}
-        ${campo('Hora telefonema', `${b}.telefonema.hora`, t.telefonema.hora, 'type="time"')}</div>
-      <div class="dos">${campo('Entrada en vía', `${b}.entradaVia`, t.entradaVia, 'type="time"')}
-        ${campo('Salida de vía', `${b}.salidaVia`, t.salidaVia, 'type="time"')}</div>`}
+        ${campoHora('Hora telefonema', `${b}.telefonema.hora`, t.telefonema.hora)}</div>
+      <div class="dos">${campoHora('Entrada en vía', `${b}.entradaVia`, t.entradaVia)}
+        ${campoHora('Salida de vía', `${b}.salidaVia`, t.salidaVia)}</div>`}
       <div class="campo"><span>Línea</span>
         <div class="segmentado">${LINEAS.map((l) => radio(`${b}.linea`, l, l, t.linea)).join('')}</div></div>
       <div class="campo"><span>Vía</span>
         <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>
       ${campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"')}
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, t.pkFin)}</div>
-      ${t.sinVia ? `<div class="dos">${campo('Hora de inicio', `${b}.horaInicio`, t.horaInicio, 'type="time"')}
-        ${campo('Hora de fin', `${b}.horaFin`, t.horaFin, 'type="time"')}</div>` : ''}
+      ${t.sinVia ? `<div class="dos">${campoHora('Hora de inicio', `${b}.horaInicio`, t.horaInicio)}
+        ${campoHora('Hora de fin', `${b}.horaFin`, t.horaFin)}</div>` : ''}
     </section>
 
     <section class="tarjeta">
@@ -1356,14 +1382,15 @@ function faltasTrabajo(t) {
   else if (r.tipo === 'SIN_REF' && vacio(r.motivo)) add('motivo sin referencia', 'explica por qué no tiene referencia.');
   else if (r.tipo !== 'SIN_REF' && vacio(r.codigo)) add(`nº de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}`, `falta el número de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}.`);
   if (!t.sinVia) {
-    if (!t.entradaVia) add('entrada en vía', 'falta la hora de entrada en vía.');
-    if (!t.salidaVia) add('salida de vía', 'falta la hora de salida de vía.');
+    if (!horaValida(t.entradaVia)) add('entrada en vía', 'falta la hora de entrada en vía.');
+    if (!horaValida(t.salidaVia)) add('salida de vía', 'falta la hora de salida de vía.');
+    if (t.telefonema && t.telefonema.hora && !horaValida(t.telefonema.hora)) add('hora del telefonema', 'la hora del telefonema no es válida.');
     if (vacio(t.via)) add('vía', 'falta la vía.');
     if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
     if (!pkValido(t.pkFin)) add('PK fin', 'falta el PK de fin (km y metros).');
   } else {
-    if (!t.horaInicio) add('hora de inicio', 'falta la hora de inicio.');
-    if (!t.horaFin) add('hora de fin', 'falta la hora de fin.');
+    if (!horaValida(t.horaInicio)) add('hora de inicio', 'falta la hora de inicio.');
+    if (!horaValida(t.horaFin)) add('hora de fin', 'falta la hora de fin.');
   }
   if (vacio(t.linea)) add('línea', 'falta la línea.');
   if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');
@@ -1676,6 +1703,7 @@ function onInput(e) {
     return;
   }
   if (el.dataset.pk) { aplicarPk(el, false); return; }
+  if (el.dataset.hora) { aplicarHora(el, false); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
   if (el.matches('[data-bind]') && el.type !== 'radio' && el.type !== 'checkbox') aplicarBind(el);
 }
@@ -1720,6 +1748,7 @@ async function onChange(e) {
     return;
   }
   if (el.dataset.pk) { aplicarPk(el, true); return; }
+  if (el.dataset.hora) { aplicarHora(el, true); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
   if (el.dataset.medida != null) {
     const p = estado.parte;
