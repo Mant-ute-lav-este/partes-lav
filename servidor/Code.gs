@@ -4,7 +4,7 @@
  * - Registra a los capataces (Gmail + código por correo + nombre de la lista + PIN).
  *   Cada registro queda pendiente hasta que la oficina lo aprueba desde un enlace.
  *   Si alguien olvida el PIN, crea otro con un código que le llega al correo.
- * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, medidas antiincendios, motivos y cabecera).
+ * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, aparatos con sus PK, medidas antiincendios, motivos y cabecera).
  * - Recibe los partes y los manda por correo a la oficina, donde Power Automate los
  *   guarda en la carpeta de Teams.
  *
@@ -113,6 +113,7 @@ function configurar() {
   crearHoja_(libro, 'Trabajadores', ['Nombre', 'Empresa', 'Habilitacion', 'Categoria']);
   crearHoja_(libro, 'Maquinas', ['Descripcion']);
   crearHoja_(libro, 'Antiincendios', ['Medida']);
+  crearHoja_(libro, 'Aparatos', ['Nombre', 'PkInicio', 'PkFin']);
   crearHoja_(libro, 'Vehiculos', ['Descripcion', 'Matricula']);
   crearHoja_(libro, 'Motivos', ['Tipo', 'Motivo']);
   crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
@@ -346,6 +347,9 @@ function config_(d) {
       maquinas: tabla_('Maquinas').filas.filter((v) => v.Descripcion).map((v) => ({
         descripcion: String(v.Descripcion),
       })),
+      aparatos: tabla_('Aparatos').filas.filter((a) => a.Nombre).map((a) => ({
+        nombre: String(a.Nombre), pkInicio: String(a.PkInicio || ''), pkFin: String(a.PkFin || ''),
+      })),
       antiincendios: tabla_('Antiincendios').filas.map((m) => String(m.Medida || '').trim()).filter(Boolean),
       vehiculos: tabla_('Vehiculos').filas.filter((v) => v.Descripcion).map((v) => ({
         descripcion: String(v.Descripcion), matricula: String(v.Matricula || ''),
@@ -357,7 +361,7 @@ function config_(d) {
 
 /**
  * Sube la lista de la oficina (mismo formato que config-partes-lav.json). Requiere la clave de
- * administración. Solo cambia lo que venga: trabajadores, maquinas, vehiculos, antiincendios, motivos y, si
+ * administración. Solo cambia lo que venga: trabajadores, maquinas, vehiculos, aparatos, antiincendios, motivos y, si
  * viene la cabecera, los ajustes.
  */
 function cargarLista_(d) {
@@ -378,6 +382,11 @@ function cargarLista_(d) {
   if (Array.isArray(c.vehiculos)) {
     reemplazar_('Vehiculos', c.vehiculos.map((v) => [v.descripcion, v.matricula || '']));
     hecho.vehiculos = c.vehiculos.length;
+  }
+  if (Array.isArray(c.aparatos)) {
+    asegurarHoja_('Aparatos', ['Nombre', 'PkInicio', 'PkFin']);
+    reemplazar_('Aparatos', c.aparatos.map((a) => [a.nombre, a.pkInicio || '', a.pkFin || '']));
+    hecho.aparatos = c.aparatos.length;
   }
   if (Array.isArray(c.antiincendios)) {
     asegurarHoja_('Antiincendios', ['Medida']);

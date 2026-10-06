@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.8.7';
+const APP_VERSION = '0.9.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1111,11 +1111,38 @@ function etiquetaFoto(t) {
   const r = t.referencia || {};
   if (r.tipo === 'SIOS') return `SIOS ${r.codigo}`.trim();
   if (r.tipo === 'INCIDENCIA') return `INCIDENCIA ${r.codigo}`.trim();
-  return 'SIN REFERENCIA';
+  return (r.motivo || '').trim().toUpperCase() || 'SIN REFERENCIA';
 }
 
 function campo(etq, ruta, valor, extra = '') {
   return `<label class="campo"><span>${etq}</span><input data-bind="${ruta}" value="${esc(valor == null ? '' : valor)}" ${extra}></label>`;
+}
+
+/**
+ * Aparato (opcional): con la lista de la oficina sale un desplegable agrupado por estación y, al
+ * elegir uno, se rellenan solos los PK de inicio y fin (que se pueden cambiar). Sin lista, o con
+ * «Otro», se escribe a mano.
+ */
+function campoAparato(t, b) {
+  const lista = (estado.config && estado.config.aparatos) || [];
+  if (!lista.length) return campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"');
+  const a = t.aparato || '';
+  const otro = t.aparatoOtro || (a && !lista.some((x) => x.nombre === a));
+  const grupos = new Map();
+  lista.forEach((x) => {
+    const est = x.nombre.split(/\s+/)[1] || 'Otros';
+    if (!grupos.has(est)) grupos.set(est, []);
+    grupos.get(est).push(x);
+  });
+  return `
+      <div class="campo"><span>Aparato <small>(opcional)</small></span>
+        <select data-aparato="${b}" aria-label="Aparato">
+          <option value="">Sin aparato</option>
+          ${[...grupos].map(([est, xs]) => `<optgroup label="${esc(est)}">${xs.map((x) => `<option value="${esc(x.nombre)}" ${!otro && x.nombre === a ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</optgroup>`).join('')}
+          <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
+        </select>
+        ${otro ? `<input data-bind="${b}.aparato" value="${esc(a)}" placeholder="Escribe el aparato" autocomplete="off">` : ''}
+      </div>`;
 }
 
 /** Líneas que se ofrecen en botones, en Infra y en Super (las de la cabecera del PDF no cuentan aquí). */
@@ -1205,7 +1232,7 @@ function vTrabajo() {
       </div>
       ${r.tipo === 'SIOS' || r.tipo === 'INCIDENCIA'
     ? campo(r.tipo === 'SIOS' ? 'Nº de SIOS' : 'Nº de incidencia', `${b}.referencia.codigo`, r.codigo, 'autocomplete="off"') : ''}
-      ${r.tipo === 'SIN_REF' ? `<label class="campo"><span>Motivo (¿por qué no tiene referencia?)</span>
+      ${r.tipo === 'SIN_REF' ? `<label class="campo"><span>Escribe la referencia <span class="oblig">obligatorio</span></span>
         <textarea data-bind="${b}.referencia.motivo" rows="2">${esc(r.motivo)}</textarea></label>` : ''}
       ${t.fotos.length ? '<p class="nota">Las fotos ya hechas conservan la referencia con la que se hicieron.</p>' : ''}
       ${campo('Nº acta PIDAME', `${b}.pidame`, t.pidame, 'autocomplete="off"')}
@@ -1224,7 +1251,7 @@ function vTrabajo() {
         <div class="segmentado">${LINEAS.map((l) => radio(`${b}.linea`, l, l, t.linea)).join('')}</div></div>
       <div class="campo"><span>Vía</span>
         <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>
-      ${campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"')}
+      ${campoAparato(t, b)}
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, t.pkFin)}</div>
       ${t.sinVia ? `<div class="dos">${campoHora('Hora de inicio', `${b}.horaInicio`, t.horaInicio)}
         ${campoHora('Hora de fin', `${b}.horaFin`, t.horaFin)}</div>` : ''}
@@ -1379,7 +1406,7 @@ function faltasTrabajo(t) {
   const vacio = (s) => !String(s == null ? '' : s).trim();
   const r = t.referencia || {};
   if (!r.tipo) add('referencia', 'elige la referencia (SIOS, incidencia o sin referencia).');
-  else if (r.tipo === 'SIN_REF' && vacio(r.motivo)) add('motivo sin referencia', 'explica por qué no tiene referencia.');
+  else if (r.tipo === 'SIN_REF' && vacio(r.motivo)) add('referencia escrita', 'escribe la referencia (has elegido «Sin referencia»).');
   else if (r.tipo !== 'SIN_REF' && vacio(r.codigo)) add(`nº de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}`, `falta el número de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}.`);
   if (!t.sinVia) {
     if (!horaValida(t.entradaVia)) add('entrada en vía', 'falta la hora de entrada en vía.');
@@ -1722,6 +1749,23 @@ async function onChange(e) {
     if (files.length && estado.fotoPendiente) await anadirFotos(files, estado.fotoPendiente);
     return;
   }
+  if (el.dataset.aparato) {
+    const t = trabajoActual();
+    if (!t || estado.parte.estado !== 'borrador') return;
+    if (el.value === '__otro') {
+      t.aparatoOtro = true;
+      t.aparato = '';
+    } else {
+      t.aparatoOtro = false;
+      t.aparato = el.value;
+      const ap = ((estado.config || {}).aparatos || []).find((x) => x.nombre === el.value);
+      if (ap) { t.pkInicio = ap.pkInicio; t.pkFin = ap.pkFin; }
+    }
+    guardarPronto();
+    render();
+    if (t.aparatoOtro) { const inp = app.querySelector(`[data-bind="${el.dataset.aparato}.aparato"]`); if (inp) inp.focus(); }
+    return;
+  }
   if (el.dataset.motivo) {
     const t = trabajoActual();
     if (!t || estado.parte.estado !== 'borrador') return;
@@ -1950,7 +1994,7 @@ async function onClick(e) {
     case 'foto': {
       const t = trabajoActual();
       const r = t.referencia;
-      if (!r.tipo || (r.tipo !== 'SIN_REF' && !r.codigo.trim())) {
+      if (!r.tipo || (r.tipo === 'SIN_REF' ? !String(r.motivo || '').trim() : !r.codigo.trim())) {
         toast('Pon primero la referencia: sale en el sello de la foto.', 3500);
         break;
       }

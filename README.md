@@ -33,7 +33,7 @@ El repositorio es **público**: aquí solo hay código y datos inventados. Los n
 
 - `destinatario`: correo al que se envían los partes.
 - `cabecera`: textos de la cabecera del PDF (jefatura, ámbito, empresa, líneas).
-- `capataces`, `trabajadores` (nombre, empresa, habilitación, categoría), `maquinas` (descripción), `vehiculos` (descripción y matrícula), `antiincendios` (lista de medidas) y `motivos`. Para cambiar solo una parte, basta con subir esa lista: lo que no venga no se toca.
+- `capataces`, `trabajadores` (nombre, empresa, habilitación, categoría), `maquinas` (descripción), `vehiculos` (descripción y matrícula), `aparatos` (nombre, pkInicio y pkFin, que rellenan los PK), `antiincendios` (lista de medidas) y `motivos`. Para cambiar solo una parte, basta con subir esa lista: lo que no venga no se toca.
 
 ## Servidor de envío (Google Apps Script)
 

@@ -32,6 +32,11 @@
     { "descripcion": "Camión grúa", "matricula": "1111-BBB" },
     { "descripcion": "Todoterreno", "matricula": "2222-CCC" }
   ],
+  "aparatos": [
+    { "nombre": "S1 EJE 1", "pkInicio": "100+250", "pkFin": "100+430" },
+    { "nombre": "S2 EJE 2", "pkInicio": "100+520", "pkFin": "100+340" },
+    { "nombre": "D3 OTR 1", "pkInicio": "205+010", "pkFin": "205+190" }
+  ],
   "motivos": {
     "infra": ["DESBROCE, HERBICIDA", "TALA Y PODA", "DESCASTE", "TRABAJOS EN BASE", "LIMPIEZA DE CUNETAS", "REVISIÓN DE CERRAMIENTO"],
     "super": ["BATEO", "PERFILADO", "ESTABILIZADO", "SOLDADURA", "SUSTITUCIÓN DE MATERIAL", "REVISIÓN DE APARATOS DE VÍA"]

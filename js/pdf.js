@@ -90,7 +90,8 @@ export function textoReferencia(t) {
   const r = t.referencia || {};
   if (r.tipo === 'SIOS') return `SIOS ${r.codigo || ''}`.trim();
   if (r.tipo === 'INCIDENCIA') return `Incidencia ${r.codigo || ''}`.trim();
-  if (r.tipo === 'SIN_REF') return `Sin referencia${r.motivo ? `: ${r.motivo}` : ''}`;
+  // Sin referencia: lo que escribe el capataz es la referencia (antes salía «Sin referencia: …»).
+  if (r.tipo === 'SIN_REF') return (r.motivo || '').trim() || 'Sin referencia';
   return '';
 }
 
