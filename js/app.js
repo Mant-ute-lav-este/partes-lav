@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.1';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1051,7 +1051,7 @@ function nuevoTrabajo() {
     referencia: { tipo: '', codigo: '', motivo: '' },
     pidame: '',
     sinVia: false,
-    telefonema: { numero: '', hora: '' },
+    telefonema: { numero: '', salida: '' },   // nº del telefonema de entrada y del de salida
     entradaVia: '',
     salidaVia: '',
     horaInicio: '',
@@ -1243,8 +1243,8 @@ function vTrabajo() {
       <label class="check"><input type="checkbox" data-bind="${b}.sinVia" data-rerender ${t.sinVia ? 'checked' : ''}>
         <span>No se ocupa la vía <small>(p. ej. trabajos en base)</small></span></label>
       ${t.sinVia ? '' : `
-      <div class="dos">${campo('Telefonema nº', `${b}.telefonema.numero`, t.telefonema.numero, 'inputmode="numeric" autocomplete="off"')}
-        ${campoHora('Hora telefonema', `${b}.telefonema.hora`, t.telefonema.hora)}</div>
+      <div class="dos">${campo('Telefonema de entrada nº', `${b}.telefonema.numero`, t.telefonema.numero, 'inputmode="numeric" autocomplete="off"')}
+        ${campo('Telefonema de salida nº', `${b}.telefonema.salida`, t.telefonema.salida, 'inputmode="numeric" autocomplete="off"')}</div>
       <div class="dos">${campoHora('Entrada en vía', `${b}.entradaVia`, t.entradaVia)}
         ${campoHora('Salida de vía', `${b}.salidaVia`, t.salidaVia)}</div>`}
       <div class="campo"><span>Línea</span>
@@ -1411,7 +1411,6 @@ function faltasTrabajo(t) {
   if (!t.sinVia) {
     if (!horaValida(t.entradaVia)) add('entrada en vía', 'falta la hora de entrada en vía.');
     if (!horaValida(t.salidaVia)) add('salida de vía', 'falta la hora de salida de vía.');
-    if (t.telefonema && t.telefonema.hora && !horaValida(t.telefonema.hora)) add('hora del telefonema', 'la hora del telefonema no es válida.');
     if (vacio(t.via)) add('vía', 'falta la vía.');
     if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
     if (!pkValido(t.pkFin)) add('PK fin', 'falta el PK de fin (km y metros).');

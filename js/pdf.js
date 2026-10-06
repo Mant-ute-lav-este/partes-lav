@@ -251,7 +251,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
   seccion(c, `TRABAJOS (${parte.trabajos.length})`, 20);
   tabla(c, [
     { t: 'Nº', w: 7, a: 'center' }, { t: 'REFERENCIA', w: 30 }, { t: 'Nº PIDAME', w: 18 },
-    { t: 'TELEFONEMA', w: 20 }, { t: 'ENTRADA\nVÍA', w: 15, a: 'center' }, { t: 'SALIDA\nVÍA', w: 13, a: 'center' },
+    { t: 'TELEFONEMAS', w: 20 }, { t: 'ENTRADA\nVÍA', w: 15, a: 'center' }, { t: 'SALIDA\nVÍA', w: 13, a: 'center' },
     { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' }, { t: 'APARATO', w: 16 },
     { t: 'P.K. INICIO', w: 16, a: 'center' },
     { t: 'P.K. FIN', w: 16, a: 'center' }, { t: 'M. LIN', w: 11, a: 'center' }, { t: 'MOTIVO ACTUACIÓN', w: 26 },
@@ -260,7 +260,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     String(i + 1),
     textoReferencia(t),
     t.pidame,
-    t.sinVia ? 'No ocupa vía' : [t.telefonema?.numero && `Nº ${t.telefonema.numero}`, t.telefonema?.hora].filter(Boolean).join('\n'),
+    t.sinVia ? 'No ocupa vía' : [t.telefonema?.numero && `Ent. ${t.telefonema.numero}`, t.telefonema?.salida && `Sal. ${t.telefonema.salida}`, t.telefonema?.hora].filter(Boolean).join('\n'),
     // Sin ocupar la vía: en esas columnas van la hora de inicio y la de fin del trabajo.
     t.sinVia ? (t.horaInicio ? `Inicio\n${t.horaInicio}` : '-') : t.entradaVia,
     t.sinVia ? (t.horaFin ? `Fin\n${t.horaFin}` : '-') : t.salidaVia,
