@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.9.2';
+const APP_VERSION = '0.9.3';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1341,11 +1341,27 @@ function vFotoGrande() {
   </div></div>`;
 }
 
+/** Explica por qué una foto no se ha podido usar, en lugar de culpar siempre al formato. */
+function textoErrorFoto(e, file) {
+  const nombre = `«${String((file && file.name) || 'la foto').slice(0, 30)}»`;
+  const heic = /heic|heif/i.test((file && file.type) || '') || /\.(heic|heif)$/i.test((file && file.name) || '');
+  if (e && e.motivo === 'vacia') return `${nombre} está vacía o no se ha descargado entera.`;
+  if (e && e.motivo === 'formato') {
+    return heic
+      ? `${nombre} es HEIC y este navegador no puede abrirla. Hazla con la cámara de la app o pásala a JPG.`
+      : `${nombre} no se puede abrir en este navegador (formato no compatible). Prueba con otra foto o desde Chrome.`;
+  }
+  if (e && e.name === 'QuotaExceededError') return 'No hay espacio en el móvil para guardar la foto. Libera espacio.';
+  if (e && e.motivo === 'memoria') return `${nombre} es demasiado grande para este móvil. Prueba con menos fotos a la vez.`;
+  return `No se ha podido usar la foto ${nombre}.`;
+}
+
 async function anadirFotos(files, { fase, origen }) {
   const p = estado.parte;
   const t = trabajoActual();
   if (!t) return;
   let ok = 0;
+  const fallos = [];
   for (const [k, file] of files.entries()) {
     estado.procesando = files.length > 1 ? `Preparando foto ${k + 1} de ${files.length}…` : 'Preparando foto…';
     render();
@@ -1361,13 +1377,19 @@ async function anadirFotos(files, { fase, origen }) {
       ok++;
     } catch (e) {
       console.error(e);
-      toast('No se ha podido usar una de las fotos (formato no compatible).', 4000);
+      fallos.push(textoErrorFoto(e, file));
     }
   }
   estado.procesando = '';
   await guardarYa();
   render();
-  if (ok) toast(ok === 1 ? 'Foto añadida' : `${ok} fotos añadidas`);
+  const hechas = ok === 1 ? 'Foto añadida' : `${ok} fotos añadidas`;
+  if (fallos.length) {
+    const aviso = fallos.length === 1 ? fallos[0] : `${fallos.length} fotos no se han podido usar. ${fallos[0]}`;
+    toast(ok ? `${hechas}. ${aviso}` : aviso, 7000);
+  } else if (ok) {
+    toast(hechas);
+  }
 }
 
 async function borrarFoto(id) {

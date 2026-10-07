@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.9.3 · 2026-10-07
+- Fotos de la galería: el aviso dice la causa real (formato no compatible, HEIC, foto vacía, demasiado grande o sin espacio) y el nombre de la foto, en vez de culpar siempre al formato.
+
 ## 0.9.2 · 2026-10-07
 - Aviso en la portada: «Tienes N partes sin enviar» con botón «Enviar ahora» (o «Abrir» si el parte está cerrado pero sin pulsar Enviar).
 

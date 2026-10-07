@@ -138,10 +138,16 @@ export async function procesarFoto(file, { origen, fase, etiqueta, ref }) {
     }
   }
 
-  const img = await decodificar(file);
+  if (!file.size) throw Object.assign(new Error('Archivo vacío'), { motivo: 'vacia' });
+  let img;
+  try {
+    img = await decodificar(file);
+  } catch (e) {
+    throw Object.assign(new Error('No se pudo abrir la imagen'), { motivo: 'formato', causa: e });
+  }
   const w0 = img.width || img.naturalWidth;
   const h0 = img.height || img.naturalHeight;
-  if (!w0 || !h0) throw new Error('Imagen vacía');
+  if (!w0 || !h0) throw Object.assign(new Error('Imagen vacía'), { motivo: 'vacia' });
   const escala = Math.min(1, LADO_MAX / Math.max(w0, h0));
   const w = Math.round(w0 * escala);
   const h = Math.round(h0 * escala);
@@ -174,7 +180,7 @@ export async function procesarFoto(file, { origen, fase, etiqueta, ref }) {
   ctx.fillText(linea2, margen, h + banda * 0.72);
 
   const blob = await new Promise((res, rej) => canvas.toBlob(
-    (b) => (b ? res(b) : rej(new Error('No se pudo generar la foto'))), 'image/jpeg', CALIDAD,
+    (b) => (b ? res(b) : rej(Object.assign(new Error('No se pudo generar la foto'), { motivo: 'memoria' }))), 'image/jpeg', CALIDAD,
   ));
   const alto = canvas.height;
   canvas.width = 0;   // libera memoria en móviles modestos
