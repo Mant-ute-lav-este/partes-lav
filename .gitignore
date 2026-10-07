@@ -1,7 +1,10 @@
 # Datos reales de la oficina: NUNCA al repositorio (es público)
+# Listas con datos reales (menos el archivo de ejemplo)
 config*.json
 !ejemplo/config-ejemplo.json
+# Herramientas, claves y pruebas locales
 privado/
+# Hojas de cálculo, PDF y fotos (pueden llevar datos de personas)
 *.xlsx
 *.pdf
 *.jpg

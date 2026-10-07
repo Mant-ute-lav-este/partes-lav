@@ -61,9 +61,15 @@ Para publicar cambios en `Code.gs` sin cambiar la URL: pegar el código, guardar
 
 ## Publicar cambios
 
-La app se publica con GitHub Pages desde la rama `main`. **Al publicar cambios hay que subir `VERSION` en `sw.js`**; si no, los móviles seguirán usando la copia guardada.
+La app se publica con GitHub Pages desde la rama `main`. **Al publicar hay que subir la versión** en `sw.js` y `js/app.js`; si no, los móviles seguirán usando la copia guardada. El script `privado/herramientas/publicar.ps1` lo hace a la vez, comprueba la lista de caché y que no haya datos privados, y sube el cambio.
 
-Para probar en el PC hace falta un servidor local (por ejemplo, uno de PowerShell con `HttpListener`). El navegador integrado no activa el modo sin conexión en `localhost`; en la web publicada sí.
+Para probar en el PC hace falta un servidor local (`privado/herramientas/servidor.ps1`). El navegador integrado no activa el modo sin conexión en `localhost`; en la web publicada sí.
+
+## Documentación
+
+- [Arquitectura](docs/ARQUITECTURA.md): cómo encajan app, servidor, correo, Power Automate y Teams.
+- [API del servidor](docs/API-servidor.md): para conectar otra app al registro de usuarios.
+- [Historial de versiones](CHANGELOG.md).
 
 ## Licencia
 
