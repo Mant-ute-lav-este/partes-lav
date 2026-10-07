@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.9.1';
+const APP_VERSION = '0.9.2';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -533,8 +533,25 @@ function grupo(titulo, partes) {
   return `<h2 class="titulo-grupo">${titulo}</h2>${partes.map(itemParte).join('')}`;
 }
 
+function avisoSinEnviar(pendientes) {
+  if (!pendientes.length) return '';
+  const n = pendientes.length;
+  const conError = pendientes.some((p) => p.errorEnvio);
+  // Un parte cerrado al que aún no se ha pulsado Enviar no está en la cola: hay que abrirlo.
+  const sinCola = pendientes.find((p) => p.estado === 'cerrado');
+  const boton = sinCola
+    ? `<button class="btn secundario" data-action="abrir" data-id="${sinCola.id}">Abrir</button>`
+    : '<button class="btn secundario" data-action="enviar-pendientes">Enviar ahora</button>';
+  return `
+    <div class="aviso aviso-envio">
+      <span>${n === 1 ? 'Tienes 1 parte sin enviar' : `Tienes ${n} partes sin enviar`}${conError ? ': alguno ha dado error, ábrelo' : ''}</span>
+      ${boton}
+    </div>`;
+}
+
 function vInicio() {
   const ps = estado.lista.slice().sort((a, b) => (b.modificado || '').localeCompare(a.modificado || ''));
+  const sinEnviar = ps.filter((p) => p.estado === 'cerrado' || p.estado === 'en-cola');
   return `
   <header class="barra">
     <div><div class="barra-titulo">Partes LAV</div><div class="barra-sub">${esc(estado.perfil.capataz)}</div></div>
@@ -545,11 +562,12 @@ function vInicio() {
     <div class="aviso">Tu registro está pendiente de que lo apruebe la oficina. Puedes ir haciendo partes:
       se enviarán solos en cuanto te aprueben.
       <button class="btn secundario" data-action="comprobar-cuenta">Comprobar ahora</button></div>` : ''}
+    ${avisoSinEnviar(sinEnviar)}
     <div class="tipos">
       <button class="btn-tipo infra" data-action="nuevo" data-tipo="INFRA"><span class="tipo-grande">INFRA</span><span>Infraestructura</span></button>
       <button class="btn-tipo super" data-action="nuevo" data-tipo="SUPER"><span class="tipo-grande">SUPER</span><span>Superestructura</span></button>
     </div>
-    ${grupo('Pendientes de enviar', ps.filter((p) => p.estado === 'cerrado' || p.estado === 'en-cola'))}
+    ${grupo('Pendientes de enviar', sinEnviar)}
     ${grupo('Borradores', ps.filter((p) => p.estado === 'borrador'))}
     ${grupo('Enviados', ps.filter((p) => p.estado === 'enviado').slice(0, 30))}
     ${ps.length ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA o SUPER para empezar.</p>'}
@@ -1933,6 +1951,17 @@ async function onClick(e) {
     }
     case 'elegir-nombre': estado.reg.nombre = el.dataset.nombre; ir('reg-pin'); break;
     case 'comprobar-cuenta': await conEspera('Comprobando…', () => sincronizar({ avisar: true })); break;
+    case 'enviar-pendientes':
+      await conEspera('Enviando…', async () => {
+        const r = await procesarSalida();
+        if (r.enviados) toast(r.enviados === 1 ? 'Parte recibido en la oficina ✓' : `${r.enviados} partes recibidos en la oficina ✓`, 4000);
+        else if (r.pendientes) {
+          const fallo = (await db.listarSalida()).find((i) => i.error);
+          toast(fallo ? fallo.error : 'Todavía no se ha podido enviar. Se enviará solo cuando haya cobertura.', 5000);
+        }
+        refrescarVista();
+      });
+      break;
     case 'actualizar-lista': {
       estado.menu = false;
       render();

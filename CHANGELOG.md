@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.9.2 · 2026-10-07
+- Aviso en la portada: «Tienes N partes sin enviar» con botón «Enviar ahora» (o «Abrir» si el parte está cerrado pero sin pulsar Enviar).
+
 ## 0.9.1 · 2026-10-06
 - Telefonema de entrada y de salida: dos números.
 
