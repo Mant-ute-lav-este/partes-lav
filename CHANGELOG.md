@@ -67,3 +67,4 @@ Las versiones del servidor se numeran en Google («Gestionar implementaciones»)
 
 - **v5** · 2026-10-06 · aparatos con PK.
 - Versiones anteriores (v1–v4): ver el historial de implementaciones en Apps Script.
+- **Sin desplegar (2026-10-07):** `servidor/Code.gs` incluye la copia de seguridad semanal de la hoja (`copiaSeguridad`, `activarCopiaSemanal`). El código está guardado en el editor y el activador funciona, pero la implementación publicada sigue siendo la v5. Se desplegará como v6 con el próximo cambio del servidor.
