@@ -490,6 +490,45 @@ function activarCopiaSemanal() {
   ScriptApp.newTrigger('copiaSeguridad').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(3).create();
 }
 
+// ---------- Resumen diario ----------
+
+/**
+ * Manda a la oficina la lista de partes recibidos hoy. Solo sabe lo que el servidor ha enviado
+ * por correo: no puede saber si Power Automate los ha guardado en Teams.
+ * El asunto no lleva «PARTE LAV» a propósito, para que el flujo de Power Automate no lo coja.
+ */
+function resumenDiario() {
+  const aj = ajustes_();
+  if (!aj.destinatario) throw new Error('Falta el correo de destino en los ajustes del servidor.');
+  const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  const dia = Utilities.formatDate(new Date(), ZONA, 'dd/MM/yyyy');
+  const enviados = tabla_('Envios').filas
+    .filter((f) => String(f.Recibido).indexOf(hoy) === 0)
+    .sort((a, b) => String(a.Recibido).localeCompare(String(b.Recibido)));
+  let cuerpo;
+  if (!enviados.length) {
+    cuerpo = 'Hoy (' + dia + ') no se ha recibido ningún parte.';
+  } else {
+    cuerpo = 'Partes recibidos hoy (' + dia + '): ' + enviados.length + '\n\n' + enviados.map((f) =>
+      String(f.Recibido).slice(11, 16) + '  ' + String(f.Ref) + '  ' + String(f.Nombre)).join('\n') +
+      '\n\nComprueba que están en la carpeta de Teams: este resumen solo cuenta lo recibido por el servidor.';
+  }
+  MailApp.sendEmail({
+    to: aj.destinatario,
+    name: 'Partes LAV',
+    subject: 'Resumen del día · capataces LAV · ' + dia + ' · ' + enviados.length + (enviados.length === 1 ? ' parte' : ' partes'),
+    body: cuerpo,
+  });
+}
+
+/** Se ejecuta una vez a mano: crea el activador que manda el resumen todos los días a las 16:00. */
+function activarResumenDiario() {
+  ScriptApp.getProjectTriggers()
+    .filter((t) => t.getHandlerFunction() === 'resumenDiario')
+    .forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('resumenDiario').timeBased().everyDays(1).atHour(16).inTimezone(ZONA).create();
+}
+
 // ---------- Utilidades ----------
 
 function props_() { return PropertiesService.getScriptProperties(); }
