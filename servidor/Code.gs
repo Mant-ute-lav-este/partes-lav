@@ -459,6 +459,37 @@ function enviar_(d) {
   return { recibido: recibido };
 }
 
+// ---------- Copia de seguridad ----------
+
+const COPIAS_A_GUARDAR = 8;   // semanas
+
+/**
+ * Copia la hoja de datos en la carpeta «Partes LAV · Copias» del Drive de la cuenta y deja solo
+ * las últimas COPIAS_A_GUARDAR (las demás van a la papelera, de donde Google las borra a los 30 días).
+ * La llama el activador semanal; también se puede ejecutar a mano.
+ */
+function copiaSeguridad() {
+  const original = DriveApp.getFileById(props_().getProperty('HOJA_ID'));
+  const carpetas = DriveApp.getFoldersByName('Partes LAV · Copias');
+  const carpeta = carpetas.hasNext() ? carpetas.next() : DriveApp.createFolder('Partes LAV · Copias');
+  const fecha = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  original.makeCopy('Copia ' + fecha + ' · Partes LAV · Datos', carpeta);
+  const copias = [];
+  const it = carpeta.getFiles();
+  while (it.hasNext()) copias.push(it.next());
+  copias.sort((a, b) => b.getDateCreated() - a.getDateCreated());
+  copias.slice(COPIAS_A_GUARDAR).forEach((f) => f.setTrashed(true));
+  Logger.log('Copia hecha: ' + fecha + ' (' + Math.min(copias.length, COPIAS_A_GUARDAR) + ' guardadas)');
+}
+
+/** Se ejecuta una vez a mano: crea el activador que hace la copia cada lunes a las 3 de la madrugada. */
+function activarCopiaSemanal() {
+  ScriptApp.getProjectTriggers()
+    .filter((t) => t.getHandlerFunction() === 'copiaSeguridad')
+    .forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('copiaSeguridad').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(3).create();
+}
+
 // ---------- Utilidades ----------
 
 function props_() { return PropertiesService.getScriptProperties(); }
