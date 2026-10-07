@@ -65,6 +65,6 @@ La versión que ve el capataz está en Ajustes («Versión de la app»). Al publ
 
 Las versiones del servidor se numeran en Google («Gestionar implementaciones»); la URL no cambia.
 
+- **v6** · 2026-10-07 · copia de seguridad semanal de la hoja (lunes 3:00, carpeta «Partes LAV · Copias», 8 copias).
 - **v5** · 2026-10-06 · aparatos con PK.
 - Versiones anteriores (v1–v4): ver el historial de implementaciones en Apps Script.
-- **Sin desplegar (2026-10-07):** `servidor/Code.gs` incluye la copia de seguridad semanal de la hoja (`copiaSeguridad`, `activarCopiaSemanal`). El código está guardado en el editor y el activador funciona, pero la implementación publicada sigue siendo la v5. Se desplegará como v6 con el próximo cambio del servidor.
