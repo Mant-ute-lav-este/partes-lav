@@ -115,7 +115,7 @@ function configurar() {
   crearHoja_(libro, 'Antiincendios', ['Medida']);
   crearHoja_(libro, 'Aparatos', ['Nombre', 'PkInicio', 'PkFin']);
   crearHoja_(libro, 'Vehiculos', ['Descripcion', 'Matricula']);
-  crearHoja_(libro, 'MaquinasVia', ['Descripcion', 'UIC', 'Trabajo']);
+  crearHoja_(libro, 'MaquinasVia', ['Descripcion', 'UIC', 'Trabajo', 'Parte']);
   crearHoja_(libro, 'PersonalMaquinaria', ['Nombre', 'Empresa', 'Categoria']);
   crearHoja_(libro, 'Motivos', ['Tipo', 'Motivo']);
   crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
@@ -356,6 +356,7 @@ function config_(d) {
       // Parte de maquinaria de vía: sus máquinas y su personal (si la hoja aún no existe, van vacías)
       maquinasVia: tabla_('MaquinasVia').filas.filter((m) => m.Descripcion).map((m) => ({
         descripcion: String(m.Descripcion), uic: String(m.UIC || ''), trabajo: String(m.Trabajo || ''),
+        parte: String(m.Parte || 'via').toLowerCase(),   // via, locomotora o dresina: qué parte abre
       })),
       personalMaquinaria: tabla_('PersonalMaquinaria').filas.filter((t) => t.Nombre).map((t) => ({
         nombre: String(t.Nombre), empresa: String(t.Empresa || ''), categoria: String(t.Categoria || ''),
@@ -398,8 +399,8 @@ function cargarLista_(d) {
     hecho.aparatos = c.aparatos.length;
   }
   if (Array.isArray(c.maquinasVia)) {
-    asegurarHoja_('MaquinasVia', ['Descripcion', 'UIC', 'Trabajo']);
-    reemplazar_('MaquinasVia', c.maquinasVia.map((m) => [m.descripcion, m.uic || '', m.trabajo || '']));
+    asegurarHoja_('MaquinasVia', ['Descripcion', 'UIC', 'Trabajo', 'Parte']);
+    reemplazar_('MaquinasVia', c.maquinasVia.map((m) => [m.descripcion, m.uic || '', m.trabajo || '', m.parte || 'via']));
     hecho.maquinasVia = c.maquinasVia.length;
   }
   if (Array.isArray(c.personalMaquinaria)) {

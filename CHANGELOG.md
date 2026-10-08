@@ -2,6 +2,14 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.11.0 · 2026-10-08
+- **MAQUINARIA: primero se elige la máquina** y según cuál se abre su parte. Solo una máquina por parte.
+  - Bateadora, Perfiladora o Estabilizador → parte de maquinaria de vía (el de la 0.10.0, ahora con una sola máquina). Referencias MAQ-.
+  - Locomotora → **parte de trabajos con locomotora** (LOC-): nº de acta, salida y apartado, vagones (tolva o plataforma, últimos 4 dígitos del UIC, m³; aviso si una tolva pasa de 35 m³), procedencia del balasto, trabajo realizado (vía, PK, horas, trabajo, m³), combustible, kilómetros, observaciones, personal (maquinista, responsable de trabajos, operarios) y horas extra. De momento la locomotora se escribe a mano: la lista llegará más adelante.
+  - Dresina → **parte de trabajos con dresina** (DRE-): UIC de la plataforma, telefonemas de entrada y de salida, y el resto como el de locomotora sin vagones (personal: maquinista, ET / al amparo de, operarios).
+  - La semana se calcula sola a partir de la fecha. Todos se guardan en la carpeta Maquinaria de Teams.
+- Servidor (`Code.gs`, pendiente de desplegar): la lista «MaquinasVia» lleva la columna «Parte» (via, locomotora o dresina).
+
 ## 0.10.0 · 2026-10-08
 - Nuevo **parte de MAQUINARIA** de vía (tercer botón en la portada, para todos). Referencias MAQ-0001…
   - Jornada (fecha y horario), máquinas con sus horas (de momento Bateadora, Perfiladora y Estabilizador; se pueden poner varias o escribir otra), viaje (horas y lugares de salida y llegada).

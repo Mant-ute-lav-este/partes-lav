@@ -67,7 +67,11 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   ].filter((x) => x.n);
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
-    parte.tipo === 'MAQUINARIA'
+    parte.tipo === 'MAQUINARIA' && parte.subtipo && parte.subtipo !== 'via'
+      ? `Lo rellena: ${parte.capataz}. ${parte.subtipo === 'locomotora' ? 'Locomotora' : 'Dresina'}: ${parte.maquina.descripcion}` +
+        `${parte.maquina.uic ? ` (UIC ${parte.maquina.uic})` : ''}. Nº acta: ${parte.acta}. ` +
+        `Trabajos: ${(parte.realizados || []).map((r) => `vía ${r.via} PK ${r.pkInicio}-${r.pkFin} ${r.trabajo}`).join('; ')}.`
+      : parte.tipo === 'MAQUINARIA'
       ? `Lo rellena: ${parte.capataz}. Máquinas: ${(parte.maquinasVia || []).filter((m) => m.descripcion).map((m) => `${m.descripcion} (${m.horas} h)`).join('; ')}. ` +
         `Tajos: ${(parte.tajos || []).map((t) => `vía ${t.via} PK ${t.pkInicio}-${t.pkFin}`).join('; ')}.`
       : `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,

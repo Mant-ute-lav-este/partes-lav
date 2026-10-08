@@ -204,7 +204,8 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
   const L = { fill: GRIS, b: true, s: 7 };   // estilo de etiqueta
 
   if (parte.tipo === 'MAQUINARIA') {
-    cuerpoMaquinaria(c, parte, cab);
+    if (parte.subtipo && parte.subtipo !== 'via') cuerpoLocoDresina(c, parte, cab);
+    else cuerpoMaquinaria(c, parte, cab);
     pdfPie(c, parte, versionApp);
     return doc.output('blob');
   }
@@ -387,6 +388,127 @@ function textoOperacion(nombre, o) {
   else if (nombre === 'registro') d.push(CUANDO_TXT[o.cuando] || '', o.texto || '');
   else if (nombre === 'perfilado') d.push(`Cepillado: ${SI_NO(o.cepillado)}`);
   return ['SÍ', ...d.filter(Boolean)].join('\n');
+}
+
+/** Personal por puesto (los puestos vacíos salen con «-»). */
+function tablaPersonalPuestos(c, parte, puestos) {
+  const { doc } = c;
+  seccion(c, `PERSONAL (${parte.personal.length})`);
+  tabla(c, [
+    { t: 'PUESTO', w: 50 }, { t: 'NOMBRE Y APELLIDOS', w: 100 }, { t: 'EMPRESA', w: 70 }, { t: 'CATEGORÍA', w: AN - 220 },
+  ], puestos.flatMap(([clave, titulo]) => {
+    const gente = parte.personal.filter((x) => x.puesto === clave);
+    return gente.length ? gente.map((x) => [titulo, x.nombre + (x.otro ? ' *' : ''), x.empresa, x.categoria]) : [[titulo, '-', '', '']];
+  }));
+  if (parte.personal.some((x) => x.otro)) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.5);
+    doc.text('* Añadido a mano: no está en la lista de la oficina.', M, c.y + 1, { baseline: 'top' });
+    c.y += 4;
+  }
+}
+
+/** Número de semana (ISO) de una fecha «AAAA-MM-DD». */
+function semanaIso(fecha) {
+  const d = new Date(`${fecha}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  const dia = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - dia + 3);
+  const primerJueves = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  return String(1 + Math.round(((d - primerJueves) / 86400000 - 3 + ((primerJueves.getUTCDay() + 6) % 7)) / 7));
+}
+
+/** Partes de trabajos con locomotora o con dresina (PDF sencillo; el aspecto del papel, más adelante). */
+function cuerpoLocoDresina(c, parte, cab) {
+  const loco = parte.subtipo === 'locomotora';
+  const L = { fill: GRIS, b: true, s: 7 };
+  const num = (s) => String(s == null ? '' : s).replace('.', ',');
+  fila(c, [
+    { w: 52, t: `Ref. ${parte.ref}${parte.rev > 1 ? `   ·   Rev. ${parte.rev}` : ''}`, b: true, s: 9 },
+    { w: AN - 104, t: `PARTE DE TRABAJOS CON ${loco ? 'LOCOMOTORA' : 'DRESINA'}`, b: true, s: 14, a: 'center' },
+    { w: 52, t: `Fecha ${fmtFecha(parte.fecha)}\nSemana ${semanaIso(parte.fecha)}`, b: true, s: 9, a: 'center' },
+  ], { minH: 13 });
+  fila(c, [
+    { ...L, w: 22, t: 'ÁMBITO' }, { w: 45, t: cab.ambito || '', b: true },
+    { ...L, w: 22, t: 'Nº ACTA' }, { w: 40, t: parte.acta || '', b: true },
+    { ...L, w: 22, t: 'LO RELLENA' }, { w: 70, t: parte.capataz, b: true },
+    { ...L, w: 30, t: 'CIERRE (MÓVIL)' }, { w: AN - 251, t: fmtFechaHora(parte.cierre) || '—', b: true },
+  ], { minH: 8 });
+  fila(c, [
+    { ...L, w: 30, t: loco ? 'LOCOMOTORA' : 'DRESINA' },
+    { w: loco ? AN - 30 : 140, t: `${parte.maquina.descripcion}${parte.maquina.uic ? `   ·   UIC ${parte.maquina.uic}` : ''}`, b: true },
+    ...(loco ? [] : [{ ...L, w: 35, t: 'UIC PLATAFORMA' }, { w: AN - 205, t: parte.uicPlataforma || '', b: true }]),
+  ], { minH: 8 });
+
+  if (parte.rectificaA) {
+    c.y += 1.5;
+    fila(c, [{
+      w: AN, b: true, s: 8.5, color: [170, 0, 0],
+      t: `PARTE RECTIFICATIVO: sustituye a la revisión ${parte.rectificaA.rev} de este parte` +
+        `${parte.rectificaA.cierre ? ` (cerrada el ${fmtFechaHora(parte.rectificaA.cierre)})` : ''}.`,
+    }], { minH: 7 });
+  }
+
+  if (!loco) {
+    const t = parte.telefonemas || { entrada: {}, salida: {} };
+    seccion(c, 'TELEFONEMAS');
+    fila(c, [
+      { ...L, w: 40, t: 'ENTRADA: NÚMERO' }, { w: 50, t: t.entrada.numero || '', b: true },
+      { ...L, w: 20, t: 'HORA' }, { w: 30, t: t.entrada.hora || '', b: true, a: 'center' },
+      { ...L, w: 40, t: 'SALIDA: NÚMERO' }, { w: 50, t: t.salida.numero || '', b: true },
+      { ...L, w: 20, t: 'HORA' }, { w: AN - 250, t: t.salida.hora || '', b: true, a: 'center' },
+    ], { minH: 8 });
+  }
+
+  seccion(c, 'SALIDA Y APARTADO');
+  fila(c, [
+    { ...L, w: 30, t: 'HORA SALIDA' }, { w: 30, t: parte.salida.hora || '', b: true, a: 'center' },
+    { ...L, w: 30, t: 'LUGAR SALIDA' }, { w: 50, t: parte.salida.lugar || '', b: true },
+    { ...L, w: 30, t: 'HORA APARTADO' }, { w: 30, t: parte.apartado.hora || '', b: true, a: 'center' },
+    { ...L, w: 30, t: 'LUGAR APARTADO' }, { w: AN - 230, t: parte.apartado.lugar || '', b: true },
+  ], { minH: 8 });
+
+  if (loco) {
+    const vs = parte.vagones || [];
+    const total = vs.reduce((s, v) => s + (Number(String(v.m3 || '').replace(',', '.')) || 0), 0);
+    seccion(c, `VAGONES (${vs.length})`);
+    tabla(c, [
+      { t: 'Nº', w: 10, a: 'center' }, { t: 'TIPO', w: 50 }, { t: 'UIC (ÚLTIMOS 4 DÍGITOS)', w: 60, a: 'center' },
+      { t: 'DESCARGADAS (m³)', w: 50, a: 'center' }, { t: '', w: AN - 170 },
+    ], vs.map((v, i) => [String(i + 1), v.tipo === 'tolva' ? 'Tolva' : v.tipo === 'plataforma' ? 'Plataforma' : '', v.uic, num(v.m3), '']),
+    { vacio: 'Sin vagones' });
+    fila(c, [
+      { ...L, w: 50, t: 'PROCEDENCIA DEL BALASTO' }, { w: 120, t: parte.procedencia || '', b: true },
+      { ...L, w: 50, t: 'TOTAL DESCARGADO' }, { w: AN - 220, t: total ? `${num(total)} m³` : '', b: true, a: 'center' },
+    ], { minH: 8 });
+  }
+
+  const rs = parte.realizados || [];
+  seccion(c, `TRABAJO REALIZADO (${rs.length})`, 20);
+  tabla(c, [
+    { t: 'Nº', w: 8, a: 'center' }, { t: 'VÍA', w: 12, a: 'center' }, { t: 'P.K. INICIO', w: 22, a: 'center' },
+    { t: 'P.K. FIN', w: 22, a: 'center' }, { t: 'HORA INICIO', w: 20, a: 'center' }, { t: 'HORA FIN', w: 20, a: 'center' },
+    { t: 'TRABAJO', w: loco ? AN - 124 : AN - 104 }, ...(loco ? [{ t: 'm³', w: 20, a: 'center' }] : []),
+  ], rs.map((r, i) => [String(i + 1), r.via, r.pkInicio, r.pkFin, r.horaInicio, r.horaFin, r.trabajo, ...(loco ? [num(r.m3)] : [])]),
+  { vacio: 'Sin trabajos' });
+
+  if ((parte.observaciones || '').trim()) {
+    seccion(c, 'OBSERVACIONES');
+    fila(c, [{ w: AN, t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
+  }
+
+  seccion(c, 'COMBUSTIBLE Y KILÓMETROS');
+  fila(c, [
+    { ...L, w: 40, t: 'COMBUSTIBLE SALIDA' }, { w: 30, t: parte.combustible.salida ? `${num(parte.combustible.salida)} l` : '', b: true, a: 'center' },
+    { ...L, w: 40, t: 'COMBUSTIBLE LLEGADA' }, { w: 30, t: parte.combustible.llegada ? `${num(parte.combustible.llegada)} l` : '', b: true, a: 'center' },
+    { ...L, w: 35, t: 'KM SALIDA' }, { w: 35, t: num(parte.km.salida), b: true, a: 'center' },
+    { ...L, w: 35, t: 'KM LLEGADA' }, { w: AN - 245, t: num(parte.km.llegada), b: true, a: 'center' },
+  ], { minH: 8 });
+
+  tablaPersonalPuestos(c, parte, loco
+    ? [['maquinista', 'Maquinista'], ['responsable', 'Responsable de trabajos'], ['operario', 'Operario/s']]
+    : [['maquinista', 'Maquinista'], ['amparo', 'ET / al amparo de'], ['operario', 'Operario/s']]);
+  pdfHorasExtra(c, parte);
 }
 
 function cuerpoMaquinaria(c, parte, cab) {
