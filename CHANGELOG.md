@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.9.4 · 2026-10-08
+- Parte INFRA: se quita «Jornada nocturna» y la fecha automática de madrugada (SUPER sigue igual).
+- Parte INFRA: en cada trabajo, casillas opcionales RREE o POI (solo una o ninguna), para los trabajos de coste directo que se facturan aparte. Salen en una columna nueva del PDF entre REFERENCIA y Nº PIDAME (guion si no se marca ninguna), en los datos del parte y en el texto del correo.
+
 ## 0.9.3 · 2026-10-07
 - Fotos de la galería: el aviso dice la causa real (formato no compatible, HEIC, foto vacía, demasiado grande o sin espacio) y el nombre de la foto, en vez de culpar siempre al formato.
 

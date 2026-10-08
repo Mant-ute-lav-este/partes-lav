@@ -53,7 +53,7 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
     `${parte.rev > 1 ? ` rev. ${parte.rev}` : ''} · ${parte.capataz}`;
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
-    `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map(textoReferencia).join('; ')}.`,
+    `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,
     'Enviado desde la app Partes LAV. No cambies los adjuntos.',
   ].join('\n');
   return { pdf, archivos, asunto, cuerpo };

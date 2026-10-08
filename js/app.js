@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.9.3';
+const APP_VERSION = '0.9.4';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -597,7 +597,8 @@ function vMenu() {
 
 async function nuevoParte(tipo) {
   const ahora = new Date();
-  const nocturna = ahora.getHours() < 7;   // de madrugada: la jornada empezó ayer
+  // De madrugada, la jornada de SUPER empezó ayer. En INFRA ya no hay jornada nocturna ni fecha automática.
+  const nocturna = tipo !== 'INFRA' && ahora.getHours() < 7;
   const dia = new Date(ahora);
   if (nocturna) dia.setDate(dia.getDate() - 1);
   const fecha = fechaLocal(dia);
@@ -667,8 +668,8 @@ function vParte() {
     <section class="tarjeta">
       <h2>Jornada</h2>
       <label class="campo"><span>Fecha de la jornada</span><input type="date" data-bind="fecha" value="${esc(p.fecha)}"></label>
-      <label class="check"><input type="checkbox" data-bind="nocturna" ${p.nocturna ? 'checked' : ''}>
-        <span>Jornada nocturna <small>(pon la fecha del día en que empezó)</small></span></label>
+      ${p.tipo === 'INFRA' ? '' : `<label class="check"><input type="checkbox" data-bind="nocturna" ${p.nocturna ? 'checked' : ''}>
+        <span>Jornada nocturna <small>(pon la fecha del día en que empezó)</small></span></label>`}
       <div class="campo"><span>Capataz</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
     </section>
 
@@ -1067,6 +1068,7 @@ function nuevoTrabajo() {
   p.trabajos.push({
     id: uuid(),
     referencia: { tipo: '', codigo: '', motivo: '' },
+    tipoCoste: '',   // solo INFRA: '' (ninguno), 'RREE' o 'POI'; trabajos de coste directo que se facturan aparte
     pidame: '',
     sinVia: false,
     telefonema: { numero: '', salida: '' },   // nº del telefonema de entrada y del de salida
@@ -1253,6 +1255,10 @@ function vTrabajo() {
       ${r.tipo === 'SIN_REF' ? `<label class="campo"><span>Escribe la referencia <span class="oblig">obligatorio</span></span>
         <textarea data-bind="${b}.referencia.motivo" rows="2">${esc(r.motivo)}</textarea></label>` : ''}
       ${t.fotos.length ? '<p class="nota">Las fotos ya hechas conservan la referencia con la que se hicieron.</p>' : ''}
+      ${p.tipo === 'INFRA' ? `
+      <div class="campo"><span>Trabajo de coste directo <small>(opcional, solo uno)</small></span>
+        <label class="check"><input type="checkbox" data-coste="RREE" ${t.tipoCoste === 'RREE' ? 'checked' : ''}><span>RREE</span></label>
+        <label class="check"><input type="checkbox" data-coste="POI" ${t.tipoCoste === 'POI' ? 'checked' : ''}><span>POI</span></label></div>` : ''}
       ${campo('Nº acta PIDAME', `${b}.pidame`, t.pidame, 'autocomplete="off"')}
     </section>
 
@@ -1833,6 +1839,15 @@ async function onChange(e) {
   if (el.dataset.pk) { aplicarPk(el, true); return; }
   if (el.dataset.hora) { aplicarHora(el, true); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
+  if (el.dataset.coste) {
+    const t = trabajoActual();
+    if (!t || estado.parte.estado !== 'borrador') return;
+    // Una casilla o ninguna: al marcar una se desmarca la otra; al quitarla, queda en ninguno.
+    t.tipoCoste = el.checked ? el.dataset.coste : '';
+    guardarPronto();
+    render();
+    return;
+  }
   if (el.dataset.medida != null) {
     const p = estado.parte;
     if (!p || p.estado !== 'borrador') return;

@@ -249,16 +249,22 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
 
   // Trabajos
   seccion(c, `TRABAJOS (${parte.trabajos.length})`, 20);
+  // Solo INFRA lleva la columna RREE/POI (trabajos de coste directo, que se facturan aparte).
+  const conCoste = parte.tipo === 'INFRA';
+  const ANCHO_COSTE = 14;
   tabla(c, [
-    { t: 'Nº', w: 7, a: 'center' }, { t: 'REFERENCIA', w: 30 }, { t: 'Nº PIDAME', w: 18 },
+    { t: 'Nº', w: 7, a: 'center' }, { t: 'REFERENCIA', w: 30 },
+    ...(conCoste ? [{ t: 'RREE /\nPOI', w: ANCHO_COSTE, a: 'center' }] : []),
+    { t: 'Nº PIDAME', w: 18 },
     { t: 'TELEFONEMAS', w: 20 }, { t: 'ENTRADA\nVÍA', w: 15, a: 'center' }, { t: 'SALIDA\nVÍA', w: 13, a: 'center' },
     { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' }, { t: 'APARATO', w: 16 },
     { t: 'P.K. INICIO', w: 16, a: 'center' },
     { t: 'P.K. FIN', w: 16, a: 'center' }, { t: 'M. LIN', w: 11, a: 'center' }, { t: 'MOTIVO ACTUACIÓN', w: 26 },
-    { t: '¿FIN?', w: 10, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 218 },
+    { t: '¿FIN?', w: 10, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 218 - (conCoste ? ANCHO_COSTE : 0) },
   ], parte.trabajos.map((t, i) => [
     String(i + 1),
     textoReferencia(t),
+    ...(conCoste ? [t.tipoCoste || '-'] : []),
     t.pidame,
     t.sinVia ? 'No ocupa vía' : [t.telefonema?.numero && `Ent. ${t.telefonema.numero}`, t.telefonema?.salida && `Sal. ${t.telefonema.salida}`, t.telefonema?.hora].filter(Boolean).join('\n'),
     // Sin ocupar la vía: en esas columnas van la hora de inicio y la de fin del trabajo.
