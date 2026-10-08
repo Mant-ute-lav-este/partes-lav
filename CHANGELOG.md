@@ -88,7 +88,7 @@ La versión que ve el capataz está en Ajustes («Versión de la app»). Al publ
 
 Las versiones del servidor se numeran en Google («Gestionar implementaciones»); la URL no cambia.
 
+- **v7** · 2026-10-08 · resumen diario de partes recibidos (todos los días a las 16:00, al correo de destino de los ajustes).
 - **v6** · 2026-10-07 · copia de seguridad semanal de la hoja (lunes 3:00, carpeta «Partes LAV · Copias», 8 copias).
 - **v5** · 2026-10-06 · aparatos con PK.
 - Versiones anteriores (v1–v4): ver el historial de implementaciones en Apps Script.
-- **Sin desplegar (2026-10-07):** `servidor/Code.gs` incluye además `resumenDiario` y `activarResumenDiario` (correo diario a las 16:00 con los partes recibidos). El activador funciona con el código guardado en el editor; la implementación publicada sigue siendo la v6. Se desplegará como v7 con el próximo cambio del servidor.
