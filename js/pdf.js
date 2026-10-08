@@ -95,9 +95,14 @@ export function textoReferencia(t) {
   return '';
 }
 
+/** Foto de galería cuyo archivo no traía la fecha original: se usó la fecha del archivo. */
+export const sinFechaOriginal = (x) => x.origen === 'galeria' && x.fuenteFecha === 'archivo';
+
 function contarFotos(t) {
   const n = (f) => t.fotos.filter((x) => x.fase === f).length;
-  return `Fotos: ${n('antes')} antes · ${n('durante')} durante · ${n('despues')} después${t.fotos.length ? ' (ver anexo)' : ''}`;
+  const sinFecha = t.fotos.filter(sinFechaOriginal).length;
+  return `Fotos: ${n('antes')} antes · ${n('durante')} durante · ${n('despues')} después${t.fotos.length ? ' (ver anexo)' : ''}` +
+    `${sinFecha ? `\n${sinFecha} sin fecha original` : ''}`;
 }
 
 const FASE_TXT = { antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS' };
@@ -150,11 +155,15 @@ async function anexoFotos(c, parte, leerFoto) {
         doc.rect(x0 + (anchoCelda - w) / 2, y0, w, h, 'S');
         yPie = y0 + h + 2;
       }
+      const sinFecha = sinFechaOriginal(x);
       const pie = `Trabajo ${i + 1} · ${textoReferencia(t)} · ${FASE_TXT[x.fase] || x.fase} · ` +
-        `${x.origen === 'galeria' ? 'Galería' : 'Cámara'} · ${fmtFechaHora(x.fechaFoto)}`;
+        `${x.origen === 'galeria' ? 'Galería' : 'Cámara'} · ${fmtFechaHora(x.fechaFoto)}` +
+        `${sinFecha ? ' · SIN FECHA ORIGINAL (fecha del archivo)' : ''}`;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
+      if (sinFecha) doc.setTextColor(170, 0, 0);
       doc.text(doc.splitTextToSize(limpia(pie), anchoCelda), x0 + anchoCelda / 2, yPie, { baseline: 'top', align: 'center' });
+      doc.setTextColor(0, 0, 0);
     }
   }
 }

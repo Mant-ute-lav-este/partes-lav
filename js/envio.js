@@ -5,7 +5,7 @@
 // golpe. Las fotos van dentro de un .txt en JSON (base64) y Power Automate las vuelve
 // a separar en .jpg. Se usa .txt y no .json porque Android no deja compartir .json.
 
-import { generarPDF, textoReferencia } from './pdf.js';
+import { generarPDF, textoReferencia, sinFechaOriginal } from './pdf.js';
 import { blobABase64, fmtFecha, isoLocal, slug } from './util.js';
 
 export function nombreBase(p) {
@@ -51,9 +51,15 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   ];
   const asunto = `PARTE LAV · ${parte.tipo} · ${fmtFecha(parte.fecha)} · ${parte.ref}` +
     `${parte.rev > 1 ? ` rev. ${parte.rev}` : ''} · ${parte.capataz}`;
+  // Aviso para la oficina (no para el operario): fotos de galería sin fecha original.
+  const sinFecha = parte.trabajos
+    .map((t, i) => ({ i, n: t.fotos.filter(sinFechaOriginal).length, de: t.fotos.length }))
+    .filter((x) => x.n);
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
     `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,
+    ...(sinFecha.length ? [`AVISO: fotos de galería sin fecha original (se ha usado la fecha del archivo): ${
+      sinFecha.map((x) => `trabajo ${x.i + 1} (${x.n} de ${x.de})`).join(', ')}.`] : []),
     'Enviado desde la app Partes LAV. No cambies los adjuntos.',
   ].join('\n');
   return { pdf, archivos, asunto, cuerpo };
