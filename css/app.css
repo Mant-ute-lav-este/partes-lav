@@ -12,6 +12,7 @@
   --acento: #1f5fd1;
   --infra: #c2410c;
   --super: #1d4ed8;
+  --maq: #4d7c0f;
   --ok: #157a3a;
   --ok-fondo: #e3f5e9;
   --pendiente-fondo: #fff4d6;
@@ -35,6 +36,7 @@
     --acento: #6b9cff;
     --infra: #e0601c;
     --super: #3b6fe8;
+    --maq: #65a30d;
     --ok: #4ade80;
     --ok-fondo: #12301d;
     --pendiente-fondo: #3a2c06;
@@ -270,3 +272,11 @@ input.mal { border-color: var(--peligro); outline: 2px solid color-mix(in srgb, 
 /* RREE y POI, uno al lado del otro */
 .checks-fila { display: flex; gap: 32px; flex-wrap: wrap; }
 .checks-fila .check { margin-top: 6px; }
+/* Parte de maquinaria de vía */
+.btn-tipo.maquinaria { background: var(--maq); grid-column: 1 / -1; min-height: 84px; }
+.btn-tipo.maquinaria .tipo-grande { font-size: 1.5rem; }
+.barra.maquinaria { background: var(--maq); }
+.etiqueta.maquinaria { background: var(--maq); }
+.tajo-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tajo-cab h3 { margin: 0; }
+.operacion { border-top: 1px solid var(--borde); margin-top: 12px; padding-top: 4px; }

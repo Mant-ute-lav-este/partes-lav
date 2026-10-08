@@ -15,9 +15,10 @@ import {
   FORMATO1, MAX_FORMATO1, LADO_FORMATO1,
 } from './util.js';
 
-const APP_VERSION = '0.9.8';
+const APP_VERSION = '0.10.0';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
+const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
 const app = document.getElementById('app');
 
 const estado = {
@@ -522,9 +523,9 @@ function estadoTexto(p) {
 function itemParte(p) {
   return `
   <button class="item item-parte ${p.estado}" data-action="abrir" data-id="${p.id}">
-    <span class="etiqueta ${p.tipo.toLowerCase()}">${p.tipo}</span>
+    <span class="etiqueta ${p.tipo.toLowerCase()}">${p.tipo === 'MAQUINARIA' ? 'MAQ' : p.tipo}</span>
     <span class="item-info"><strong>${fmtFecha(p.fecha)}${p.nocturna ? ' · noche' : ''}</strong> · ${esc(p.ref)}${p.rev > 1 ? ` rev. ${p.rev}` : ''}
-      <br><small>${p.trabajos.length} trabajo(s) · ${estadoTexto(p)}</small></span>
+      <br><small>${p.tipo === 'MAQUINARIA' ? `${(p.tajos || []).length} tajo(s)` : `${p.trabajos.length} trabajo(s)`} · ${estadoTexto(p)}</small></span>
     <span class="flecha">›</span>
   </button>`;
 }
@@ -567,11 +568,12 @@ function vInicio() {
     <div class="tipos">
       <button class="btn-tipo infra" data-action="nuevo" data-tipo="INFRA"><span class="tipo-grande">INFRA</span><span>Infraestructura</span></button>
       <button class="btn-tipo super" data-action="nuevo" data-tipo="SUPER"><span class="tipo-grande">SUPER</span><span>Superestructura</span></button>
+      <button class="btn-tipo maquinaria" data-action="nuevo" data-tipo="MAQUINARIA"><span class="tipo-grande">MAQUINARIA</span><span>Maquinaria de vía</span></button>
     </div>
     ${grupo('Pendientes de enviar', sinEnviar)}
     ${grupo('Borradores', ps.filter((p) => p.estado === 'borrador'))}
     ${grupo('Enviados', ps.filter((p) => p.estado === 'enviado').slice(0, 30))}
-    ${ps.length ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA o SUPER para empezar.</p>'}
+    ${ps.length ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p>'}
   </main>
   ${estado.menu ? vMenu() : ''}`;
 }
@@ -598,10 +600,12 @@ function vMenu() {
 
 async function nuevoParte(tipo) {
   const ahora = new Date();
-  // De madrugada, la jornada de SUPER empezó ayer. En INFRA ya no hay jornada nocturna ni fecha automática.
-  const nocturna = tipo !== 'INFRA' && ahora.getHours() < 7;
+  // De madrugada, la jornada de SUPER y la de MAQUINARIA empezaron ayer. En INFRA ya no hay
+  // jornada nocturna ni fecha automática. MAQUINARIA no marca «nocturna»: lleva su horario.
+  const madrugada = tipo !== 'INFRA' && ahora.getHours() < 7;
+  const nocturna = tipo === 'SUPER' && madrugada;
   const dia = new Date(ahora);
-  if (nocturna) dia.setDate(dia.getDate() - 1);
+  if (madrugada) dia.setDate(dia.getDate() - 1);
   const fecha = fechaLocal(dia);
   const lista = await db.listarPartes();
   if (lista.some((p) => p.tipo === tipo && p.fecha === fecha && !p.rectificaA) &&
@@ -613,7 +617,7 @@ async function nuevoParte(tipo) {
     formato: 'parte-lav',
     version: 1,
     id: uuid(),
-    ref: `${tipo === 'INFRA' ? 'INF' : 'SUP'}-${String(n).padStart(4, '0')}`,
+    ref: `${PREFIJO_REF[tipo]}-${String(n).padStart(4, '0')}`,
     rev: 1,
     rectificaA: null,
     tipo,
@@ -641,6 +645,16 @@ async function nuevoParte(tipo) {
     envios: [],
     app: { version: APP_VERSION },
   };
+  if (tipo === 'MAQUINARIA') {
+    Object.assign(estado.parte, {
+      personal: [],   // cada persona lleva su puesto (encargado, maquinista, piloto, omi, operario)
+      horaInicio: '',
+      horaFin: '',
+      maquinasVia: [nuevaMaquinaVia()],
+      viaje: { horaSalida: '', lugarSalida: '', horaLlegada: '', lugarLlegada: '' },
+      tajos: [nuevoTajo()],
+    });
+  }
   await guardarYa();
   ir('parte');
 }
@@ -679,6 +693,7 @@ function seccionFormato1(p) {
 }
 
 function vParte() {
+  if (estado.parte.tipo === 'MAQUINARIA') return vParteMaq();
   const p = normalizarParte(estado.parte);
   return `
   ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
@@ -744,6 +759,275 @@ function vParte() {
   ${estado.fotoVista ? vFotoGrande() : ''}
   ${estado.errores.length ? vErrores() : ''}
   ${estado.preguntaExtras ? vPreguntaExtras() : ''}`;
+}
+
+// ---------- Parte de maquinaria de vía ----------
+// Sigue el orden del papel: jornada (fecha y horario), máquinas con sus horas, viaje, tajos,
+// observaciones y personal por puesto. Normalmente es una máquina por noche, pero caben varias.
+
+const PUESTOS_MAQ = [
+  ['encargado', 'Encargado de trabajo', false],
+  ['maquinista', 'Maquinista tipo A', false],
+  ['piloto', 'Piloto', false],
+  ['omi', 'OMI', false],
+  ['operario', 'Operario/s', true],   // el único puesto con varias personas
+];
+const nombrePuesto = (clave) => (PUESTOS_MAQ.find((x) => x[0] === clave) || [, 'Personal'])[1];
+
+// Mientras la oficina no ponga las máquinas en la hoja («MaquinasVia»), se usan estas.
+const MAQUINAS_VIA_PROVISIONALES = [
+  { descripcion: 'Bateadora 08-475-4S', uic: '99713011401-7', trabajo: 'Bateo' },
+  { descripcion: 'Perfiladora PDB-110', uic: '99713011302-7', trabajo: 'Perfilado' },
+  { descripcion: 'Estabilizador DGS-62N', uic: '97180150217-2', trabajo: 'Estabilizado' },
+];
+
+function maquinasViaCfg() {
+  const l = (estado.config && estado.config.maquinasVia) || [];
+  return l.length ? l : MAQUINAS_VIA_PROVISIONALES;
+}
+
+/** Personal para los desplegables: el de maquinaria de la hoja o, mientras no haya, la lista general. */
+function personalMaqCfg() {
+  const c = estado.config || {};
+  return (c.personalMaquinaria && c.personalMaquinaria.length ? c.personalMaquinaria : c.trabajadores) || [];
+}
+
+const nuevaMaquinaVia = () => ({ descripcion: '', uic: '', trabajo: '', horas: '', otro: false });
+
+function nuevoTajo() {
+  return {
+    id: uuid(), llegada: '', inicio: '', fin: '', salida: '', via: '', pkInicio: '', pkFin: '', desvio: '',
+    nivelado: { si: null, modo: '', max: '', pk: '' },
+    alineado: { si: null, modo: '', max: '', pk: '' },
+    estabilizado: { si: null, programada: null },
+    registro: { si: null, cuando: '', texto: '' },
+    perfilado: { si: null, cepillado: null },
+  };
+}
+
+const textoBool = (v) => (v === true ? 'si' : v === false ? 'no' : '');
+const numeroOk = (s) => Number(String(s == null ? '' : s).replace(',', '.')) > 0;
+
+/** Sí / No que vuelve a pintar la pantalla (para mostrar u ocultar lo que depende de la respuesta). */
+function siNo(ruta, v) {
+  return `<div class="segmentado">${radio(ruta, 'si', 'Sí', textoBool(v), 'data-tipo="bool" data-rerender')}${radio(ruta, 'no', 'No', textoBool(v), 'data-tipo="bool" data-rerender')}</div>`;
+}
+
+function opciones(ruta, lista, actual) {
+  return `<div class="segmentado">${lista.map(([v, t]) => radio(ruta, v, t, actual, 'data-rerender')).join('')}</div>`;
+}
+
+const MODOS_NIVELADO = [['calculado', 'Calculado'], ['manual', 'Manual'], ['visor', 'Visor']];
+const MODOS_ALINEADO = [['calculado', 'Calculado'], ['auto', 'Auto'], ['visor', 'Visor']];
+const CUANDO_REGISTRO = [['antes', 'Antes'], ['despues', 'Después'], ['ambos', 'Ambos']];
+
+/** Una operación del tajo: Sí/No y, si es que sí, sus detalles. */
+function operacion(titulo, ruta, o, detalle) {
+  return `
+      <div class="operacion">
+        <div class="campo"><span>${titulo}</span>${siNo(`${ruta}.si`, o.si)}</div>
+        ${o.si ? detalle : ''}
+      </div>`;
+}
+
+/** Nivelado o alineado: método y, si es calculado, el máximo en mm y su PK. */
+function detalleGeometria(ruta, o, modos, etqMax) {
+  return `
+        ${opciones(`${ruta}.modo`, modos, o.modo)}
+        ${o.modo === 'calculado' ? `<div class="dos">
+          ${campo(`${etqMax} (mm)`, `${ruta}.max`, o.max, 'inputmode="decimal" autocomplete="off"')}
+          ${campoPk(`PK del ${etqMax.toLowerCase()}`, `${ruta}.pk`, o.pk)}</div>` : ''}`;
+}
+
+function faltasTajo(t) {
+  const e = [];
+  const add = (corto, largo) => e.push({ corto, largo });
+  [['llegada', 'llegada a tajo'], ['inicio', 'inicio de trabajo'], ['fin', 'fin de trabajo'], ['salida', 'salida de tajo']]
+    .forEach(([k, txt]) => { if (!horaValida(t[k])) add(txt, `falta la hora de ${txt}.`); });
+  if (!t.via) add('vía', 'elige la vía (1 o 2).');
+  if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
+  if (!pkValido(t.pkFin)) add('PK final', 'falta el PK final (km y metros).');
+  const op = (nombre, o, si) => {
+    if (o.si == null) add(nombre.toLowerCase(), `${nombre}: contesta Sí o No.`);
+    else if (o.si) si();
+  };
+  const geometria = (nombre, o, metodos, etqMax) => op(nombre, o, () => {
+    if (!o.modo) add(`método de ${nombre.toLowerCase()}`, `${nombre}: elige ${metodos}.`);
+    else if (o.modo === 'calculado') {
+      if (!numeroOk(o.max)) add(etqMax, `${nombre} calculado: falta el ${etqMax} (mm).`);
+      if (!pkValido(o.pk)) add(`PK del ${etqMax}`, `${nombre} calculado: falta el PK del ${etqMax.replace(/\.$/, '')}.`);
+    }
+  });
+  geometria('Nivelado', t.nivelado, 'Calculado, Manual o Visor', 'Lev. máx.');
+  geometria('Alineado', t.alineado, 'Calculado, Auto o Visor', 'Rip. máx.');
+  op('Estabilizado', t.estabilizado, () => {
+    if (t.estabilizado.programada == null) add('¿programada?', 'Estabilizado: indica si es programada (Sí o No).');
+  });
+  op('Registro', t.registro, () => {
+    if (!t.registro.cuando) add('registro antes/después', 'Registro: elige Antes, Después o Ambos.');
+  });
+  op('Perfilado', t.perfilado, () => {
+    if (t.perfilado.cepillado == null) add('cepillado', 'Perfilado: indica si hay cepillado (Sí o No).');
+  });
+  return e;
+}
+
+function seccionTajo(t, i, total) {
+  const b = `tajos.${i}`;
+  const faltas = faltasTajo(t);
+  return `
+    <div class="sub-tarjeta tajo">
+      <div class="tajo-cab"><h3>Tajo ${i + 1}</h3>
+        ${total > 1 ? `<button class="btn-quitar" data-action="quitar-tajo" data-i="${i}" aria-label="Quitar el tajo ${i + 1}">✕</button>` : ''}</div>
+      <div class="dos">${campoHora('Llegada a tajo', `${b}.llegada`, t.llegada)}${campoHora('Inicio de trabajo', `${b}.inicio`, t.inicio)}</div>
+      <div class="dos">${campoHora('Fin de trabajo', `${b}.fin`, t.fin)}${campoHora('Salida de tajo', `${b}.salida`, t.salida)}</div>
+      <div class="campo"><span>Vía</span>
+        <div class="segmentado">${radio(`${b}.via`, '1', 'Vía 1', t.via)}${radio(`${b}.via`, '2', 'Vía 2', t.via)}</div></div>
+      <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK final', `${b}.pkFin`, t.pkFin)}</div>
+      ${campo('Nombre del desvío / AD <small>(opcional)</small>', `${b}.desvio`, t.desvio, 'autocomplete="off"')}
+      ${operacion('Nivelado', `${b}.nivelado`, t.nivelado, detalleGeometria(`${b}.nivelado`, t.nivelado, MODOS_NIVELADO, 'Lev. máx.'))}
+      ${operacion('Alineado', `${b}.alineado`, t.alineado, detalleGeometria(`${b}.alineado`, t.alineado, MODOS_ALINEADO, 'Rip. máx.'))}
+      ${operacion('Estabilizado', `${b}.estabilizado`, t.estabilizado,
+    `<div class="campo"><span>¿Programada?</span>${siNo(`${b}.estabilizado.programada`, t.estabilizado.programada)}</div>`)}
+      ${operacion('Registro', `${b}.registro`, t.registro, `
+        ${opciones(`${b}.registro.cuando`, CUANDO_REGISTRO, t.registro.cuando)}
+        ${campo('Anotación <small>(opcional)</small>', `${b}.registro.texto`, t.registro.texto, 'autocomplete="off"')}`)}
+      ${operacion('Perfilado', `${b}.perfilado`, t.perfilado,
+    `<div class="campo"><span>Cepillado</span>${siNo(`${b}.perfilado.cepillado`, t.perfilado.cepillado)}</div>`)}
+      ${faltas.length ? `<p class="falta">Falta: ${esc(faltas.map((f) => f.corto).join(', '))}</p>` : '<p class="listo">Tajo completo</p>'}
+    </div>`;
+}
+
+function seccionMaquinasVia(p) {
+  const cfg = maquinasViaCfg();
+  const filas = p.maquinasVia.map((m, i) => {
+    const k = m.otro ? -1 : cfg.findIndex((c) => c.descripcion === m.descripcion);
+    return `
+      <div class="fila-equipo">
+        <div class="equipo-campos">
+          <select data-maqvia="${i}" aria-label="Máquina ${i + 1}">
+            <option value="">Elige la máquina…</option>
+            ${cfg.map((c, j) => `<option value="${j}" ${j === k ? 'selected' : ''}>${esc(c.descripcion)}${c.uic ? ` · UIC ${esc(c.uic)}` : ''}</option>`).join('')}
+            <option value="otro" ${m.otro ? 'selected' : ''}>Otra (escribirla)</option>
+          </select>
+          ${m.otro ? `
+          <input placeholder="Máquina" data-bind="maquinasVia.${i}.descripcion" value="${esc(m.descripcion)}" autocomplete="off">
+          <input placeholder="Trabajo (bateo, perfilado…)" data-bind="maquinasVia.${i}.trabajo" value="${esc(m.trabajo)}" autocomplete="off">`
+    : m.trabajo ? `<small>Trabajo: ${esc(m.trabajo)}</small>` : ''}
+          ${campo('Horas', `maquinasVia.${i}.horas`, m.horas, 'inputmode="decimal" autocomplete="off"')}
+        </div>
+        ${p.maquinasVia.length > 1 ? `<button class="btn-quitar" data-action="quitar-maqvia" data-i="${i}" aria-label="Quitar la máquina ${i + 1}">✕</button>` : ''}
+      </div>`;
+  }).join('');
+  return `
+    <section class="tarjeta">
+      <h2>Máquinas <span class="oblig">obligatorio</span></h2>
+      ${filas}
+      <button class="btn secundario" data-action="nueva-maqvia">+ Añadir otra máquina</button>
+    </section>`;
+}
+
+function seccionPersonalMaq(p) {
+  const lista = personalMaqCfg();
+  const bloques = PUESTOS_MAQ.map(([clave, titulo, varios]) => {
+    const gente = p.personal.map((x, i) => ({ x, i })).filter(({ x }) => x.puesto === clave);
+    const filas = gente.map(({ x, i }) => `
+        <div class="fila-equipo">
+          <div class="equipo-campos">${x.otro
+    ? `<input placeholder="Nombre y apellidos" data-bind="personal.${i}.nombre" value="${esc(x.nombre)}" autocomplete="off">`
+    : `<strong>${esc(x.nombre)}</strong>`}</div>
+          <button class="btn-quitar" data-action="quitar-persona" data-i="${i}" aria-label="Quitar a ${esc(x.nombre || titulo)}">✕</button>
+        </div>`).join('');
+    const anadir = varios || !gente.length ? `
+        <select data-puesto="${clave}" aria-label="Añadir ${titulo}">
+          <option value="">${gente.length ? '+ Añadir otro…' : 'Elige…'}</option>
+          ${lista.map((c, j) => `<option value="${j}">${esc(c.nombre)}</option>`).join('')}
+          <option value="otro">Otra persona (escribirla)</option>
+        </select>` : '';
+    return `<div class="campo"><span>${titulo}</span>${filas}${anadir}</div>`;
+  }).join('');
+  return `
+    <section class="tarjeta">
+      <h2>Personal <span class="contador">${p.personal.length}</span></h2>
+      <p class="nota">Elige quién ocupa cada puesto. Los puestos pueden quedar vacíos.</p>
+      ${bloques}
+    </section>`;
+}
+
+function vParteMaq() {
+  const p = normalizarParte(estado.parte);
+  const v = p.viaje;
+  return `
+  ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
+  <main class="contenido con-pie">
+    ${p.rectificaA ? `<div class="aviso">Corrección del parte (revisión ${p.rectificaA.rev}). Al enviarla, la oficina guardará las dos versiones.</div>` : ''}
+    <section class="tarjeta">
+      <h2>Jornada</h2>
+      <label class="campo"><span>Fecha <small>(si es de noche, el día en que empieza)</small></span><input type="date" data-bind="fecha" value="${esc(p.fecha)}"></label>
+      <div class="dos">${campoHora('Horario: inicio', 'horaInicio', p.horaInicio)}${campoHora('Horario: fin', 'horaFin', p.horaFin)}</div>
+      <div class="campo"><span>Lo rellena</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
+    </section>
+
+    ${seccionMaquinasVia(p)}
+
+    <section class="tarjeta">
+      <h2>Viaje</h2>
+      <div class="dos">${campoHora('Hora de salida', 'viaje.horaSalida', v.horaSalida)}
+        ${campo('Lugar de salida', 'viaje.lugarSalida', v.lugarSalida, 'autocomplete="off"')}</div>
+      <div class="dos">${campoHora('Hora de llegada', 'viaje.horaLlegada', v.horaLlegada)}
+        ${campo('Lugar de llegada', 'viaje.lugarLlegada', v.lugarLlegada, 'autocomplete="off"')}</div>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Tajos <span class="contador">${p.tajos.length}</span></h2>
+      ${p.tajos.map((t, i) => seccionTajo(t, i, p.tajos.length)).join('')}
+      <button class="btn anadir" data-action="nuevo-tajo">+ Añadir tajo</button>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Observaciones</h2>
+      <textarea data-bind="observaciones" rows="3" placeholder="Opcional">${esc(p.observaciones)}</textarea>
+    </section>
+
+    ${seccionPersonalMaq(p)}
+    ${p.usaExtras && !estado.preguntaExtras ? seccionExtras() : ''}
+
+    <button class="btn peligro-texto" data-action="borrar-parte">Borrar este borrador</button>
+  </main>
+  <footer class="pie"><div class="fila-botones">
+    <button class="btn secundario grande" data-action="guardar-salir">Guardar y salir</button>
+    <button class="btn primario grande" data-action="cerrar-parte">Cerrar parte</button>
+  </div></footer>
+  ${estado.errores.length ? vErrores() : ''}
+  ${estado.preguntaExtras ? vPreguntaExtras() : ''}`;
+}
+
+function validarMaq(p) {
+  const e = [];
+  const add = (msg) => e.push({ msg, trabajo: null });
+  const vacio = (s) => !String(s == null ? '' : s).trim();
+  if (!p.fecha) add('Falta la fecha de la jornada.');
+  if (!horaValida(p.horaInicio) || !horaValida(p.horaFin)) add('Falta el horario de la jornada (inicio y fin).');
+  const maquinas = p.maquinasVia.filter((m) => !vacio(m.descripcion));
+  if (!maquinas.length) add('Elige al menos una máquina.');
+  p.maquinasVia.forEach((m, i) => {
+    if (m.otro && vacio(m.descripcion)) add(`Máquina ${i + 1}: escribe cuál es.`);
+    else if (!vacio(m.descripcion) && !numeroOk(m.horas)) add(`Pon las horas de ${m.descripcion}.`);
+  });
+  const v = p.viaje;
+  if (!horaValida(v.horaSalida)) add('Viaje: falta la hora de salida.');
+  if (vacio(v.lugarSalida)) add('Viaje: falta el lugar de salida.');
+  if (!horaValida(v.horaLlegada)) add('Viaje: falta la hora de llegada.');
+  if (vacio(v.lugarLlegada)) add('Viaje: falta el lugar de llegada.');
+  if (!p.tajos.length) add('Añade al menos un tajo.');
+  p.tajos.forEach((t, i) => faltasTajo(t).forEach((f) => add(`Tajo ${i + 1}: ${f.largo}`)));
+  p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(x.puesto)}: escribe el nombre o quítalo.`); });
+  if (p.usaExtras) {
+    const hs = extrasDelParte(p);
+    if (!hs.length) add('Has marcado horas extra: pon las horas de quien las haya hecho (o marca «No»).');
+    hs.filter((x) => !x.tipo).forEach((x) => add(`Horas extra de ${x.nombre}: elige si son normales, nocturnas o festivas.`));
+  }
+  return e;
 }
 
 function vOtroForm() {
@@ -1553,12 +1837,15 @@ function validar(p) {
 
 async function cerrarParte() {
   await guardarYa();
-  const errores = validar(estado.parte);
+  const maq = estado.parte.tipo === 'MAQUINARIA';
+  const errores = maq ? validarMaq(estado.parte) : validar(estado.parte);
   if (errores.length) {
     estado.errores = errores;
     render();
     return;
   }
+  // Sin nadie en el parte de maquinaria no hay a quién poner horas extra.
+  if (maq && !estado.parte.personal.length) estado.parte.usaExtras = false;
   // Las horas extra se preguntan al cerrar: Sí abre la lista del personal; No sigue cerrando.
   if (estado.parte.usaExtras == null) {
     estado.preguntaExtras = true;
@@ -1601,7 +1888,7 @@ function vEnvio() {
 function resumenEnvio(p) {
   const envios = (p.envios || []).map((x) => (typeof x === 'string' ? fmtFechaHora(x) : fmtFechaHora(x.recibido || x.fecha)));
   return `
-      <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${p.trabajos.length} trabajo(s) · ${p.personal.length} persona(s)${(p.formato1 || []).length ? ` · ${esc(FORMATO1.toLowerCase())}: ${p.formato1.length} foto(s)` : ''}</p>
+      <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${p.tipo === 'MAQUINARIA' ? `${(p.tajos || []).length} tajo(s)` : `${p.trabajos.length} trabajo(s)`} · ${p.personal.length} persona(s)${(p.formato1 || []).length ? ` · ${esc(FORMATO1.toLowerCase())}: ${p.formato1.length} foto(s)` : ''}</p>
       <p><small>Cerrado en el móvil: ${fmtFechaHora(p.cierre)}${envios.length ? `<br>Envíos: ${envios.join(', ')}` : ''}</small></p>`;
 }
 
@@ -1864,6 +2151,39 @@ async function onChange(e) {
     if (t.motivoOtro) { const inp = app.querySelector(`[data-bind="${el.dataset.motivo}.motivoActuacion"]`); if (inp) inp.focus(); }
     return;
   }
+  if (el.matches('select[data-maqvia]')) {
+    const p = estado.parte;
+    if (!p || p.estado !== 'borrador') return;
+    const i = Number(el.dataset.maqvia);
+    const horas = p.maquinasVia[i].horas;
+    const c = maquinasViaCfg()[Number(el.value)];
+    p.maquinasVia[i] = el.value === 'otro' ? { ...nuevaMaquinaVia(), horas, otro: true }
+      : c ? { descripcion: c.descripcion, uic: c.uic || '', trabajo: c.trabajo || '', horas, otro: false }
+        : { ...nuevaMaquinaVia(), horas };
+    guardarPronto();
+    render();
+    if (el.value === 'otro') { const inp = app.querySelector(`[data-bind="maquinasVia.${i}.descripcion"]`); if (inp) inp.focus(); }
+    return;
+  }
+  if (el.matches('select[data-puesto]')) {
+    const p = estado.parte;
+    if (!p || p.estado !== 'borrador' || el.value === '') return;
+    const puesto = el.dataset.puesto;
+    const c = personalMaqCfg()[Number(el.value)];
+    if (el.value !== 'otro' && c && p.personal.some((x) => x.puesto === puesto && x.nombre === c.nombre)) {
+      toast(`${c.nombre} ya está en ${nombrePuesto(puesto)}`);
+      render();
+      return;
+    }
+    p.personal.push({ ...persona(el.value === 'otro' ? { otro: true } : c), puesto });
+    guardarPronto();
+    render();
+    if (el.value === 'otro') {
+      const inp = app.querySelector(`[data-bind="personal.${p.personal.length - 1}.nombre"]`);
+      if (inp) inp.focus();
+    }
+    return;
+  }
   if (el.matches('select[data-lista]')) {
     if (!estado.parte || estado.parte.estado !== 'borrador') return;
     const lista = el.dataset.lista;
@@ -2099,6 +2419,19 @@ async function onClick(e) {
     case 'borrar-trabajo': borrarTrabajo(); break;
     case 'nuevo-equipo': p[el.dataset.lista].push({ descripcion: '', matricula: '', otro: false }); guardarPronto(); render(); break;
     case 'quitar-equipo': p[el.dataset.lista].splice(i, 1); guardarPronto(); render(); break;
+    case 'nueva-maqvia': p.maquinasVia.push(nuevaMaquinaVia()); guardarPronto(); render(); break;
+    case 'quitar-maqvia': p.maquinasVia.splice(i, 1); guardarPronto(); render(); break;
+    case 'nuevo-tajo': {
+      p.tajos.push(nuevoTajo());
+      await guardarYa();
+      render();
+      const tajos = app.querySelectorAll('.tajo');
+      if (tajos.length) tajos[tajos.length - 1].scrollIntoView({ block: 'start', behavior: 'smooth' });
+      break;
+    }
+    case 'quitar-tajo':
+      if (confirm(`¿Quitar el tajo ${i + 1}?`)) { p.tajos.splice(i, 1); guardarPronto(); render(); }
+      break;
     case 'foto': {
       const t = trabajoActual();
       const r = t.referencia;

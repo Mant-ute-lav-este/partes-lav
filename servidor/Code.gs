@@ -4,7 +4,7 @@
  * - Registra a los capataces (Gmail + código por correo + nombre de la lista + PIN).
  *   Cada registro queda pendiente hasta que la oficina lo aprueba desde un enlace.
  *   Si alguien olvida el PIN, crea otro con un código que le llega al correo.
- * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, aparatos con sus PK, medidas antiincendios, motivos y cabecera).
+ * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, aparatos con sus PK, medidas antiincendios, motivos, cabecera, y máquinas de vía y su personal para el parte de maquinaria).
  * - Recibe los partes y los manda por correo a la oficina, donde Power Automate los
  *   guarda en la carpeta de Teams.
  *
@@ -115,6 +115,8 @@ function configurar() {
   crearHoja_(libro, 'Antiincendios', ['Medida']);
   crearHoja_(libro, 'Aparatos', ['Nombre', 'PkInicio', 'PkFin']);
   crearHoja_(libro, 'Vehiculos', ['Descripcion', 'Matricula']);
+  crearHoja_(libro, 'MaquinasVia', ['Descripcion', 'UIC', 'Trabajo']);
+  crearHoja_(libro, 'PersonalMaquinaria', ['Nombre', 'Empresa', 'Categoria']);
   crearHoja_(libro, 'Motivos', ['Tipo', 'Motivo']);
   crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
   const sobra = libro.getSheetByName('Hoja 1') || libro.getSheetByName('Sheet1');
@@ -351,6 +353,13 @@ function config_(d) {
         nombre: String(a.Nombre), pkInicio: String(a.PkInicio || ''), pkFin: String(a.PkFin || ''),
       })),
       antiincendios: tabla_('Antiincendios').filas.map((m) => String(m.Medida || '').trim()).filter(Boolean),
+      // Parte de maquinaria de vía: sus máquinas y su personal (si la hoja aún no existe, van vacías)
+      maquinasVia: tabla_('MaquinasVia').filas.filter((m) => m.Descripcion).map((m) => ({
+        descripcion: String(m.Descripcion), uic: String(m.UIC || ''), trabajo: String(m.Trabajo || ''),
+      })),
+      personalMaquinaria: tabla_('PersonalMaquinaria').filas.filter((t) => t.Nombre).map((t) => ({
+        nombre: String(t.Nombre), empresa: String(t.Empresa || ''), categoria: String(t.Categoria || ''),
+      })),
       vehiculos: tabla_('Vehiculos').filas.filter((v) => v.Descripcion).map((v) => ({
         descripcion: String(v.Descripcion), matricula: String(v.Matricula || ''),
       })),
@@ -387,6 +396,16 @@ function cargarLista_(d) {
     asegurarHoja_('Aparatos', ['Nombre', 'PkInicio', 'PkFin']);
     reemplazar_('Aparatos', c.aparatos.map((a) => [a.nombre, a.pkInicio || '', a.pkFin || '']));
     hecho.aparatos = c.aparatos.length;
+  }
+  if (Array.isArray(c.maquinasVia)) {
+    asegurarHoja_('MaquinasVia', ['Descripcion', 'UIC', 'Trabajo']);
+    reemplazar_('MaquinasVia', c.maquinasVia.map((m) => [m.descripcion, m.uic || '', m.trabajo || '']));
+    hecho.maquinasVia = c.maquinasVia.length;
+  }
+  if (Array.isArray(c.personalMaquinaria)) {
+    asegurarHoja_('PersonalMaquinaria', ['Nombre', 'Empresa', 'Categoria']);
+    reemplazar_('PersonalMaquinaria', c.personalMaquinaria.map((t) => [t.nombre, t.empresa || '', t.categoria || '']));
+    hecho.personalMaquinaria = c.personalMaquinaria.length;
   }
   if (Array.isArray(c.antiincendios)) {
     asegurarHoja_('Antiincendios', ['Medida']);

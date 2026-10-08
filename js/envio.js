@@ -13,8 +13,10 @@ export function nombreBase(p) {
 }
 
 /** Carpeta dentro de "General/Partes" donde lo guarda Power Automate. */
+const CARPETA_TIPO = { INFRA: 'Infra', SUPER: 'Super', MAQUINARIA: 'Maquinaria' };
+
 export function carpetaDestino(p) {
-  return `${p.fecha}/${p.tipo === 'INFRA' ? 'Infra' : 'Super'}/${p.ref}_${slug(p.capataz)}`;
+  return `${p.fecha}/${CARPETA_TIPO[p.tipo] || p.tipo}/${p.ref}_${slug(p.capataz)}`;
 }
 
 export async function prepararEnvio(parte, config, leerFoto, versionApp) {
@@ -65,7 +67,10 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   ].filter((x) => x.n);
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
-    `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,
+    parte.tipo === 'MAQUINARIA'
+      ? `Lo rellena: ${parte.capataz}. Máquinas: ${(parte.maquinasVia || []).filter((m) => m.descripcion).map((m) => `${m.descripcion} (${m.horas} h)`).join('; ')}. ` +
+        `Tajos: ${(parte.tajos || []).map((t) => `vía ${t.via} PK ${t.pkInicio}-${t.pkFin}`).join('; ')}.`
+      : `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,
     ...(sinFecha.length ? [`AVISO: fotos de galería sin fecha original (se ha usado la fecha del archivo): ${
       sinFecha.map((x) => `${x.nombre} (${x.n} de ${x.de})`).join(', ')}.`] : []),
     ...((parte.formato1 || []).length ? [`${FORMATO1} adjunto: ${parte.formato1.length} foto(s).`] : []),

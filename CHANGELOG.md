@@ -2,6 +2,14 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.10.0 · 2026-10-08
+- Nuevo **parte de MAQUINARIA** de vía (tercer botón en la portada, para todos). Referencias MAQ-0001…
+  - Jornada (fecha y horario), máquinas con sus horas (de momento Bateadora, Perfiladora y Estabilizador; se pueden poner varias o escribir otra), viaje (horas y lugares de salida y llegada).
+  - Tajos sin límite: horas de llegada, inicio, fin y salida, vía 1 o 2, PK inicio y final, desvío/AD opcional; Nivelado, Alineado, Estabilizado, Registro y Perfilado con Sí/No obligatorio y sus detalles obligatorios cuando es Sí (método; Lev./Rip. máx. y PK si es calculado; ¿programada?; antes/después/ambos; cepillado).
+  - Observaciones, personal por puesto (encargado, maquinista tipo A, piloto, OMI, operarios; pueden quedar vacíos) y horas extra como en INFRA y SUPER.
+  - PDF sencillo y completo (el aspecto del papel llegará en la siguiente versión). Se guarda en Teams en `Partes/AAAA-MM-DD/Maquinaria/MAQ-0001_…` sin cambiar el flujo.
+- Servidor (`Code.gs`, pendiente de desplegar): listas «MaquinasVia» y «PersonalMaquinaria» de la hoja. Mientras no estén, la app usa las tres máquinas de siempre y la lista general de trabajadores.
+
 ## 0.9.8 · 2026-10-08
 - Parte SUPER: apartado opcional «Adjuntar formato 1» después de las medidas antiincendios. Foto de cámara o de galería (hasta 6, de una hoja cada una) con el impreso de cómo se protege la vía. Se guardan a 2400 px, con sello «FORMATO 1».
 - PDF: «ANEXO FORMATO 1» después del anexo fotográfico, con el mismo diseño (dos fotos por página). Teams: archivos `Formato1_1.jpg`… en la carpeta del parte. Si falta la fecha original, se avisa a la oficina como en las demás fotos. El nombre «Formato 1» está en `js/util.js` (`FORMATO1`).
