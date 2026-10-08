@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.9.5 · 2026-10-08
+- Las casillas RREE/POI del trabajo se llaman «Tipo de trabajo».
+
 ## 0.9.4 · 2026-10-08
 - Parte INFRA: se quita «Jornada nocturna» y la fecha automática de madrugada (SUPER sigue igual).
 - Parte INFRA: en cada trabajo, casillas opcionales RREE o POI (solo una o ninguna), para los trabajos de coste directo que se facturan aparte. Salen en una columna nueva del PDF entre REFERENCIA y Nº PIDAME (guion si no se marca ninguna), en los datos del parte y en el texto del correo.
