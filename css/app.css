@@ -267,3 +267,6 @@ input.pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; }
 input.mal { border-color: var(--peligro); outline: 2px solid color-mix(in srgb, var(--peligro) 35%, transparent); }
 .aviso-envio { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .aviso-envio .btn { width: auto; flex: none; margin: 0; padding: 8px 14px; }
+/* RREE y POI, uno al lado del otro */
+.checks-fila { display: flex; gap: 32px; flex-wrap: wrap; }
+.checks-fila .check { margin-top: 6px; }

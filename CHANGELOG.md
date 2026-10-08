@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.9.6 · 2026-10-08
+- Las casillas RREE y POI salen una al lado de la otra.
+
 ## 0.9.5 · 2026-10-08
 - Las casillas RREE/POI del trabajo se llaman «Tipo de trabajo».
 

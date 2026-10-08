@@ -14,7 +14,7 @@ import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
 } from './util.js';
 
-const APP_VERSION = '0.9.5';
+const APP_VERSION = '0.9.6';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -1257,8 +1257,10 @@ function vTrabajo() {
       ${t.fotos.length ? '<p class="nota">Las fotos ya hechas conservan la referencia con la que se hicieron.</p>' : ''}
       ${p.tipo === 'INFRA' ? `
       <div class="campo"><span>Tipo de trabajo <small>(opcional, solo uno)</small></span>
-        <label class="check"><input type="checkbox" data-coste="RREE" ${t.tipoCoste === 'RREE' ? 'checked' : ''}><span>RREE</span></label>
-        <label class="check"><input type="checkbox" data-coste="POI" ${t.tipoCoste === 'POI' ? 'checked' : ''}><span>POI</span></label></div>` : ''}
+        <div class="checks-fila">
+          <label class="check"><input type="checkbox" data-coste="RREE" ${t.tipoCoste === 'RREE' ? 'checked' : ''}><span>RREE</span></label>
+          <label class="check"><input type="checkbox" data-coste="POI" ${t.tipoCoste === 'POI' ? 'checked' : ''}><span>POI</span></label>
+        </div></div>` : ''}
       ${campo('Nº acta PIDAME', `${b}.pidame`, t.pidame, 'autocomplete="off"')}
     </section>
 
