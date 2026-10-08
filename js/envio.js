@@ -6,7 +6,7 @@
 // a separar en .jpg. Se usa .txt y no .json porque Android no deja compartir .json.
 
 import { generarPDF, textoReferencia, sinFechaOriginal } from './pdf.js';
-import { blobABase64, fmtFecha, isoLocal, slug } from './util.js';
+import { blobABase64, fmtFecha, isoLocal, slug, FORMATO1 } from './util.js';
 
 export function nombreBase(p) {
   return `${p.fecha}_${p.tipo}_${p.ref}${p.rev > 1 ? `_v${p.rev}` : ''}_${slug(p.capataz)}`;
@@ -34,6 +34,13 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
       fotos.push({ archivo: f.archivo, trabajo: i + 1, fase: f.fase, base64: await blobABase64(blob) });
     }
   }
+  // Formato 1 (solo SUPER): sus fotos van con las demás, en la misma carpeta, como Formato1_n.jpg
+  for (const [k, f] of (datos.formato1 || []).entries()) {
+    f.archivo = `Formato1_${k + 1}${sufijo}.jpg`;
+    const blob = await leerFoto(f.id);
+    if (!blob) throw new Error(`Falta una foto del ${FORMATO1.toLowerCase()}. Ábrelo y revisa sus fotos.`);
+    fotos.push({ archivo: f.archivo, trabajo: 0, fase: 'formato', base64: await blobABase64(blob) });
+  }
   datos.carpeta = carpetaDestino(parte);
   datos.archivos = {
     pdf: `Parte_${base}.pdf`,
@@ -52,14 +59,16 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   const asunto = `PARTE LAV · ${parte.tipo} · ${fmtFecha(parte.fecha)} · ${parte.ref}` +
     `${parte.rev > 1 ? ` rev. ${parte.rev}` : ''} · ${parte.capataz}`;
   // Aviso para la oficina (no para el operario): fotos de galería sin fecha original.
-  const sinFecha = parte.trabajos
-    .map((t, i) => ({ i, n: t.fotos.filter(sinFechaOriginal).length, de: t.fotos.length }))
-    .filter((x) => x.n);
+  const sinFecha = [
+    ...parte.trabajos.map((t, i) => ({ nombre: `trabajo ${i + 1}`, n: t.fotos.filter(sinFechaOriginal).length, de: t.fotos.length })),
+    { nombre: FORMATO1.toLowerCase(), n: (parte.formato1 || []).filter(sinFechaOriginal).length, de: (parte.formato1 || []).length },
+  ].filter((x) => x.n);
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
     `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,
     ...(sinFecha.length ? [`AVISO: fotos de galería sin fecha original (se ha usado la fecha del archivo): ${
-      sinFecha.map((x) => `trabajo ${x.i + 1} (${x.n} de ${x.de})`).join(', ')}.`] : []),
+      sinFecha.map((x) => `${x.nombre} (${x.n} de ${x.de})`).join(', ')}.`] : []),
+    ...((parte.formato1 || []).length ? [`${FORMATO1} adjunto: ${parte.formato1.length} foto(s).`] : []),
     'Enviado desde la app Partes LAV. No cambies los adjuntos.',
   ].join('\n');
   return { pdf, archivos, asunto, cuerpo };

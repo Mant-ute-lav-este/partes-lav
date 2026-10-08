@@ -12,9 +12,10 @@ import { api, hayServidor, SERVIDOR_URL, alReintentar } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
+  FORMATO1, MAX_FORMATO1, LADO_FORMATO1,
 } from './util.js';
 
-const APP_VERSION = '0.9.7';
+const APP_VERSION = '0.9.8';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const app = document.getElementById('app');
@@ -621,6 +622,7 @@ async function nuevoParte(tipo) {
     capataz: estado.perfil.capataz,
     personal: [capatazComoPersona()],
     trabajos: [],
+    formato1: [],   // fotos del formato de protección de la vía (solo SUPER, opcional)
     usaMaquinaria: null,
     maquinas: [],
     usaVehiculos: null,
@@ -657,6 +659,23 @@ function cabeceraParte(volver, textoVolver, titulo) {
 
 function refParte(p) {
   return `${p.tipo} · ${esc(p.ref)}${p.rev > 1 ? ` rev. ${p.rev}` : ''}`;
+}
+
+/** SUPER: foto(s) del formato con la protección de la vía. Opcional. */
+function seccionFormato1(p) {
+  const fs = p.formato1 || [];
+  const lleno = fs.length >= MAX_FORMATO1;
+  return `
+    <section class="tarjeta">
+      <h2>Adjuntar ${esc(FORMATO1.toLowerCase())} <span class="contador">${fs.length}</span></h2>
+      <p class="nota">Opcional. Si el trabajo lleva este formato, haz una foto de cada hoja (hasta ${MAX_FORMATO1}).</p>
+      <div class="fila-botones">
+        <button class="btn secundario" data-action="foto-formato" data-origen="camara" ${lleno ? 'disabled' : ''}>📷 Cámara</button>
+        <button class="btn secundario" data-action="foto-formato" data-origen="galeria" ${lleno ? 'disabled' : ''}>🖼️ Galería</button>
+      </div>
+      ${fs.length ? `<div class="miniaturas">${fs.map((x) => `
+        <button class="mini-foto" data-action="ver-foto" data-id="${x.id}"><img data-foto-id="${x.id}" alt="${esc(FORMATO1)}"></button>`).join('')}</div>` : ''}
+    </section>`;
 }
 
 function vParte() {
@@ -707,6 +726,8 @@ function vParte() {
       ${p.medidasOtrasSi ? `<textarea data-bind="medidasOtras" rows="2" placeholder="Escribe las otras medidas">${esc(p.medidasOtras)}</textarea>` : ''}
     </section>
 
+    ${p.tipo === 'SUPER' ? seccionFormato1(p) : ''}
+
     <section class="tarjeta">
       <h2>Observaciones</h2>
       <textarea data-bind="observaciones" rows="3" placeholder="Opcional">${esc(p.observaciones)}</textarea>
@@ -718,6 +739,9 @@ function vParte() {
     <button class="btn secundario grande" data-action="guardar-salir">Guardar y salir</button>
     <button class="btn primario grande" data-action="cerrar-parte">Cerrar parte</button>
   </div></footer>
+  ${p.tipo === 'SUPER' ? `<input type="file" id="in-camara" accept="image/*" capture="environment" hidden>
+  <input type="file" id="in-galeria" accept="image/*" multiple hidden>` : ''}
+  ${estado.fotoVista ? vFotoGrande() : ''}
   ${estado.errores.length ? vErrores() : ''}
   ${estado.preguntaExtras ? vPreguntaExtras() : ''}`;
 }
@@ -969,6 +993,7 @@ function normalizarParte(p) {
     p.extras = [];
     p.usaExtras = null;
   }
+  if (!p.formato1) p.formato1 = [];
   // Antes de v0.7.0 las medidas antiincendios eran texto libre: pasa a «Otras».
   if (!p.medidas) {
     p.medidas = [];
@@ -1364,30 +1389,47 @@ function textoErrorFoto(e, file) {
   return `No se ha podido usar la foto ${nombre}.`;
 }
 
-async function anadirFotos(files, { fase, origen }) {
+/**
+ * Añade fotos al trabajo actual o, con `formato: true`, al formato 1 del parte (SUPER).
+ * Las del formato salen más grandes (se lee letra a mano) y hay un máximo.
+ */
+async function anadirFotos(archivos, { fase, origen, formato = false }) {
   const p = estado.parte;
-  const t = trabajoActual();
-  if (!t) return;
+  const t = formato ? null : trabajoActual();
+  if (!formato && !t) return;
+  if (formato && !p.formato1) p.formato1 = [];
+  let files = [...archivos];
+  let sobran = 0;
+  if (formato) {
+    const hueco = Math.max(0, MAX_FORMATO1 - p.formato1.length);
+    sobran = Math.max(0, files.length - hueco);
+    files = files.slice(0, hueco);
+  }
   let ok = 0;
   const fallos = [];
   for (const [k, file] of files.entries()) {
     estado.procesando = files.length > 1 ? `Preparando foto ${k + 1} de ${files.length}…` : 'Preparando foto…';
     render();
     try {
-      const etiqueta = etiquetaFoto(t);
-      const r = await procesarFoto(file, { origen, fase, etiqueta, ref: p.ref });
+      const etiqueta = formato ? FORMATO1.toUpperCase() : etiquetaFoto(t);
+      const r = await procesarFoto(file, formato
+        ? { origen, fase: 'formato', faseTxt: FORMATO1.toUpperCase(), etiqueta, ref: p.ref, ladoMax: LADO_FORMATO1, calidad: 0.85 }
+        : { origen, fase, etiqueta, ref: p.ref });
       const id = uuid();
       await db.putFoto({ id, parteId: p.id, blob: r.blob });
-      t.fotos.push({
-        id, fase, origen, etiqueta, fechaFoto: r.fechaFoto, fuenteFecha: r.fuenteFecha,
+      const meta = {
+        id, origen, etiqueta, fechaFoto: r.fechaFoto, fuenteFecha: r.fuenteFecha,
         ancho: r.ancho, alto: r.alto, anadida: isoLocal(),
-      });
+      };
+      if (formato) p.formato1.push(meta);
+      else t.fotos.push({ ...meta, fase });
       ok++;
     } catch (e) {
       console.error(e);
       fallos.push(textoErrorFoto(e, file));
     }
   }
+  if (sobran) fallos.push(`Solo caben ${MAX_FORMATO1} fotos del ${FORMATO1.toLowerCase()}: ${sobran === 1 ? 'una no se ha añadido' : `${sobran} no se han añadido`}.`);
   estado.procesando = '';
   await guardarYa();
   render();
@@ -1403,6 +1445,7 @@ async function anadirFotos(files, { fase, origen }) {
 async function borrarFoto(id) {
   if (!confirm('¿Borrar esta foto?')) return;
   for (const t of estado.parte.trabajos) t.fotos = t.fotos.filter((f) => f.id !== id);
+  estado.parte.formato1 = (estado.parte.formato1 || []).filter((f) => f.id !== id);
   await db.borrarFoto(id);
   if (urls.has(id)) { URL.revokeObjectURL(urls.get(id)); urls.delete(id); }
   estado.fotoVista = null;
@@ -1558,7 +1601,7 @@ function vEnvio() {
 function resumenEnvio(p) {
   const envios = (p.envios || []).map((x) => (typeof x === 'string' ? fmtFechaHora(x) : fmtFechaHora(x.recibido || x.fecha)));
   return `
-      <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${p.trabajos.length} trabajo(s) · ${p.personal.length} persona(s)</p>
+      <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${p.trabajos.length} trabajo(s) · ${p.personal.length} persona(s)${(p.formato1 || []).length ? ` · ${esc(FORMATO1.toLowerCase())}: ${p.formato1.length} foto(s)` : ''}</p>
       <p><small>Cerrado en el móvil: ${fmtFechaHora(p.cierre)}${envios.length ? `<br>Envíos: ${envios.join(', ')}` : ''}</small></p>`;
 }
 
@@ -1733,13 +1776,11 @@ async function corregir() {
   });
   delete nuevo.recibido;
   delete nuevo.errorEnvio;
-  for (const t of nuevo.trabajos) {
-    for (const f of t.fotos) {
-      const reg = await db.getFoto(f.id);
-      const id = uuid();
-      if (reg) await db.putFoto({ id, parteId: nuevo.id, blob: reg.blob });
-      f.id = id;
-    }
+  for (const f of [...nuevo.trabajos.flatMap((t) => t.fotos), ...(nuevo.formato1 || [])]) {
+    const reg = await db.getFoto(f.id);
+    const id = uuid();
+    if (reg) await db.putFoto({ id, parteId: nuevo.id, blob: reg.blob });
+    f.id = id;
   }
   estado.parte = nuevo;
   await guardarYa();
@@ -2069,6 +2110,11 @@ async function onClick(e) {
       document.getElementById(el.dataset.origen === 'camara' ? 'in-camara' : 'in-galeria').click();
       break;
     }
+    case 'foto-formato':
+      if ((p.formato1 || []).length >= MAX_FORMATO1) { toast(`Ya hay ${MAX_FORMATO1} fotos: borra alguna para añadir otra.`, 3500); break; }
+      estado.fotoPendiente = { formato: true, origen: el.dataset.origen };
+      document.getElementById(el.dataset.origen === 'camara' ? 'in-camara' : 'in-galeria').click();
+      break;
     case 'ver-foto': estado.fotoVista = el.dataset.id; render(); break;
     case 'cerrar-foto': estado.fotoVista = null; render(); break;
     case 'borrar-foto': borrarFoto(el.dataset.id); break;

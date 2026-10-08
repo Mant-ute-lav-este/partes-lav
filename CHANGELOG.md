@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.9.8 · 2026-10-08
+- Parte SUPER: apartado opcional «Adjuntar formato 1» después de las medidas antiincendios. Foto de cámara o de galería (hasta 6, de una hoja cada una) con el impreso de cómo se protege la vía. Se guardan a 2400 px, con sello «FORMATO 1».
+- PDF: «ANEXO FORMATO 1» después del anexo fotográfico, con el mismo diseño (dos fotos por página). Teams: archivos `Formato1_1.jpg`… en la carpeta del parte. Si falta la fecha original, se avisa a la oficina como en las demás fotos. El nombre «Formato 1» está en `js/util.js` (`FORMATO1`).
+
 ## 0.9.7 · 2026-10-08
 - Aviso para la oficina (no para el operario) cuando una foto de galería no trae su fecha original y se usa la fecha del archivo: línea «N sin fecha original» en la tabla de trabajos del PDF, pie en rojo «SIN FECHA ORIGINAL» en el anexo y línea de AVISO en el texto del correo. El dato `fuenteFecha` (exif, captura o archivo) ya iba en los datos de cada foto.
 

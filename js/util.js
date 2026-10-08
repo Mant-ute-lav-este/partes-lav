@@ -6,6 +6,12 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
 
 export const uuid = () => crypto.randomUUID();
 
+// Formato que el SUPER puede adjuntar (impreso de cómo se va a proteger la vía).
+// Cuando se sepa su nombre real, basta con cambiarlo aquí.
+export const FORMATO1 = 'Formato 1';
+export const MAX_FORMATO1 = 6;        // fotos como máximo
+export const LADO_FORMATO1 = 2400;    // píxeles del lado largo (más que las fotos normales: se lee letra a mano)
+
 const p2 = (n) => String(n).padStart(2, '0');
 
 /** Fecha local "AAAA-MM-DD". */

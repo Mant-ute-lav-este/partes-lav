@@ -122,7 +122,7 @@ function ajustarTexto(ctx, texto, anchoMax, tam) {
  * @param {{origen:'camara'|'galeria', fase:string, etiqueta:string, ref:string}} o
  * @returns {Promise<{blob:Blob, fechaFoto:string, fuenteFecha:'exif'|'captura'|'archivo', ancho:number, alto:number}>}
  */
-export async function procesarFoto(file, { origen, fase, etiqueta, ref }) {
+export async function procesarFoto(file, { origen, fase, etiqueta, ref, faseTxt, ladoMax = LADO_MAX, calidad = CALIDAD }) {
   let exif = null;
   try { exif = leerExif(await file.arrayBuffer()); } catch { exif = null; }
 
@@ -148,7 +148,7 @@ export async function procesarFoto(file, { origen, fase, etiqueta, ref }) {
   const w0 = img.width || img.naturalWidth;
   const h0 = img.height || img.naturalHeight;
   if (!w0 || !h0) throw Object.assign(new Error('Imagen vacía'), { motivo: 'vacia' });
-  const escala = Math.min(1, LADO_MAX / Math.max(w0, h0));
+  const escala = Math.min(1, ladoMax / Math.max(w0, h0));
   const w = Math.round(w0 * escala);
   const h = Math.round(h0 * escala);
   const banda = Math.max(64, Math.round(Math.min(w, h) * 0.09));
@@ -168,7 +168,7 @@ export async function procesarFoto(file, { origen, fase, etiqueta, ref }) {
     ? (fuenteFecha === 'exif' ? 'GALERÍA' : 'GALERÍA · FECHA DEL ARCHIVO')
     : 'CÁMARA';
   const linea1 = `${textoFecha(fechaFoto)} · ${etiqueta}`;
-  const linea2 = `${FASES[fase] || fase} · ${origenTxt}${ref ? ` · ${ref}` : ''}`;
+  const linea2 = `${faseTxt || FASES[fase] || fase} · ${origenTxt}${ref ? ` · ${ref}` : ''}`;
   const margen = Math.round(banda * 0.25);
   const tam = Math.round(banda * 0.32);
   ctx.fillStyle = '#fff';
@@ -180,7 +180,7 @@ export async function procesarFoto(file, { origen, fase, etiqueta, ref }) {
   ctx.fillText(linea2, margen, h + banda * 0.72);
 
   const blob = await new Promise((res, rej) => canvas.toBlob(
-    (b) => (b ? res(b) : rej(Object.assign(new Error('No se pudo generar la foto'), { motivo: 'memoria' }))), 'image/jpeg', CALIDAD,
+    (b) => (b ? res(b) : rej(Object.assign(new Error('No se pudo generar la foto'), { motivo: 'memoria' }))), 'image/jpeg', calidad,
   ));
   const alto = canvas.height;
   canvas.width = 0;   // libera memoria en móviles modestos

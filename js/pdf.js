@@ -1,6 +1,6 @@
 // PDF A4 apaisado con el aspecto del parte en papel. Se genera en el móvil con jsPDF.
 
-import { fmtFecha, fmtFechaHora } from './util.js';
+import { fmtFecha, fmtFechaHora, FORMATO1 } from './util.js';
 
 const PT = 0.3528;              // 1 punto tipográfico en mm
 const M = 8;                    // margen
@@ -130,11 +130,25 @@ async function anexoFotos(c, parte, leerFoto) {
   parte.trabajos.forEach((t, i) => ['antes', 'durante', 'despues'].forEach((f) => {
     t.fotos.filter((x) => x.fase === f).forEach((x) => lista.push({ t, i, x }));
   }));
+  await paginasFotos(c, parte, leerFoto, lista, 'ANEXO FOTOGRÁFICO', ({ t, i, x }) =>
+    `Trabajo ${i + 1} · ${textoReferencia(t)} · ${FASE_TXT[x.fase] || x.fase} · ` +
+    `${x.origen === 'galeria' ? 'Galería' : 'Cámara'} · ${fmtFechaHora(x.fechaFoto)}`);
+}
+
+/** Anexo del formato de protección de la vía (solo SUPER): mismas páginas que el anexo fotográfico. */
+async function anexoFormato(c, parte, leerFoto) {
+  const lista = (parte.formato1 || []).map((x) => ({ x }));
+  await paginasFotos(c, parte, leerFoto, lista, `ANEXO ${FORMATO1.toUpperCase()}`, ({ x }) =>
+    `${FORMATO1} · ${x.origen === 'galeria' ? 'Galería' : 'Cámara'} · ${fmtFechaHora(x.fechaFoto)}`, 1600, 0.78);
+}
+
+/** Dos fotos por página, con el título del anexo y un pie por foto. */
+async function paginasFotos(c, parte, leerFoto, lista, nombreAnexo, textoPie, lado = 1100, calidad = 0.72) {
   if (!lista.length) return;
   const { doc } = c;
   const hueco = 6;
   const anchoCelda = (AN - hueco) / 2;
-  const tituloAnexo = `ANEXO FOTOGRÁFICO  ·  Ref. ${parte.ref}${parte.rev > 1 ? ` rev. ${parte.rev}` : ''}  ·  ` +
+  const tituloAnexo = `${nombreAnexo}  ·  Ref. ${parte.ref}${parte.rev > 1 ? ` rev. ${parte.rev}` : ''}  ·  ` +
     `${parte.tipo === 'INFRA' ? 'Infraestructura' : 'Superestructura'}  ·  Jornada ${fmtFecha(parte.fecha)}  ·  ${parte.capataz}`;
   for (let k = 0; k < lista.length; k += 2) {
     nuevaPagina(c);
@@ -142,12 +156,13 @@ async function anexoFotos(c, parte, leerFoto) {
     const y0 = c.y + 3;
     const altoMax = FONDO - y0 - 12;   // deja sitio al pie de foto
     for (let j = 0; j < 2 && k + j < lista.length; j++) {
-      const { t, i, x } = lista[k + j];
+      const item = lista[k + j];
+      const x = item.x;
       const x0 = M + j * (anchoCelda + hueco);
       let yPie = y0;
       const blob = await leerFoto(x.id);
       if (blob) {
-        const img = await reducir(blob);
+        const img = await reducir(blob, lado, calidad);
         const e = Math.min(anchoCelda / img.w, altoMax / img.h);
         const w = img.w * e;
         const h = img.h * e;
@@ -156,9 +171,7 @@ async function anexoFotos(c, parte, leerFoto) {
         yPie = y0 + h + 2;
       }
       const sinFecha = sinFechaOriginal(x);
-      const pie = `Trabajo ${i + 1} · ${textoReferencia(t)} · ${FASE_TXT[x.fase] || x.fase} · ` +
-        `${x.origen === 'galeria' ? 'Galería' : 'Cámara'} · ${fmtFechaHora(x.fechaFoto)}` +
-        `${sinFecha ? ' · SIN FECHA ORIGINAL (fecha del archivo)' : ''}`;
+      const pie = textoPie(item) + (sinFecha ? ' · SIN FECHA ORIGINAL (fecha del archivo)' : '');
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       if (sinFecha) doc.setTextColor(170, 0, 0);
@@ -316,7 +329,10 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     fila(c, [{ w: AN, t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
   }
 
-  if (leerFoto) await anexoFotos(c, parte, leerFoto);
+  if (leerFoto) {
+    await anexoFotos(c, parte, leerFoto);
+    if (parte.tipo === 'SUPER') await anexoFormato(c, parte, leerFoto);
+  }
 
   // Pie en todas las páginas
   const n = doc.getNumberOfPages();
