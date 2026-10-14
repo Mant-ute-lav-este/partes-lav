@@ -9,3 +9,5 @@ privado/
 *.pdf
 *.jpg
 *.jpeg
+# Excepción: la guía rápida para capataces (sin datos reales)
+!guia/guia-capataces.pdf

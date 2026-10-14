@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.11.3 · 2026-10-14
+- **Guía rápida** para capataces (1 página, PDF) en el Menú, con el permiso de cámara de Chrome, las fotos HEIC y qué hacer si algo falla. Queda guardada en el móvil y se abre sin cobertura.
+
 ## 0.11.2 · 2026-10-14
 - **Registro de fallos de campo**: los errores de la app, las fotos que no se pueden usar y los envíos rechazados se mandan solos a la hoja «Errores» del servidor (sin nombre ni correo; se tachan correos, números largos y enlaces). Sin cobertura se guardan en el móvil (hasta 20) y salen después.
 - Servidor desplegado como **versión 9** (la 8 se creó sin el código nuevo):

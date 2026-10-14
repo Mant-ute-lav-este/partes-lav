@@ -134,6 +134,7 @@ input.pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; }
   font: inherit; font-weight: 600; color: var(--texto); background: var(--superficie);
   border: 1.5px solid var(--borde); border-radius: 12px; cursor: pointer;
 }
+a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .btn:disabled { opacity: .5; }
 .btn.primario { background: var(--acento); border-color: var(--acento); color: #fff; }
 .btn.secundario { background: var(--superficie-2); }

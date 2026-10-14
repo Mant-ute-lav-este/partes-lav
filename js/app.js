@@ -16,7 +16,7 @@ import {
   FORMATO1, MAX_FORMATO1, LADO_FORMATO1,
 } from './util.js';
 
-const APP_VERSION = '0.11.2';
+const APP_VERSION = '0.11.3';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
@@ -602,6 +602,7 @@ function vMenu() {
     ? '<button class="btn secundario" data-action="actualizar-lista">Actualizar la lista de la oficina</button>'
     : `<button class="btn secundario" data-action="elegir-config">Cargar lista de la oficina</button>${inputConfig}
        <button class="btn secundario" data-action="cambiar-capataz">Cambiar de capataz</button>`}
+    <a class="btn secundario" href="./guia/guia-capataces.pdf" target="_blank" rel="noopener">Guía rápida (PDF)</a>
     <button class="btn secundario" data-action="cambiar-pin">Cambiar PIN</button>
     <button class="btn secundario" data-action="bloquear">Bloquear la app</button>
     ${srv ? '<button class="btn secundario" data-action="cerrar-sesion">Cerrar sesión en este móvil</button>' : ''}
