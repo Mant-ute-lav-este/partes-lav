@@ -30,7 +30,12 @@ const ACCIONES = {
   pin: cambiarPin_,
   nuevoPin: nuevoPin_,
   cargarLista: cargarLista_,
+  fallo: registrarFallos_,
 };
+
+// Acciones que se bloquean ellas mismas solo en los tramos cortos: enviar un parte con fotos
+// tarda segundos y, con el bloqueo puesto, dejaba esperando a todos los demás móviles.
+const SIN_BLOQUEO = { enviar: true };
 
 // ---------- Entrada ----------
 
@@ -41,7 +46,8 @@ function doPost(e) {
     const datos = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const accion = ACCIONES[datos.accion];
     if (!accion) throw new Error('Acción desconocida.');
-    texto = lock.tryLock(30000)
+    if (SIN_BLOQUEO[datos.accion]) texto = responder_(datos, accion);
+    else texto = lock.tryLock(30000)
       ? responder_(datos, accion)
       : JSON.stringify({ ok: false, reintentar: true, error: 'El servidor está ocupado. Se reintentará.' });
   } catch (err) {
@@ -71,9 +77,11 @@ function responder_(datos, accion) {
     respuesta = Object.assign({ ok: true }, accion(datos));
   } catch (err) {
     respuesta = { ok: false, error: String((err && err.message) || err) };
+    if (err && err.reintentar) respuesta.reintentar = true;
   }
   const texto = JSON.stringify(respuesta);
-  if (clave) {
+  // «Ocupado» no se guarda: el reintento con el mismo identificador tiene que volver a probar.
+  if (clave && !respuesta.reintentar) {
     try { cache.put(clave, texto, 1800); } catch (x) { /* demasiado grande para la caché: no se guarda */ }
   }
   return texto;
@@ -119,6 +127,7 @@ function configurar() {
   crearHoja_(libro, 'PersonalMaquinaria', ['Nombre', 'Empresa', 'Categoria']);
   crearHoja_(libro, 'Motivos', ['Tipo', 'Motivo']);
   crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
+  crearHoja_(libro, 'Errores', ['Recibido', 'Fecha', 'Usuario', 'Version', 'Tipo', 'Mensaje']);
   const sobra = libro.getSheetByName('Hoja 1') || libro.getSheetByName('Sheet1');
   if (sobra && libro.getSheets().length > 1) libro.deleteSheet(sobra);
   if (!p.getProperty('PIMIENTA')) p.setProperty('PIMIENTA', Utilities.getUuid() + Utilities.getUuid());
@@ -161,7 +170,7 @@ function pedirCodigo_(d) {
   cache.put('c:' + email, JSON.stringify({ codigo: codigo, fallos: 0 }), 600);
   cache.put(kn, String(n + 1), 3600);
   cache.put(kg, String(g + 1), 21600);
-  MailApp.sendEmail({
+  enviarCorreo_({
     to: email,
     name: 'Partes LAV',
     subject: 'Tu código para la app Partes LAV: ' + codigo,
@@ -220,7 +229,7 @@ function avisarRegistro_(email, nombre) {
   if (!admin) return;
   const url = ScriptApp.getService().getUrl() + '?accion=revisar&email=' + encodeURIComponent(email) +
     '&firma=' + firma_('revisar:' + email);
-  MailApp.sendEmail({
+  enviarCorreo_({
     to: admin,
     name: 'Partes LAV',
     subject: 'Registro en la app de partes: ' + nombre,
@@ -441,16 +450,56 @@ function asegurarHoja_(nombre, cabeceras) {
 
 // ---------- Envío de partes ----------
 
+/**
+ * Va en tres tramos para no tener parado al resto de móviles mientras sale el correo:
+ *  1. Con bloqueo (corto): sesión, ¿ya enviado?, ¿otro intento de este mismo parte en curso?, reserva.
+ *  2. Sin bloqueo: adjuntos y correo, que es lo lento.
+ *  3. Apuntar en Envios (appendRow no depende de números de fila, no necesita bloqueo).
+ * La reserva dura 10 minutos en la caché: si un reintento llega mientras el primero aún está
+ * mandando el correo, recibe «ocupado» y la app vuelve a probar más tarde, cuando ya figura en Envios.
+ */
 function enviar_(d) {
-  const u = usuarioDeSesion_(d.token, true);
   const envioId = String(d.envioId || '');
   if (!/^[0-9a-f-]{36}$/i.test(envioId)) throw new Error('Envío sin identificador.');
-  // Si la app reintenta un envío que ya llegó (p. ej. se cortó la cobertura al recibir
-  // la respuesta), no se manda dos veces.
-  const previo = tabla_('Envios').filas.find((f) => f.EnvioId === envioId);
-  if (previo) return { recibido: String(previo.Recibido), repetido: true };
-  const aj = ajustes_();
-  if (!aj.destinatario) throw new Error('Falta el correo de destino en los ajustes del servidor.');
+  const cache = CacheService.getScriptCache();
+  const reserva = 'e:' + envioId;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw ocupado_('El servidor está ocupado. Se reintentará.');
+  let u, aj;
+  try {
+    u = usuarioDeSesion_(d.token, true);
+    // Si la app reintenta un envío que ya llegó (p. ej. se cortó la cobertura al recibir
+    // la respuesta), no se manda dos veces.
+    const previo = tabla_('Envios').filas.find((f) => f.EnvioId === envioId);
+    if (previo) return { recibido: String(previo.Recibido), repetido: true };
+    if (cache.get(reserva)) throw ocupado_('Este parte se está enviando. Se comprobará en un momento.');
+    aj = ajustes_();
+    if (!aj.destinatario) throw new Error('Falta el correo de destino en los ajustes del servidor.');
+    cache.put(reserva, '1', 600);
+  } finally {
+    lock.releaseLock();
+  }
+  let r;
+  try {
+    r = mandarParte_(d, u, aj);
+  } catch (err) {
+    cache.remove(reserva);   // el correo no ha salido: se puede volver a intentar ya
+    throw err;
+  }
+  // Si esto fallara, la reserva sigue 10 minutos y evita mandar el correo dos veces enseguida.
+  hoja_('Envios').appendRow([envioId, String(u.Email), String(u.Nombre), String(d.ref || ''), r.asunto, String(r.bytes), r.fecha]);
+  cache.remove(reserva);
+  return { recibido: r.fecha };
+}
+
+function ocupado_(mensaje) {
+  const err = new Error(mensaje);
+  err.reintentar = true;
+  return err;
+}
+
+/** Monta los adjuntos y manda el correo del parte. Devuelve { fecha, asunto, bytes }. */
+function mandarParte_(d, u, aj) {
   let asunto = String(d.asunto || '').replace(/[\r\n]+/g, ' ').trim();
   if (asunto.indexOf('PARTE LAV') !== 0) asunto = 'PARTE LAV · ' + asunto;
   const archivos = Array.isArray(d.archivos) ? d.archivos : [];
@@ -466,7 +515,7 @@ function enviar_(d) {
   });
   if (bytes > MAX_ADJUNTOS_BYTES) throw new Error('El parte pesa demasiado (' + Math.round(bytes / 1048576) + ' MB). Quita alguna foto.');
   const recibido = ahora_();
-  MailApp.sendEmail({
+  enviarCorreo_({
     to: aj.destinatario,
     name: 'Partes LAV',
     replyTo: String(u.Email),
@@ -475,8 +524,7 @@ function enviar_(d) {
       '\nEnviado por: ' + u.Nombre + ' <' + u.Email + '>',
     attachments: adjuntos,
   });
-  hoja_('Envios').appendRow([envioId, String(u.Email), String(u.Nombre), String(d.ref || ''), asunto, String(bytes), recibido]);
-  return { recibido: recibido };
+  return { fecha: recibido, asunto: asunto, bytes: bytes };
 }
 
 // ---------- Copia de seguridad ----------
@@ -533,7 +581,21 @@ function resumenDiario() {
       String(f.Recibido).slice(11, 16) + '  ' + String(f.Ref) + '  ' + String(f.Nombre)).join('\n') +
       '\n\nComprueba que están en la carpeta de Teams: este resumen solo cuenta lo recibido por el servidor.';
   }
-  MailApp.sendEmail({
+  let limpieza;
+  try {
+    const n = limpiarSesiones_();
+    limpieza = n ? 'Sesiones borradas hoy (sin uso en ' + DIAS_SESION + ' días o de cuentas dadas de baja): ' + n + '.' : '';
+  } catch (err) {
+    limpieza = 'No se han podido limpiar las sesiones: ' + ((err && err.message) || err);
+  }
+  if (limpieza) cuerpo += '\n\n' + limpieza;
+  const fh = fallosHoy_();
+  cuerpo += '\n\nFallos de campo hoy: ' + fh.total +
+    (fh.total ? ' (' + Object.keys(fh.porTipo).map((t) => t + ' ' + fh.porTipo[t]).join(', ') +
+      '; ' + fh.usuarios + (fh.usuarios === 1 ? ' móvil' : ' móviles') + ') · detalle en la hoja «Errores».' : '.');
+  cuerpo += '\n\nCorreos enviados hoy por el servidor (antes de este): ' + correosHoy_().n +
+    ' · cuota restante: ' + MailApp.getRemainingDailyQuota() + '.';
+  enviarCorreo_({
     to: aj.destinatario,
     name: 'Partes LAV',
     subject: 'Resumen del día · capataces LAV · ' + dia + ' · ' + enviados.length + (enviados.length === 1 ? ' parte' : ' partes'),
@@ -547,6 +609,131 @@ function activarResumenDiario() {
     .filter((t) => t.getHandlerFunction() === 'resumenDiario')
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('resumenDiario').timeBased().everyDays(1).atHour(16).inTimezone(ZONA).create();
+}
+
+// ---------- Limpieza de sesiones ----------
+
+const DIAS_SESION = 180;   // sin usar la app en este tiempo, hay que volver a entrar con el PIN
+
+/**
+ * Borra las sesiones sin uso en DIAS_SESION días y las de cuentas rechazadas o borradas.
+ * Va con bloqueo: al quitar filas cambian los números de fila que usan las demás peticiones.
+ * La llama resumenDiario (no necesita activador propio). Devuelve cuántas ha borrado.
+ */
+function limpiarSesiones_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try {
+    const t = tabla_('Sesiones');
+    if (!t.h || !t.filas.length) return 0;
+    const estados = {};
+    tabla_('Usuarios').filas.forEach((u) => { estados[String(u.Email).toLowerCase()] = String(u.Estado); });
+    const limite = Date.now() - DIAS_SESION * 86400000;
+    const reales = t.filas.filter((s) => s.TokenHash);   // sin contar filas vacías
+    const quedan = reales.filter((s) => {
+      const estado = estados[String(s.Email).toLowerCase()];
+      if (!estado || estado === 'rechazado') return false;
+      const uso = new Date(String(s.UltimoUso || s.Creado)).getTime();
+      return !(uso < limite);   // fecha ilegible (NaN): se conserva
+    });
+    const borradas = reales.length - quedan.length;
+    if (!borradas) return 0;
+    const ancho = t.cab.length;
+    t.h.getRange(2, 1, t.filas.length, ancho).clearContent();
+    if (quedan.length) {
+      t.h.getRange(2, 1, quedan.length, ancho).setValues(quedan.map((s) => t.cab.map((c) => String(s[c] == null ? '' : s[c]))));
+    }
+    return borradas;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------- Registro de fallos de campo ----------
+
+const MAX_FALLOS_DIA = 200;     // tope diario para que un móvil con un bucle no llene la hoja
+const MAX_FALLOS_LOTE = 20;
+
+/**
+ * Guarda en la hoja «Errores» los fallos que manda la app. Sin datos personales: el usuario va
+ * como un código corto (no reversible sin la pimienta del servidor), nunca nombre ni correo.
+ */
+function registrarFallos_(d) {
+  const u = usuarioDeSesion_(d.token, false);
+  const lista = Array.isArray(d.fallos) ? d.fallos.slice(0, MAX_FALLOS_LOTE) : [];
+  const cache = CacheService.getScriptCache();
+  const kg = 'f:' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd');
+  let hoy = Number(cache.get(kg) || 0);
+  const usuario = firma_('u:' + String(u.Email).toLowerCase()).slice(0, 8);
+  const recibido = ahora_();
+  const filas = [];
+  lista.forEach((f) => {
+    if (hoy >= MAX_FALLOS_DIA) return;
+    hoy += 1;
+    filas.push([recibido, String(f.fecha || '').slice(0, 25), usuario, String(f.version || '').slice(0, 10),
+      String(f.tipo || '').slice(0, 20), String(f.mensaje || '').slice(0, 200)]);
+  });
+  if (filas.length) {
+    // Si la hoja aún no existe (servidor sin reconfigurar), se crea aquí.
+    const h = hoja_('Errores') || crearHoja_(libro_(), 'Errores', ['Recibido', 'Fecha', 'Usuario', 'Version', 'Tipo', 'Mensaje']);
+    h.getRange(h.getLastRow() + 1, 1, filas.length, 6).setValues(filas);
+    cache.put(kg, String(hoy), 21600);
+  }
+  return { guardados: filas.length };
+}
+
+/** Fallos de hoy, por tipo, para el resumen de las 16:00. */
+function fallosHoy_() {
+  const h = hoja_('Errores');
+  if (!h) return { total: 0, porTipo: {}, usuarios: 0 };
+  const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  const filas = tabla_('Errores').filas.filter((f) => String(f.Recibido).indexOf(hoy) === 0);
+  const porTipo = {};
+  const usuarios = {};
+  filas.forEach((f) => {
+    porTipo[f.Tipo] = (porTipo[f.Tipo] || 0) + 1;
+    usuarios[f.Usuario] = true;
+  });
+  return { total: filas.length, porTipo: porTipo, usuarios: Object.keys(usuarios).length };
+}
+
+// ---------- Control de correos ----------
+
+const AVISO_CORREOS = 70;   // Gmail gratuito permite unos 100 al día
+
+/** Cuenta los correos del día (propiedad CORREOS = {dia, n, avisado}). */
+function correosHoy_() {
+  const dia = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  let o = null;
+  try { o = JSON.parse(props_().getProperty('CORREOS') || 'null'); } catch (e) { o = null; }
+  if (!o || o.dia !== dia) o = { dia: dia, n: 0, avisado: false };
+  return o;
+}
+
+/**
+ * Único punto de envío de correo del servidor: envía, cuenta y avisa una vez al día
+ * al llegar a AVISO_CORREOS. El aviso no lleva «PARTE LAV» en el asunto.
+ */
+function enviarCorreo_(opciones) {
+  MailApp.sendEmail(opciones);
+  const o = correosHoy_();
+  o.n += 1;
+  if (o.n >= AVISO_CORREOS && !o.avisado) {
+    o.avisado = true;
+    const aj = ajustes_();
+    const para = aj.admin || aj.destinatario;
+    if (para) {
+      MailApp.sendEmail({
+        to: para,
+        name: 'Partes LAV',
+        subject: 'Aviso: ' + o.n + ' correos enviados hoy desde el servidor de partes',
+        body: 'El servidor de partes ha enviado ' + o.n + ' correos hoy (' + o.dia + ').\n' +
+          'Cuota restante hoy según Google: ' + MailApp.getRemainingDailyQuota() + '.\n\n' +
+          'Si se agota, la app dará error al enviar o registrarse hasta el día siguiente.',
+      });
+    }
+  }
+  props_().setProperty('CORREOS', JSON.stringify(o));
 }
 
 // ---------- Utilidades ----------
