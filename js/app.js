@@ -15,7 +15,7 @@ import {
   FORMATO1, MAX_FORMATO1, LADO_FORMATO1,
 } from './util.js';
 
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.11.1';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
@@ -1912,11 +1912,14 @@ function vFotoGrande() {
 /** Explica por qué una foto no se ha podido usar, en lugar de culpar siempre al formato. */
 function textoErrorFoto(e, file) {
   const nombre = `«${String((file && file.name) || 'la foto').slice(0, 30)}»`;
-  const heic = /heic|heif/i.test((file && file.type) || '') || /\.(heic|heif)$/i.test((file && file.name) || '');
+  const heic = (e && e.heic) || /heic|heif/i.test((file && file.type) || '') || /\.(heic|heif)$/i.test((file && file.name) || '');
   if (e && e.motivo === 'vacia') return `${nombre} está vacía o no se ha descargado entera.`;
   if (e && e.motivo === 'formato') {
+    if (heic && e.sinConexion) {
+      return `${nombre} es HEIC y hay que convertirla, pero el convertidor aún no está en el móvil. Vuelve a intentarlo con cobertura (solo la primera vez) o hazla con la cámara de la app.`;
+    }
     return heic
-      ? `${nombre} es HEIC y este navegador no puede abrirla. Hazla con la cámara de la app o pásala a JPG.`
+      ? `${nombre} es HEIC y no se ha podido convertir. Hazla con la cámara de la app.`
       : `${nombre} no se puede abrir en este navegador (formato no compatible). Prueba con otra foto o desde Chrome.`;
   }
   if (e && e.name === 'QuotaExceededError') return 'No hay espacio en el móvil para guardar la foto. Libera espacio.';

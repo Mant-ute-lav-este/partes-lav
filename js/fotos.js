@@ -89,7 +89,70 @@ function textoFecha(iso) {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)} ${iso.slice(11, 16)}`;
 }
 
-async function decodificar(file) {
+// ---------- Fotos HEIC ----------
+// Muchos móviles guardan las fotos de la cámara en HEIC, que Chrome en Android no sabe abrir.
+// Si una foto HEIC no se abre, se convierte a JPG en el propio móvil con heic2any. La librería
+// solo se descarga si hace falta, y el service worker la deja guardada para usarla sin cobertura.
+export const HEIC2ANY = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+let heicCargando = null;
+
+function cargarHeic2any() {
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (!heicCargando) {
+    heicCargando = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = HEIC2ANY;
+      s.onload = () => (window.heic2any ? res(window.heic2any) : rej(new Error('Convertidor HEIC no disponible')));
+      s.onerror = () => { heicCargando = null; s.remove(); rej(new Error('No se pudo cargar el convertidor HEIC')); };
+      document.head.append(s);
+    });
+  }
+  return heicCargando;
+}
+
+/** ¿Es HEIC/HEIF? Por el tipo, la extensión o la firma del archivo («ftyp» + heic, heix, mif1…). */
+export function esHeic(file, buf) {
+  if (/hei[cf]/i.test(file.type || '') || /\.(heic|heif)$/i.test(file.name || '')) return true;
+  if (!buf || buf.byteLength < 12) return false;
+  const b = new Uint8Array(buf, 4, 8);
+  const txt = String.fromCharCode(...b);
+  return txt.startsWith('ftyp') && /^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(txt.slice(4));
+}
+
+/**
+ * La fecha de una foto HEIC: el bloque EXIF va dentro del archivo con la cabecera «Exif\0\0»
+ * seguida de la cabecera TIFF, igual que en un JPEG.
+ */
+export function leerExifHeic(buf) {
+  const b = new Uint8Array(buf);
+  for (let i = 0; i + 14 < b.length; i++) {
+    if (b[i] !== 0x45 || b[i + 1] !== 0x78 || b[i + 2] !== 0x69 || b[i + 3] !== 0x66 || b[i + 4] || b[i + 5]) continue;
+    const t = i + 6;
+    const ii = b[t] === 0x49 && b[t + 1] === 0x49 && b[t + 2] === 0x2A && b[t + 3] === 0;
+    const mm = b[t] === 0x4D && b[t + 1] === 0x4D && b[t + 2] === 0 && b[t + 3] === 0x2A;
+    if (ii || mm) return leerTiff(new DataView(buf), t, Math.min(buf.byteLength, t + 262144));
+  }
+  return null;
+}
+
+async function decodificar(file, heic = false) {
+  try {
+    return await abrirImagen(file);
+  } catch (e) {
+    if (!heic) throw e;
+    let h2a;
+    try {
+      h2a = await cargarHeic2any();
+    } catch (err) {
+      // Sin cobertura y sin el convertidor guardado todavía en el móvil.
+      throw Object.assign(new Error('No se pudo cargar el convertidor HEIC'), { heicSinConvertir: true, causa: err });
+    }
+    const r = await h2a({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    return abrirImagen(Array.isArray(r) ? r[0] : r);   // las HEIC con varias imágenes devuelven una lista
+  }
+}
+
+async function abrirImagen(file) {
   // Chrome aplica la orientación EXIF al decodificar, así la foto no sale girada.
   try {
     return await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -124,7 +187,10 @@ function ajustarTexto(ctx, texto, anchoMax, tam) {
  */
 export async function procesarFoto(file, { origen, fase, etiqueta, ref, faseTxt, ladoMax = LADO_MAX, calidad = CALIDAD }) {
   let exif = null;
-  try { exif = leerExif(await file.arrayBuffer()); } catch { exif = null; }
+  let buf = null;
+  try { buf = await file.arrayBuffer(); } catch { buf = null; }
+  const heic = esHeic(file, buf);
+  try { exif = buf && (heic ? leerExifHeic(buf) : leerExif(buf)); } catch { exif = null; }
 
   let fechaFoto = fechaExifAIso(exif?.fechaOriginal, exif?.offsetOriginal) || fechaExifAIso(exif?.fecha);
   let fuenteFecha = 'exif';
@@ -141,9 +207,9 @@ export async function procesarFoto(file, { origen, fase, etiqueta, ref, faseTxt,
   if (!file.size) throw Object.assign(new Error('Archivo vacío'), { motivo: 'vacia' });
   let img;
   try {
-    img = await decodificar(file);
+    img = await decodificar(file, heic);
   } catch (e) {
-    throw Object.assign(new Error('No se pudo abrir la imagen'), { motivo: 'formato', causa: e });
+    throw Object.assign(new Error('No se pudo abrir la imagen'), { motivo: 'formato', heic, sinConexion: Boolean(e && e.heicSinConvertir), causa: e });
   }
   const w0 = img.width || img.naturalWidth;
   const h0 = img.height || img.naturalHeight;

@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.11.0';
+const VERSION = 'v0.11.1';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -31,8 +31,15 @@ const ARCHIVOS = [
 
 // «reload»: que la versión nueva no copie archivos viejos de la caché del navegador
 // (GitHub Pages los deja 10 minutos), porque se quedarían guardados como si fueran nuevos.
+// Convertidor de fotos HEIC (lo usa js/fotos.js solo cuando hace falta). Se guarda aparte y sin
+// bloquear: si en ese momento no se puede descargar, la app se actualiza igual.
+const HEIC2ANY = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))
+      .then(() => c.add(new Request(HEIC2ANY, { cache: 'reload' })).catch(() => {})))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

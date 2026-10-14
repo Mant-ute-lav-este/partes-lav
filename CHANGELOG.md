@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.11.1 · 2026-10-14
+- **Fotos HEIC** (el formato de cámara de muchos móviles): si el navegador no puede abrirlas, la app las convierte a JPG en el propio móvil y se usan como cualquier otra foto. También se lee su fecha original. El convertidor (heic2any) se descarga solo cuando hace falta y queda guardado para funcionar sin cobertura.
+
 ## 0.11.0 · 2026-10-08
 - **MAQUINARIA: primero se elige la máquina** y según cuál se abre su parte. Solo una máquina por parte.
   - Bateadora, Perfiladora o Estabilizador → parte de maquinaria de vía (el de la 0.10.0, ahora con una sola máquina). Referencias MAQ-.
