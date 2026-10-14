@@ -10,12 +10,13 @@ import { textoReferencia } from './pdf.js';
 import { prepararEnvio, compartir } from './envio.js';
 import { api, hayServidor, SERVIDOR_URL, alReintentar } from './servidor.js';
 import { procesarSalida } from './salida.js';
+import { iniciarFallos, registrarFallo, enviarFallos } from './fallos.js';
 import {
   esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
   FORMATO1, MAX_FORMATO1, LADO_FORMATO1,
 } from './util.js';
 
-const APP_VERSION = '0.11.1';
+const APP_VERSION = '0.11.2';
 const ITER_PIN = 150000;
 const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
@@ -48,6 +49,10 @@ const urls = new Map();   // id de foto → URL para las miniaturas
 // ---------- Arranque y navegación ----------
 
 async function iniciar() {
+  iniciarFallos(APP_VERSION);
+  window.addEventListener('error', (ev) => registrarFallo('js', ev.message));
+  window.addEventListener('unhandledrejection', (ev) => registrarFallo('js', (ev.reason && ev.reason.message) || ev.reason));
+  enviarFallos();
   if ('serviceWorker' in navigator) {
     const habiaVersion = Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
@@ -120,6 +125,7 @@ async function sincronizar({ avisar = false, lista = true } = {}) {
     }
   }
   const r = await procesarSalida();
+  enviarFallos();
   if (r.enviados) toast(r.enviados === 1 ? 'Parte recibido en la oficina ✓' : `${r.enviados} partes recibidos en la oficina ✓`, 4000);
   refrescarVista();
 }
@@ -1964,6 +1970,7 @@ async function anadirFotos(archivos, { fase, origen, formato = false }) {
       ok++;
     } catch (e) {
       console.error(e);
+      registrarFallo('foto', `${textoErrorFoto(e, file)} [${file.type || 'sin tipo'}, ${Math.round(file.size / 1024)} KB]`);
       fallos.push(textoErrorFoto(e, file));
     }
   }

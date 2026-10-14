@@ -4,6 +4,7 @@
 
 import * as db from './db.js';
 import { api } from './servidor.js';
+import { registrarFallo } from './fallos.js';
 import { isoLocal } from './util.js';
 
 let enCurso = null;
@@ -33,6 +34,7 @@ async function procesar() {
       enviados++;
     } catch (e) {
       if (e.red) break;   // sin cobertura: se reintenta más tarde
+      registrarFallo('envio', e.message);
       it.error = e.message;
       it.intentos = (it.intentos || 0) + 1;
       await db.putSalida(it);

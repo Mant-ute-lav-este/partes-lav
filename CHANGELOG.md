@@ -2,6 +2,15 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.11.2 · 2026-10-14
+- **Registro de fallos de campo**: los errores de la app, las fotos que no se pueden usar y los envíos rechazados se mandan solos a la hoja «Errores» del servidor (sin nombre ni correo; se tachan correos, números largos y enlaces). Sin cobertura se guardan en el móvil (hasta 20) y salen después.
+- Servidor desplegado como **versión 9** (la 8 se creó sin el código nuevo):
+  - Cuenta los correos del día y avisa una vez al llegar a 70 (límite de Gmail gratuito ~100).
+  - Envío de partes sin bloquear al resto de móviles mientras sale el correo; los reintentos no duplican correos.
+  - Limpieza diaria de sesiones (180 días sin uso o cuentas dadas de baja).
+  - El resumen de las 16:00 añade fallos del día, sesiones borradas y correos enviados.
+  - Incluye las listas MaquinasVia (con columna Parte) y PersonalMaquinaria (aún vacías en la hoja).
+
 ## 0.11.1 · 2026-10-14
 - **Fotos HEIC** (el formato de cámara de muchos móviles): si el navegador no puede abrirlas, la app las convierte a JPG en el propio móvil y se usan como cualquier otra foto. También se lee su fecha original. El convertidor (heic2any) se descarga solo cuando hace falta y queda guardado para funcionar sin cobertura.
 
