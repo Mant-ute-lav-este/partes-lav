@@ -634,6 +634,110 @@ prueba('servidor: limpieza de sesiones', async () => {
   igual(E.post({ accion: 'estado', token: E.token }).ok, true, 'la sesión reciente sigue valiendo');
 });
 
+// ---------- pantallas (pruebas de humo) ----------
+// La app de verdad, en un marco: se pinta cada pantalla con los partes de ejemplo y se comprueba
+// que sale sin errores. Así salta cualquier función que falte o que no se importe al partir
+// app.js en módulos. No se guarda nada ni se llama al servidor: solo se pinta (render).
+
+let marco = null;
+
+/** Carga index.html en un marco y coge su módulo estado.js (el mismo que usa la app). */
+async function appEnMarco() {
+  if (marco) return marco;
+  const f = document.createElement('iframe');
+  f.style.cssText = 'width:400px;height:700px;border:1px solid #ccc';
+  const errores = [];
+  await new Promise((res) => { f.onload = res; f.src = '../index.html'; document.body.append(f); });
+  f.contentWindow.addEventListener('error', (e) => errores.push(e.message));
+  f.contentWindow.addEventListener('unhandledrejection', (e) => errores.push(String(e.reason)));
+  const inicio = Date.now();
+  while (!(f.contentDocument.getElementById('app').innerHTML.length > 100)) {
+    if (Date.now() - inicio > 10000) throw new Error('la app no arranca en el marco');
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  // Un script del propio marco: así el módulo es el mismo que usa la app, no una copia.
+  const s = f.contentDocument.createElement('script');
+  s.type = 'module';
+  s.textContent = "import * as m from './js/estado.js'; window.moduloEstado = m;";
+  f.contentDocument.head.append(s);
+  while (!f.contentWindow.moduloEstado) {
+    if (Date.now() - inicio > 10000) throw new Error('no se puede cargar js/estado.js en el marco');
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  marco = { f, m: f.contentWindow.moduloEstado, errores };
+  return marco;
+}
+
+const perfilEjemplo = () => ({ email: 'ana@ejemplo.test', capataz: 'Ana Prueba', token: 'prueba', cuenta: 'activo', pin: { salt: '', hash: '', iter: 1 } });
+const borrador = (p) => ({ ...p, estado: 'borrador' });
+
+/** Pinta una pantalla y comprueba que salen los textos esperados y ningún error. */
+async function pantalla(preparar, ...esperados) {
+  const { m, errores } = await appEnMarco();
+  const { estado, render, app } = m;
+  Object.assign(estado, {
+    vista: 'inicio', config: ej.config, perfil: perfilEjemplo(), reg: {}, otros: [], lista: [], parte: null, trabajoIdx: null,
+    busqueda: '', otroAbierto: false, errores: [], menu: false, eligeMaquina: false, fotoVista: null, procesando: '',
+    envio: null, preguntaOtro: false, preguntaExtras: false,
+  });
+  preparar(estado);
+  render();
+  await new Promise((r) => setTimeout(r, 100));   // miniaturas y lo que se pinta después
+  if (errores.length) throw new Error(`errores en «${estado.vista}»: ${errores.splice(0).join(' | ')}`);
+  const texto = app.textContent;
+  for (const e of esperados) cierto(texto.includes(e), `en «${estado.vista}» falta el texto «${e}»`);
+}
+
+prueba('pantallas: registro, acceso y PIN', async () => {
+  const reg = { email: 'ana@ejemplo.test', codigo: '123456', nombres: ['Ana Prueba', 'Luis Ejemplo'], nombre: 'Ana Prueba', filtro: '' };
+  for (const vista of ['bienvenida', 'reg-email', 'reg-codigo', 'reg-nombre', 'reg-pin', 'login', 'rec-email', 'rec-pin']) {
+    await pantalla((e) => { e.vista = vista; e.perfil = null; e.reg = { ...reg }; });
+  }
+  await pantalla((e) => { e.vista = 'pin'; }, 'Ana Prueba');
+  for (const vista of ['setup-datos', 'setup-capataz', 'setup-pin']) await pantalla((e) => { e.vista = vista; e.perfil = null; });
+});
+
+prueba('pantallas: inicio, menú y elegir máquina', async () => {
+  const lista = [borrador(ej.parteInfra()), ej.parteSuper(), { ...ej.parteMaqVia(), estado: 'en-cola' }, { ...ej.parteLoco(), estado: 'enviado' }];
+  await pantalla((e) => { e.lista = lista; }, 'Partes LAV', 'INF-9001', 'SUP-9001');
+  await pantalla((e) => { e.lista = lista; e.menu = true; }, 'Guía rápida');
+  await pantalla((e) => { e.eligeMaquina = true; }, '¿Con qué máquina?', 'Bateadora 08-475-4S', 'Dresina');
+  await pantalla((e) => { e.perfil.cuenta = 'pendiente'; }, 'pendiente de que lo apruebe');
+});
+
+prueba('pantallas: parte INFRA y SUPER', async () => {
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); }, 'INF-9001', 'Maquinaria', 'Vehículos', 'Horas extra');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteSuper()); }, 'SUP-9001', 'Jornada nocturna', 'Maquinaria');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); e.otroAbierto = true; e.busqueda = 'luis'; }, 'Persona que no está en la lista');
+  await pantalla((e) => {
+    e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); e.parte.usaExtras = null; e.preguntaExtras = true;
+  }, '¿Ha habido horas extra?', 'Sí, apuntarlas');
+  await pantalla((e) => {
+    e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); e.parte.fecha = '';
+    e.errores = [{ msg: 'Falta la fecha de la jornada.', trabajo: null }, { msg: 'Trabajo 1: falta la línea.', trabajo: 0 }];
+  }, 'Falta por completar', 'Falta la fecha de la jornada.');
+});
+
+prueba('pantallas: trabajo de INFRA', async () => {
+  await pantalla((e) => { e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 0; }, 'Trabajo 1 · INF-9001');
+  await pantalla((e) => { e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 1; e.preguntaOtro = true; }, '¿Has hecho otro trabajo en esta jornada?');
+});
+
+prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco()); }, 'LOC-9001', 'Vagones', 'Trabajo realizado', 'Responsable de trabajos');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco('dresina')); }, 'DRE-9001', 'Telefonemas', 'ET / al amparo de');
+});
+
+prueba('pantallas: envío', async () => {
+  await pantalla((e) => { e.vista = 'envio'; e.parte = ej.parteInfra(); }, 'Cerrado · falta enviarlo');
+  await pantalla((e) => { e.vista = 'envio'; e.parte = { ...ej.parteSuper(), estado: 'en-cola', errorEnvio: 'Sin cobertura' }; }, 'No se ha podido enviar');
+  await pantalla((e) => { e.vista = 'envio'; e.parte = { ...ej.parteMaqVia(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00' }; }, 'Recibido en la oficina');
+  await pantalla((e) => { e.vista = 'envio'; e.perfil.token = ''; e.parte = ej.parteLoco('dresina'); }, 'Cómo enviarlo');
+  marco.f.remove();
+  marco = null;
+});
+
 // ---------- la app arranca ----------
 
 prueba('la app carga sin errores', () => new Promise((res, rej) => {

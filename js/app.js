@@ -8,50 +8,34 @@ import * as db from './db.js';
 import { procesarFoto } from './fotos.js';
 import { textoReferencia } from './pdf.js';
 import { prepararEnvio, compartir } from './envio.js';
-import { api, hayServidor, SERVIDOR_URL, alReintentar } from './servidor.js';
+import { api, hayServidor, SERVIDOR_URL } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import { iniciarFallos, registrarFallo, enviarFallos } from './fallos.js';
 import {
-  esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, debounce, setPath, toast, blobABase64,
+  esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora, normaliza, setPath, toast, blobABase64,
   FORMATO1, MAX_FORMATO1, LADO_FORMATO1,
 } from './util.js';
 import {
-  horaValida, numeroValido, aNumero, textoBool, semanaIso, nombrePuesto, puestosDe, SUBTIPOS_MAQ, subtipoDe,
+  numeroValido, aNumero, semanaIso, nombrePuesto, puestosDe, SUBTIPOS_MAQ, subtipoDe,
   extrasDelParte, faltasTrabajo, validar, faltasTajo, faltasRealizado, validarMaq, validarLD,
 } from './validaciones.js';
 import {
-  FASES, PREFIJO_REF, LINEAS, MAQUINAS_VIA_PROVISIONALES, nuevaMaquinaVia, nuevoTajo, MODOS_NIVELADO, MODOS_ALINEADO,
-  CUANDO_REGISTRO, nuevoRealizado, MAX_TOLVA, persona, EQUIPOS, textoEquipo, TIPOS_EXTRA, MEDIDAS_PROVISIONALES,
+  FASES, PREFIJO_REF, LINEAS, nuevaMaquinaVia, nuevoTajo, MODOS_NIVELADO, MODOS_ALINEADO,
+  CUANDO_REGISTRO, nuevoRealizado, MAX_TOLVA, persona, EQUIPOS, textoEquipo, TIPOS_EXTRA,
   textoMedidas, normalizarParte,
 } from './modelo.js';
+import {
+  app, estado, urls, entrarApp, sincronizar, cargarConfigServidor, refrescarVista, registrarSync, ir, render,
+  guardarYa, guardarPronto, maquinasDeVia, maquinasViaCfg, personalMaqCfg, catalogo, capatazComoPersona,
+  equiposCfg, indiceEquipo, medidasCfg, motivosCfg,
+} from './estado.js';
+import {
+  barraSimple, cabeceraParte, refParte, campo, campoHora, aplicarHora, campoPk, aplicarPk, radio, siNo, opciones,
+  vErrores, conEspera,
+} from './campos.js';
 
 const APP_VERSION = '0.11.3';
 const ITER_PIN = 150000;
-const app = document.getElementById('app');
-
-const estado = {
-  vista: 'cargando',
-  config: null,          // lista de la oficina
-  perfil: null,          // { capataz, pin: { salt, hash, iter } } + con registro: { email, token, cuenta }
-  reg: {},               // datos del registro en curso: { email, codigo, nombres, nombre, filtro }
-  otros: [],             // personas añadidas a mano, para no reescribirlas
-  lista: [],             // partes (pantalla de inicio)
-  parte: null,           // parte abierto
-  trabajoIdx: null,
-  busqueda: '',
-  otroAbierto: false,
-  errores: [],
-  menu: false,
-  fotoVista: null,
-  fotoPendiente: null,
-  procesando: '',
-  envio: null,
-  setupCapataz: '',
-  cambiandoPin: false,
-  preguntaOtro: false,   // «¿Has hecho otro trabajo?» al terminar el último trabajo
-  preguntaExtras: false, // «¿Ha habido horas extra?» al cerrar el parte
-};
-const urls = new Map();   // id de foto → URL para las miniaturas
 
 // ---------- Arranque y navegación ----------
 
@@ -114,116 +98,9 @@ function avisoVersionNueva() {
   document.body.append(d);
 }
 
-/** Tras desbloquear con el PIN: inicio y, si hay registro, sincroniza con el servidor. */
-async function entrarApp() {
-  await ir('inicio');
-  if (estado.perfil && estado.perfil.token) sincronizar();
-}
-
-/** Actualiza la lista de la oficina y el estado de la cuenta, y envía lo que esté en cola. */
-async function sincronizar({ avisar = false, lista = true } = {}) {
-  if (!estado.perfil || !estado.perfil.token) return;
-  if (lista) {
-    try {
-      await cargarConfigServidor();
-    } catch (e) {
-      if (avisar || !e.red) toast(e.message, 5000);
-      if (e.red) return;
-    }
-  }
-  const r = await procesarSalida();
-  enviarFallos();
-  if (r.enviados) toast(r.enviados === 1 ? 'Parte recibido en la oficina ✓' : `${r.enviados} partes recibidos en la oficina ✓`, 4000);
-  refrescarVista();
-}
-
-/** Descarga la lista de la oficina; la respuesta trae también el estado de la cuenta. */
-async function cargarConfigServidor() {
-  const r = await api('config', { token: estado.perfil.token });
-  estado.config = r.config;
-  await db.kvSet('config', r.config);
-  const perfil = estado.perfil;
-  if (r.estado && r.estado !== perfil.cuenta) {
-    const aprobado = perfil.cuenta === 'pendiente' && r.estado === 'activo';
-    perfil.cuenta = r.estado;
-    await db.kvSet('perfil', perfil);
-    if (aprobado) toast('La oficina ha aprobado tu registro ✓', 4000);
-  }
-}
-
-/** Vuelve a pintar inicio o envío con los datos guardados (p. ej. tras un envío en segundo plano). */
-async function refrescarVista() {
-  if (estado.vista === 'inicio') {
-    estado.lista = await db.listarPartes();
-    render();
-  } else if (estado.vista === 'envio' && estado.parte) {
-    const p = await db.getParte(estado.parte.id);
-    if (p) { estado.parte = p; render(); }
-  }
-}
-
-function registrarSync() {
-  if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.ready
-    .then((reg) => (reg.sync ? reg.sync.register('partes-salida') : null))
-    .catch(() => {});
-}
-
-async function ir(vista) {
-  if (estado.parte && (estado.vista === 'parte' || estado.vista === 'trabajo')) await guardarYa();
-  if (vista === 'inicio') {
-    estado.parte = null;
-    estado.envio = null;
-    liberarFotos();
-    estado.lista = await db.listarPartes();
-  }
-  if (vista !== 'parte') {
-    estado.busqueda = '';
-    estado.otroAbierto = false;
-  }
-  estado.vista = vista;
-  estado.errores = [];
-  estado.menu = false;
-  estado.fotoVista = null;
-  estado.preguntaOtro = false;
-  estado.preguntaExtras = false;
-  estado.eligeMaquina = false;
-  render();
-  window.scrollTo(0, 0);
-  if (vista === 'envio') prepararEnvioActual();
-}
-
-function render() {
-  const vistas = {
-    bienvenida: vBienvenida, 'reg-email': vRegEmail, 'reg-codigo': vRegCodigo, 'reg-nombre': vRegNombre,
-    'reg-pin': vRegPin, login: vLogin, 'rec-email': vRecEmail, 'rec-pin': vRecPin,
-    'setup-datos': vSetupDatos, 'setup-capataz': vSetupCapataz, 'setup-pin': vSetupPin, pin: vPin,
-    inicio: vInicio, parte: vParte, trabajo: vTrabajo, envio: vEnvio,
-  };
-  const y = window.scrollY;
-  app.innerHTML = (vistas[estado.vista] || (() => '<p class="cargando">Cargando…</p>'))() +
-    (estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : '');
-  window.scrollTo(0, y);
-  document.body.classList.toggle('sin-scroll',
-    Boolean(estado.menu || estado.eligeMaquina || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
-  pintarResultados();
-  pintarNombres();
-  cargarMiniaturas();
-  const auto = app.querySelector('[data-autofocus]');
-  if (auto) auto.focus();
-}
-
 // ---------- Registro con Gmail ----------
 
-function barraSimple(titulo, volver) {
-  return `
-  <header class="barra">
-    ${volver ? `<button class="btn-volver" data-action="ir" data-vista="${volver}">‹ Atrás</button>` : ''}
-    <div class="barra-titulo">${titulo}</div>
-  </header>`;
-}
-
-function vBienvenida() {
+export function vBienvenida() {
   return `
   ${barraSimple('Partes LAV')}
   <main class="contenido">
@@ -236,7 +113,7 @@ function vBienvenida() {
   </main>`;
 }
 
-function vRegEmail() {
+export function vRegEmail() {
   return `
   ${barraSimple('Registro · 1 de 4', 'bienvenida')}
   <main class="contenido">
@@ -252,7 +129,7 @@ function vRegEmail() {
   </main>`;
 }
 
-function vRegCodigo() {
+export function vRegCodigo() {
   return `
   ${barraSimple('Registro · 2 de 4', 'reg-email')}
   <main class="contenido">
@@ -270,7 +147,7 @@ function vRegCodigo() {
   </main>`;
 }
 
-function vRegNombre() {
+export function vRegNombre() {
   return `
   ${barraSimple('Registro · 3 de 4', 'reg-codigo')}
   <main class="contenido">
@@ -284,7 +161,7 @@ function vRegNombre() {
   </main>`;
 }
 
-function pintarNombres() {
+export function pintarNombres() {
   const cont = document.getElementById('lista-nombres');
   if (!cont) return;
   const q = normaliza(estado.reg.filtro);
@@ -294,7 +171,7 @@ function pintarNombres() {
     : '<p class="vacio">No hay nadie con ese nombre.</p>';
 }
 
-function vRegPin() {
+export function vRegPin() {
   return `
   ${barraSimple('Registro · 4 de 4', 'reg-nombre')}
   <main class="contenido">
@@ -313,7 +190,7 @@ function vRegPin() {
   </main>`;
 }
 
-function vLogin() {
+export function vLogin() {
   return `
   ${barraSimple('Entrar', 'bienvenida')}
   <main class="contenido">
@@ -333,7 +210,7 @@ function vLogin() {
 
 // «He olvidado el PIN» con registro: código al correo y PIN nuevo, sin pasar por la oficina.
 
-function vRecEmail() {
+export function vRecEmail() {
   return `
   ${barraSimple('PIN nuevo · 1 de 2', estado.perfil && estado.perfil.token ? 'pin' : 'login')}
   <main class="contenido">
@@ -349,7 +226,7 @@ function vRecEmail() {
   </main>`;
 }
 
-function vRecPin() {
+export function vRecPin() {
   return `
   ${barraSimple('PIN nuevo · 2 de 2', 'rec-email')}
   <main class="contenido">
@@ -369,34 +246,6 @@ function vRecPin() {
       <button class="btn enlace" data-action="reenviar-codigo">No me ha llegado: enviar otro</button>
     </section>
   </main>`;
-}
-
-/**
- * Ejecuta una llamada al servidor con un aviso de espera encima; si falla, avisa y devuelve null.
- * No vuelve a pintar la pantalla: así no se borra lo escrito en el formulario si hay que repetirlo.
- */
-async function conEspera(texto, fn) {
-  const capa = document.createElement('div');
-  capa.className = 'capa centro';
-  capa.innerHTML = `<div class="hoja pequena"><div class="girando"></div><p>${esc(texto)}</p></div>`;
-  document.body.append(capa);
-  // Si Google tarda o falla, la app reintenta sola: que se vea que sigue trabajando.
-  alReintentar((n, total) => {
-    const p = capa.querySelector('p');
-    if (p) p.innerHTML = `${esc(texto)}<br><small>El servidor tarda en responder. Intento ${n} de ${total}…</small>`;
-  });
-  document.body.classList.add('sin-scroll');
-  try {
-    return await fn();
-  } catch (e) {
-    toast(e.message, 5000);
-    return null;
-  } finally {
-    capa.remove();
-    alReintentar(null);
-    document.body.classList.toggle('sin-scroll',
-      Boolean(estado.menu || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
-  }
 }
 
 async function guardarPerfilServidor({ email, nombre, token, cuenta }, pin) {
@@ -427,7 +276,7 @@ async function cerrarSesion() {
 
 const inputConfig ='<input type="file" id="in-config" accept=".json,application/json,text/plain" hidden>';
 
-function vSetupDatos() {
+export function vSetupDatos() {
   return `
   ${barraSimple('Partes LAV', hayServidor() ? 'bienvenida' : null)}
   <main class="contenido">
@@ -442,7 +291,7 @@ function vSetupDatos() {
   </main>`;
 }
 
-function vSetupCapataz() {
+export function vSetupCapataz() {
   const caps = (estado.config && estado.config.capataces) || [];
   return `
   <header class="barra"><div class="barra-titulo">¿Quién eres?</div></header>
@@ -459,7 +308,7 @@ function vSetupCapataz() {
   </main>`;
 }
 
-function vSetupPin() {
+export function vSetupPin() {
   const nombre = estado.cambiandoPin ? estado.perfil.capataz : estado.setupCapataz;
   return `
   <header class="barra"><div class="barra-titulo">${estado.cambiandoPin ? 'Cambiar PIN' : 'Crea tu PIN'}</div></header>
@@ -479,7 +328,7 @@ function vSetupPin() {
   </main>`;
 }
 
-function vPin() {
+export function vPin() {
   return `
   <header class="barra"><div class="barra-titulo">Partes LAV</div></header>
   <main class="contenido">
@@ -571,7 +420,7 @@ function avisoSinEnviar(pendientes) {
     </div>`;
 }
 
-function vInicio() {
+export function vInicio() {
   const ps = estado.lista.slice().sort((a, b) => (b.modificado || '').localeCompare(a.modificado || ''));
   const sinEnviar = ps.filter((p) => p.estado === 'cerrado' || p.estado === 'en-cola');
   return `
@@ -710,20 +559,6 @@ async function nuevoParte(tipo, maquina = null) {
 
 // ---------- Parte ----------
 
-function cabeceraParte(volver, textoVolver, titulo) {
-  const p = estado.parte;
-  return `
-  <header class="barra ${p.tipo.toLowerCase()}">
-    <button class="btn-volver" data-action="${volver}">‹ ${textoVolver}</button>
-    <div class="barra-titulo">${titulo}</div>
-    <span class="guardado" id="guardado"></span>
-  </header>`;
-}
-
-function refParte(p) {
-  return `${p.tipo} · ${esc(p.ref)}${p.rev > 1 ? ` rev. ${p.rev}` : ''}`;
-}
-
 /** SUPER: foto(s) del formato con la protección de la vía. Opcional. */
 function seccionFormato1(p) {
   const fs = p.formato1 || [];
@@ -741,7 +576,7 @@ function seccionFormato1(p) {
     </section>`;
 }
 
-function vParte() {
+export function vParte() {
   if (estado.parte.tipo === 'MAQUINARIA') return vParteMaq();
   const p = normalizarParte(estado.parte);
   return `
@@ -813,28 +648,6 @@ function vParte() {
 // ---------- Parte de maquinaria de vía ----------
 // Sigue el orden del papel: jornada (fecha y horario), máquinas con sus horas, viaje, tajos,
 // observaciones y personal por puesto. Normalmente es una máquina por noche, pero caben varias.
-
-const maquinasDeVia = () => maquinasViaCfg().filter((c) => (c.parte || 'via') === 'via');
-
-function maquinasViaCfg() {
-  const l = (estado.config && estado.config.maquinasVia) || [];
-  return l.length ? l : MAQUINAS_VIA_PROVISIONALES;
-}
-
-/** Personal para los desplegables: el de maquinaria de la hoja o, mientras no haya, la lista general. */
-function personalMaqCfg() {
-  const c = estado.config || {};
-  return (c.personalMaquinaria && c.personalMaquinaria.length ? c.personalMaquinaria : c.trabajadores) || [];
-}
-
-/** Sí / No que vuelve a pintar la pantalla (para mostrar u ocultar lo que depende de la respuesta). */
-function siNo(ruta, v) {
-  return `<div class="segmentado">${radio(ruta, 'si', 'Sí', textoBool(v), 'data-tipo="bool" data-rerender')}${radio(ruta, 'no', 'No', textoBool(v), 'data-tipo="bool" data-rerender')}</div>`;
-}
-
-function opciones(ruta, lista, actual) {
-  return `<div class="segmentado">${lista.map(([v, t]) => radio(ruta, v, t, actual, 'data-rerender')).join('')}</div>`;
-}
 
 /** Una operación del tajo: Sí/No y, si es que sí, sus detalles. */
 function operacion(titulo, ruta, o, detalle) {
@@ -1154,43 +967,6 @@ function resumenTrabajo(t, i) {
   </button>`;
 }
 
-function vErrores() {
-  return `
-  <div class="capa" data-action="cerrar-errores"><div class="hoja" data-stop>
-    <h2>Falta por completar</h2>
-    <ul class="errores">
-      ${estado.errores.map((e) => `<li><span>${esc(e.msg)}</span>${e.trabajo != null
-    ? `<button class="btn mini" data-action="ir-trabajo" data-i="${e.trabajo}">Ir</button>` : ''}</li>`).join('')}
-    </ul>
-    <button class="btn primario" data-action="cerrar-errores">Entendido</button>
-  </div></div>`;
-}
-
-function catalogo() {
-  const base = ((estado.config && estado.config.trabajadores) || []).map((x) => ({ ...x, otro: false }));
-  const vistos = new Set(base.map((x) => normaliza(x.nombre)));
-  return base.concat(estado.otros.filter((x) => !vistos.has(normaliza(x.nombre))).map((x) => ({ ...x, otro: true })));
-}
-
-function capatazComoPersona() {
-  const n = normaliza(estado.perfil.capataz);
-  const t = ((estado.config && estado.config.trabajadores) || []).find((x) => normaliza(x.nombre) === n);
-  return persona(t || { nombre: estado.perfil.capataz, categoria: 'Capataz' });
-}
-
-function equiposCfg(lista) {
-  const c = estado.config || {};
-  // Lista de un servidor anterior a v0.6.0: lo que traía como «vehiculos» eran las máquinas.
-  if (!c.maquinas) return lista === 'maquinas' ? (c.vehiculos || []) : [];
-  return c[lista] || [];
-}
-
-/** Posición en la lista de la oficina del equipo elegido (-1 si es «otro» o no está). */
-function indiceEquipo(lista, x) {
-  if (x.otro || !x.descripcion) return -1;
-  return equiposCfg(lista).findIndex((c) => c.descripcion === x.descripcion && (c.matricula || '') === (x.matricula || ''));
-}
-
 function seccionEquipos(lista) {
   const p = estado.parte;
   const e = EQUIPOS[lista];
@@ -1318,17 +1094,7 @@ function extrasATodos() {
   toast(n ? `Puestas ${String(base.horas).replace('.', ',')} h ${base.tipo} a ${n} persona(s)` : 'Ya tenían todos horas puestas');
 }
 
-function medidasCfg() {
-  const m = estado.config && estado.config.antiincendios;
-  return m && m.length ? m : MEDIDAS_PROVISIONALES;
-}
-
-function motivosCfg(tipo) {
-  const m = (estado.config && estado.config.motivos) || {};
-  return m[tipo === 'INFRA' ? 'infra' : 'super'] || [];
-}
-
-function pintarResultados() {
+export function pintarResultados() {
   const cont = document.getElementById('resultados');
   if (!cont || !estado.parte) return;
   const q = normaliza(estado.busqueda);
@@ -1456,10 +1222,6 @@ function etiquetaFoto(t) {
   return (r.motivo || '').trim().toUpperCase() || 'SIN REFERENCIA';
 }
 
-function campo(etq, ruta, valor, extra = '') {
-  return `<label class="campo"><span>${etq}</span><input data-bind="${ruta}" value="${esc(valor == null ? '' : valor)}" ${extra}></label>`;
-}
-
 /**
  * Aparato (opcional): con la lista de la oficina sale un desplegable agrupado por estación y, al
  * elegir uno, se rellenan solos los PK de inicio y fin (que se pueden cambiar). Sin lista, o con
@@ -1487,64 +1249,7 @@ function campoAparato(t, b) {
       </div>`;
 }
 
-/**
- * Horas con el teclado numérico en vez del reloj: se escriben las cifras («2330») y los dos
- * puntos salen solos. Al salir de la casilla se completa: «8» → 08:00, «830» → 08:30.
- */
-
-function campoHora(etq, ruta, valor) {
-  return `<label class="campo"><span>${etq}</span><input inputmode="numeric" maxlength="5" placeholder="hh:mm"
-    autocomplete="off" data-hora="${ruta}" value="${esc(valor || '')}"></label>`;
-}
-
-function aplicarHora(el, final) {
-  if (!estado.parte || estado.parte.estado !== 'borrador') return;
-  let d = el.value.replace(/\D/g, '').slice(0, 4);
-  if (final && d) {
-    if (d.length <= 2) d = d.padStart(2, '0') + '00';
-    else if (d.length === 3) d = `0${d}`;
-  }
-  el.value = d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d;
-  el.classList.toggle('mal', final && Boolean(el.value) && !horaValida(el.value));
-  setPath(estado.parte, el.dataset.hora, el.value);
-  const g = document.getElementById('guardado');
-  if (g) g.textContent = 'Guardando…';
-  guardarPronto();
-}
-
-/**
- * PK en dos casillas numéricas (km + metros), porque el teclado numérico del móvil no tiene «+».
- * Se guarda junto como «481+045».
- */
-function campoPk(etq, ruta, valor) {
-  const [km = '', m = ''] = String(valor || '').split(/\s*[+.,/]\s*/);
-  const attrs = `inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-pk="${ruta}"`;
-  return `<div class="campo"><span>${etq}</span><div class="pk">
-    <input ${attrs} data-pk-parte="km" value="${esc(km)}" placeholder="km" aria-label="${etq}: kilómetro">
-    <b>+</b>
-    <input ${attrs} data-pk-parte="m" value="${esc(m)}" placeholder="m" maxlength="3" aria-label="${etq}: metros"></div></div>`;
-}
-
-/** Junta las dos casillas del PK; al salir de la casilla de metros los completa a 3 cifras. */
-function aplicarPk(el, final) {
-  if (!estado.parte || estado.parte.estado !== 'borrador') return;
-  const caja = el.closest('.pk');
-  const km = caja.querySelector('[data-pk-parte="km"]');
-  const m = caja.querySelector('[data-pk-parte="m"]');
-  km.value = km.value.replace(/\D/g, '');
-  m.value = m.value.replace(/\D/g, '').slice(0, 3);
-  if (final && m.value) m.value = m.value.padStart(3, '0');
-  setPath(estado.parte, el.dataset.pk, km.value || m.value ? `${km.value}+${m.value.padStart(3, '0')}` : '');
-  const g = document.getElementById('guardado');
-  if (g) g.textContent = 'Guardando…';
-  guardarPronto();
-}
-
-function radio(ruta, valor, texto, actual, extra = '') {
-  return `<label><input type="radio" name="${ruta}" value="${valor}" data-bind="${ruta}" ${extra} ${actual === valor ? 'checked' : ''}><span>${texto}</span></label>`;
-}
-
-function vTrabajo() {
+export function vTrabajo() {
   const p = estado.parte;
   const i = estado.trabajoIdx;
   const t = trabajoActual();
@@ -1759,27 +1464,18 @@ async function urlFoto(id) {
   return urls.get(id);
 }
 
-async function cargarMiniaturas() {
+export async function cargarMiniaturas() {
   for (const img of app.querySelectorAll('img[data-foto-id]')) {
     try { img.src = await urlFoto(img.dataset.fotoId); } catch { img.alt = 'Foto no disponible'; }
   }
 }
 
-function liberarFotos() {
+export function liberarFotos() {
   for (const u of urls.values()) URL.revokeObjectURL(u);
   urls.clear();
 }
 
 // ---------- Guardado, validación y cierre ----------
-
-async function guardarYa() {
-  if (!estado.parte) return;
-  estado.parte.modificado = isoLocal();
-  await db.putParte(estado.parte);
-  const g = document.getElementById('guardado');
-  if (g) g.textContent = 'Guardado ✓';
-}
-const guardarPronto = debounce(guardarYa, 500);
 
 async function cerrarParte() {
   await guardarYa();
@@ -1827,7 +1523,7 @@ async function borrarTrabajo() {
 
 // ---------- Envío ----------
 
-function vEnvio() {
+export function vEnvio() {
   if (estado.perfil && estado.perfil.token) return vEnvioServidor();
   return vEnvioGmail();
 }
@@ -1958,7 +1654,7 @@ function vEnvioGmail() {
   </main>`;
 }
 
-async function prepararEnvioActual() {
+export async function prepararEnvioActual() {
   const p = estado.parte;
   estado.envio = { listo: false };
   render();
