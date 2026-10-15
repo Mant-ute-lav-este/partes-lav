@@ -6,7 +6,7 @@ import { semanaIso, numeroValido, aNumero, faltasTajo, faltasRealizado, subtipoD
 import { MAX_TOLVA, MODOS_NIVELADO, MODOS_ALINEADO, CUANDO_REGISTRO, normalizarParte } from './modelo.js';
 import { estado, maquinasDeVia, personalMaqCfg } from './estado.js';
 import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores } from './campos.js';
-import { seccionExtras, vPreguntaExtras } from './app.js';
+import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 
 // ---------- Parte de maquinaria de vía ----------
 // Sigue el orden del papel: jornada (fecha y horario), máquinas con sus horas, viaje, tajos,
