@@ -12,9 +12,10 @@ import {
   vBienvenida, vRegEmail, vRegCodigo, vRegNombre, vRegPin, vLogin, vRecEmail, vRecPin,
   vSetupDatos, vSetupCapataz, vSetupPin, vPin, pintarNombres,
 } from './vista-acceso.js';
+import { vInicio } from './vista-inicio.js';
 // Pendiente de partir: estas vistas siguen en app.js.
 import {
-  vInicio, vParte, vTrabajo, vEnvio, pintarResultados, cargarMiniaturas, liberarFotos, prepararEnvioActual,
+  vParte, vTrabajo, vEnvio, pintarResultados, cargarMiniaturas, liberarFotos, prepararEnvioActual,
 } from './app.js';
 
 export const app = document.getElementById('app');
