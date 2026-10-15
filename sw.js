@@ -30,6 +30,7 @@ const ARCHIVOS = [
   './js/vista-extras.js',
   './js/vista-inicio.js',
   './js/vista-maquinaria.js',
+  './js/vista-parte.js',
   './guia/guia-capataces.pdf',
   './manifest.webmanifest',
   './icons/icon-192.png',

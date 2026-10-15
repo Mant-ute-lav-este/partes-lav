@@ -9,14 +9,13 @@ import { enviarFallos } from './fallos.js';
 import { esc, isoLocal, normaliza, debounce, toast } from './util.js';
 import { MAQUINAS_VIA_PROVISIONALES, MEDIDAS_PROVISIONALES, persona } from './modelo.js';
 import {
-  vBienvenida, vRegEmail, vRegCodigo, vRegNombre, vRegPin, vLogin, vRecEmail, vRecPin,
-  vSetupDatos, vSetupCapataz, vSetupPin, vPin, pintarNombres,
+  vBienvenida, vRegEmail, vRegCodigo, vRegNombre, vRegPin, vLogin, vRecEmail, vRecPin, vSetupDatos,
+  vSetupCapataz, vSetupPin, vPin, pintarNombres,
 } from './vista-acceso.js';
 import { vInicio } from './vista-inicio.js';
 // Pendiente de partir: estas vistas siguen en app.js.
-import {
-  vParte, vTrabajo, vEnvio, pintarResultados, cargarMiniaturas, liberarFotos, prepararEnvioActual,
-} from './app.js';
+import { vTrabajo, vEnvio, cargarMiniaturas, liberarFotos, prepararEnvioActual } from './app.js';
+import { vParte, pintarResultados } from './vista-parte.js';
 
 export const app = document.getElementById('app');
 
