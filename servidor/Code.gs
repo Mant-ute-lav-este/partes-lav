@@ -434,6 +434,7 @@ function cargarLista_(d) {
     const cab = c.cabecera;
     const aj = {
       nombre: c.nombre || '', fecha: c.fecha || '', destinatario: c.destinatario || '', admin: c.admin || c.destinatario || '',
+      copia: c.copia != null ? c.copia : (ajustes_().copia || ''),   // si la lista no la trae, se conserva la que hay
       jefatura: cab.jefatura || '', ambito: cab.ambito || '', empresa: cab.empresa || '',
       lineaInfra: cab.lineaInfra || '', lineaSuper: cab.lineaSuper || '',
     };
@@ -515,8 +516,11 @@ function mandarParte_(d, u, aj) {
   });
   if (bytes > MAX_ADJUNTOS_BYTES) throw new Error('El parte pesa demasiado (' + Math.round(bytes / 1048576) + ' MB). Quita alguna foto.');
   const recibido = ahora_();
+  // Copia de cada parte: fila «copia» de Ajustes (uno o varios correos separados por comas).
+  const copia = correosValidos_(aj.copia);
   enviarCorreo_({
     to: aj.destinatario,
+    ...(copia ? { cc: copia } : {}),
     name: 'Partes LAV',
     replyTo: String(u.Email),
     subject: asunto,
@@ -717,7 +721,8 @@ function correosHoy_() {
 function enviarCorreo_(opciones) {
   MailApp.sendEmail(opciones);
   const o = correosHoy_();
-  o.n += 1;
+  // Google cuenta el límite diario por DESTINATARIO: un parte con copia gasta 2.
+  o.n += [opciones.to, opciones.cc, opciones.bcc].join(',').split(',').filter((x) => x.trim()).length || 1;
   if (o.n >= AVISO_CORREOS && !o.avisado) {
     o.avisado = true;
     const aj = ajustes_();
@@ -737,6 +742,14 @@ function enviarCorreo_(opciones) {
 }
 
 // ---------- Utilidades ----------
+
+/** «a@x.com, b@y.com» → solo los correos bien escritos, separados por comas ('' si no hay ninguno). */
+function correosValidos_(s) {
+  return String(s || '').split(/[,;\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(e))
+    .join(',');
+}
 
 function props_() { return PropertiesService.getScriptProperties(); }
 function libro_() { return SpreadsheetApp.openById(props_().getProperty('HOJA_ID')); }

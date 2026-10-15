@@ -262,6 +262,18 @@ prueba('servidor: envía un parte sin tener bloqueado al resto', async () => {
   cierto(E.correos[0].subject.startsWith('PARTE LAV'), 'asunto del correo');
 });
 
+prueba('servidor: copia de los partes (Ajustes «copia») y cuenta por destinatario', async () => {
+  const E = await servidorListo();
+  E.post(E.parte());
+  igual(E.correos[0].cc, undefined, 'sin copia configurada no debe llevar CC');
+  igual(JSON.parse(E.props.CORREOS).n, 1);
+  E.hojas.Ajustes.appendRow(['copia', ' Otro@Ejemplo.test ; mal-escrito , tercero@ejemplo.test']);
+  E.post(E.parte());
+  igual(E.correos[1].cc, 'otro@ejemplo.test,tercero@ejemplo.test', 'CC');
+  igual(E.correos[1].to, 'oficina@ejemplo.test');
+  igual(JSON.parse(E.props.CORREOS).n, 4, 'un parte con 2 copias cuenta 3 destinatarios');
+});
+
 prueba('servidor: un reintento no manda el correo dos veces', async () => {
   const E = await servidorListo();
   const p = E.parte();
