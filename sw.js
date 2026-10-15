@@ -26,6 +26,7 @@ const ARCHIVOS = [
   './js/servidor.js',
   './js/util.js',
   './js/validaciones.js',
+  './js/vista-acceso.js',
   './guia/guia-capataces.pdf',
   './manifest.webmanifest',
   './icons/icon-192.png',

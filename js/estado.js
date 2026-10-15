@@ -8,11 +8,13 @@ import { procesarSalida } from './salida.js';
 import { enviarFallos } from './fallos.js';
 import { esc, isoLocal, normaliza, debounce, toast } from './util.js';
 import { MAQUINAS_VIA_PROVISIONALES, MEDIDAS_PROVISIONALES, persona } from './modelo.js';
-// Pendiente de partir: las vistas siguen en app.js.
 import {
   vBienvenida, vRegEmail, vRegCodigo, vRegNombre, vRegPin, vLogin, vRecEmail, vRecPin,
-  vSetupDatos, vSetupCapataz, vSetupPin, vPin, vInicio, vParte, vTrabajo, vEnvio,
-  pintarResultados, pintarNombres, cargarMiniaturas, liberarFotos, prepararEnvioActual,
+  vSetupDatos, vSetupCapataz, vSetupPin, vPin, pintarNombres,
+} from './vista-acceso.js';
+// Pendiente de partir: estas vistas siguen en app.js.
+import {
+  vInicio, vParte, vTrabajo, vEnvio, pintarResultados, cargarMiniaturas, liberarFotos, prepararEnvioActual,
 } from './app.js';
 
 export const app = document.getElementById('app');
