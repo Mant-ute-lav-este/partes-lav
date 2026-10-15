@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor · 2026-10-15
+- **Copia de cada parte** a otros correos: fila `copia` en la pestaña Ajustes de la hoja (uno o varios correos separados por comas; se ignoran los mal escritos). Van en CC del mismo correo. Se cambia editando la hoja, sin tocar la app.
+- El contador de correos diarios cuenta **destinatarios** (como Google): un parte con una copia gasta 2 de los ~100 diarios.
+- Desplegado como versión nueva de la implementación de siempre (la URL no cambia).
+
 ## 0.11.3 · 2026-10-14
 - **Guía rápida** para capataces (1 página, PDF) en el Menú, con el permiso de cámara de Chrome, las fotos HEIC y qué hacer si algo falla. Queda guardada en el móvil y se abre sin cobertura.
 
