@@ -76,7 +76,10 @@ function crearEntorno(codigo) {
       computeDigest: (a, s) => bytesDe('d' + s),
       computeHmacSha256Signature: (s, k) => bytesDe('h' + k + s),
       base64Decode: (b) => Array.from(atob(b), (c) => c.charCodeAt(0)),
-      newBlob: (bytes) => ({ getBytes: () => (typeof bytes === 'string' ? Array.from(bytes) : bytes) }),
+      newBlob: (bytes, tipo, nombre) => ({
+        getBytes: () => (typeof bytes === 'string' ? Array.from(bytes) : bytes),
+        getName: () => nombre, getContentType: () => tipo,
+      }),
       DigestAlgorithm: {}, Charset: {},
     },
     MailApp: {

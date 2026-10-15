@@ -516,19 +516,91 @@ function mandarParte_(d, u, aj) {
   });
   if (bytes > MAX_ADJUNTOS_BYTES) throw new Error('El parte pesa demasiado (' + Math.round(bytes / 1048576) + ' MB). Quita alguna foto.');
   const recibido = ahora_();
-  // Copia de cada parte: fila «copia» de Ajustes (uno o varios correos separados por comas).
-  const copia = correosValidos_(aj.copia);
+  const cuerpo = String(d.cuerpo || '') + '\n\nRecibido en el servidor: ' + recibido +
+    '\nEnviado por: ' + u.Nombre + ' <' + u.Email + '>';
+  // Correo de la oficina: es el que lee Power Automate para guardar en Teams. No cambiar sus adjuntos.
   enviarCorreo_({
     to: aj.destinatario,
-    ...(copia ? { cc: copia } : {}),
     name: 'Partes LAV',
     replyTo: String(u.Email),
     subject: asunto,
-    body: String(d.cuerpo || '') + '\n\nRecibido en el servidor: ' + recibido +
-      '\nEnviado por: ' + u.Nombre + ' <' + u.Email + '>',
+    body: cuerpo,
     attachments: adjuntos,
   });
+  // Copia (fila «copia» de Ajustes): correo aparte con el PDF y las fotos sueltas en .jpg.
+  // El parte ya ha salido: si la copia falla, NO se lanza el error (la app reenviaría el parte
+  // y llegaría dos veces a Teams); se apunta en la hoja Errores.
+  const copia = correosValidos_(aj.copia);
+  if (copia) {
+    try {
+      mandarCopia_(archivos, adjuntos, copia, asunto, cuerpo, u);
+    } catch (err) {
+      apuntarError_('copia', String(d.ref || '') + ': ' + String((err && err.message) || err));
+    }
+  }
   return { fecha: recibido, asunto: asunto, bytes: bytes };
+}
+
+/**
+ * Correo para la copia: el PDF y cada foto como .jpg con un nombre que lo dice todo,
+ * p. ej. «INF-0012_2026-10-15_T1_SIOS-12345_antes_1.jpg». Sin los .txt técnicos.
+ */
+function mandarCopia_(archivos, adjuntos, para, asunto, cuerpo, u) {
+  const texto = (prefijo) => {
+    const a = archivos.find((x) => String(x.nombre || '').indexOf(prefijo) === 0);
+    return a && a.texto != null ? String(a.texto) : '';
+  };
+  let datos = {};
+  let fotos = [];
+  try { datos = JSON.parse(texto('Datos_') || '{}'); } catch (e) { datos = {}; }
+  try { fotos = (JSON.parse(texto('Fotos_') || '{}').fotos) || []; } catch (e) { fotos = []; }
+  const base = nombreArchivo_(String(datos.ref || 'PARTE') + (datos.rev > 1 ? '_v' + datos.rev : '') + '_' + String(datos.fecha || ''));
+  const trabajos = Array.isArray(datos.trabajos) ? datos.trabajos : [];
+  const cuenta = {};
+  const jpgs = fotos.map((f) => {
+    let nombre;
+    if (f.fase === 'formato') {
+      cuenta.formato = (cuenta.formato || 0) + 1;
+      nombre = 'Formato1_' + cuenta.formato;
+    } else {
+      const k = 'T' + f.trabajo + '_' + f.fase;
+      cuenta[k] = (cuenta[k] || 0) + 1;
+      nombre = 'T' + f.trabajo + '_' + refTrabajo_(trabajos[f.trabajo - 1]) + '_' + f.fase + '_' + cuenta[k];
+    }
+    return Utilities.newBlob(Utilities.base64Decode(String(f.base64 || '')), 'image/jpeg', base + '_' + nombreArchivo_(nombre) + '.jpg');
+  });
+  const pdf = adjuntos.filter((b) => /\.pdf$/i.test(String(b.getName())));
+  enviarCorreo_({
+    to: para,
+    name: 'Partes LAV',
+    replyTo: String(u.Email),
+    subject: asunto,
+    body: cuerpo + '\n\nCopia: PDF del parte' + (jpgs.length ? ' y ' + jpgs.length + ' foto(s) sueltas en .jpg.' : ' (sin fotos).'),
+    attachments: pdf.concat(jpgs),
+  });
+}
+
+/** Referencia del trabajo para el nombre de la foto: SIOS-123, INC-45 o lo que escribió el capataz. */
+function refTrabajo_(t) {
+  const r = (t && t.referencia) || {};
+  if (r.tipo === 'SIOS') return 'SIOS-' + (r.codigo || '');
+  if (r.tipo === 'INCIDENCIA') return 'INC-' + (r.codigo || '');
+  return String(r.motivo || '').trim().slice(0, 30) || 'SinRef';
+}
+
+/** Texto apto para nombre de archivo: sin tildes ni símbolos raros. */
+function nombreArchivo_(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9+\-]+/g, '_').replace(/^_+|_+$/g, '') || 'x';
+}
+
+/** Apunta un fallo del servidor en la hoja Errores (mismo formato que los de los móviles). */
+function apuntarError_(tipo, mensaje) {
+  try {
+    const cab = ['Recibido', 'Fecha', 'Usuario', 'Version', 'Tipo', 'Mensaje'];
+    const h = hoja_('Errores') || crearHoja_(libro_(), 'Errores', cab);
+    h.appendRow([ahora_(), ahora_(), 'servidor', '', tipo, String(mensaje).slice(0, 200)]);
+  } catch (e) { /* sin hoja: nada más que hacer */ }
 }
 
 // ---------- Copia de seguridad ----------

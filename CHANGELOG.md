@@ -3,7 +3,9 @@
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
 ## Servidor · 2026-10-15
-- **Copia de cada parte** a otros correos: fila `copia` en la pestaña Ajustes de la hoja (uno o varios correos separados por comas; se ignoran los mal escritos). Van en CC del mismo correo. Se cambia editando la hoja, sin tocar la app.
+- **Copia de cada parte** a otros correos: fila `copia` en la pestaña Ajustes de la hoja (uno o varios correos separados por comas; se ignoran los mal escritos). Se cambia editando la hoja, sin tocar la app.
+  - La copia es un **correo aparte** con el PDF y las **fotos sueltas en .jpg** con nombre completo (p. ej. `INF-0012_2026-10-15_T1_SIOS-12345_antes_1.jpg`). El correo de la oficina, el que lee Power Automate, no cambia.
+  - Si la copia falla, el parte se da por enviado igualmente y el fallo se apunta en la hoja Errores (tipo «copia»).
 - El contador de correos diarios cuenta **destinatarios** (como Google): un parte con una copia gasta 2 de los ~100 diarios.
 - Desplegado como versión nueva de la implementación de siempre (la URL no cambia).
 

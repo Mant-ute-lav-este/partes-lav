@@ -262,16 +262,70 @@ prueba('servidor: envía un parte sin tener bloqueado al resto', async () => {
   cierto(E.correos[0].subject.startsWith('PARTE LAV'), 'asunto del correo');
 });
 
-prueba('servidor: copia de los partes (Ajustes «copia») y cuenta por destinatario', async () => {
+/** Los 3 adjuntos que manda la app (PDF, Datos y Fotos), con 3 fotos y un formato 1. */
+function adjuntosConFotos() {
+  const b64 = btoa('foto');
+  const datos = {
+    ref: 'SUP-0007', rev: 1, fecha: '2026-10-15',
+    trabajos: [
+      { referencia: { tipo: 'SIOS', codigo: '12345' } },
+      { referencia: { tipo: 'SIN_REF', motivo: 'Limpieza cuneta Ñ' } },
+    ],
+  };
+  const fotos = [
+    { archivo: 'T1_antes_1.jpg', trabajo: 1, fase: 'antes', base64: b64 },
+    { archivo: 'T1_antes_2.jpg', trabajo: 1, fase: 'antes', base64: b64 },
+    { archivo: 'T2_despues_1.jpg', trabajo: 2, fase: 'despues', base64: b64 },
+    { archivo: 'Formato1_1.jpg', trabajo: 0, fase: 'formato', base64: b64 },
+  ];
+  return [
+    { nombre: 'Parte_x.pdf', tipo: 'application/pdf', base64: btoa('%PDF-prueba') },
+    { nombre: 'Datos_x.txt', tipo: 'text/plain', texto: JSON.stringify(datos) },
+    { nombre: 'Fotos_x.txt', tipo: 'text/plain', texto: JSON.stringify({ formato: 'fotos-parte-lav', fotos }) },
+  ];
+}
+
+prueba('servidor: sin copia configurada sale un solo correo, igual que siempre', async () => {
   const E = await servidorListo();
-  E.post(E.parte());
-  igual(E.correos[0].cc, undefined, 'sin copia configurada no debe llevar CC');
-  igual(JSON.parse(E.props.CORREOS).n, 1);
+  E.post(E.parte({ archivos: adjuntosConFotos() }));
+  igual(E.correos.length, 1);
+  igual(E.correos[0].cc, undefined);
+  igual(E.correos[0].attachments.map((b) => b.getName()), ['Parte_x.pdf', 'Datos_x.txt', 'Fotos_x.txt']);
+});
+
+prueba('servidor: copia aparte con PDF y fotos .jpg con nombre completo', async () => {
+  const E = await servidorListo();
   E.hojas.Ajustes.appendRow(['copia', ' Otro@Ejemplo.test ; mal-escrito , tercero@ejemplo.test']);
-  E.post(E.parte());
-  igual(E.correos[1].cc, 'otro@ejemplo.test,tercero@ejemplo.test', 'CC');
-  igual(E.correos[1].to, 'oficina@ejemplo.test');
-  igual(JSON.parse(E.props.CORREOS).n, 4, 'un parte con 2 copias cuenta 3 destinatarios');
+  const r = E.post(E.parte({ archivos: adjuntosConFotos() }));
+  igual(r.ok, true, r.error);
+  igual(E.correos.length, 2, 'oficina + copia');
+  const [oficina, copia] = E.correos;
+  igual(oficina.to, 'oficina@ejemplo.test');
+  igual(oficina.cc, undefined, 'el correo de la oficina no lleva CC');
+  igual(oficina.attachments.map((b) => b.getName()), ['Parte_x.pdf', 'Datos_x.txt', 'Fotos_x.txt'], 'adjuntos de la oficina (Power Automate)');
+  igual(copia.to, 'otro@ejemplo.test,tercero@ejemplo.test');
+  igual(copia.attachments.map((b) => b.getName()), [
+    'Parte_x.pdf',
+    'SUP-0007_2026-10-15_T1_SIOS-12345_antes_1.jpg',
+    'SUP-0007_2026-10-15_T1_SIOS-12345_antes_2.jpg',
+    'SUP-0007_2026-10-15_T2_Limpieza_cuneta_N_despues_1.jpg',
+    'SUP-0007_2026-10-15_Formato1_1.jpg',
+  ]);
+  cierto(copia.attachments.slice(1).every((b) => b.getContentType() === 'image/jpeg'), 'las fotos deben ir como image/jpeg');
+  igual(JSON.parse(E.props.CORREOS).n, 3, 'cuenta 1 (oficina) + 2 (copia)');
+});
+
+prueba('servidor: si falla la copia, el parte sale igual y se apunta el error', async () => {
+  const E = await servidorListo();
+  E.hojas.Ajustes.appendRow(['copia', 'otro@ejemplo.test']);
+  let n = 0;
+  E.g.alEnviarCorreo = () => { if (++n === 2) throw new Error('fallo en la copia'); };
+  const r = E.post(E.parte({ archivos: adjuntosConFotos() }));
+  igual(r.ok, true, 'el parte no debe fallar por la copia');
+  igual(E.hojas.Envios._d.length, 2, 'el parte queda apuntado en Envios');
+  const err = E.hojas.Errores._d.at(-1);
+  igual(err[4], 'copia');
+  cierto(/fallo en la copia/.test(err[5]), 'mensaje del error');
 });
 
 prueba('servidor: un reintento no manda el correo dos veces', async () => {
