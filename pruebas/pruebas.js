@@ -11,6 +11,7 @@ import { procesarSalida } from '../js/salida.js';
 import { iniciarFallos, registrarFallo } from '../js/fallos.js';
 import { SERVIDOR_URL } from '../js/servidor.js';
 import * as val from '../js/validaciones.js';
+import * as modelo from '../js/modelo.js';
 import * as ej from './ejemplos.js';
 import { cargarServidor } from './google-simulado.js';
 
@@ -265,6 +266,37 @@ prueba('validaciones: parte de dresina', () => {
   solo((p) => { p.acta = ''; p.combustible.salida = ''; }, ['Falta el nº de acta.', 'Falta el combustible de salida y de llegada.']);
   // Comportamiento actual: el texto habla de «locomotora» también en la dresina.
   solo((p) => { p.maquina.descripcion = ''; }, ['Escribe qué locomotora es.']);
+});
+
+// ---------- modelo (partes nuevos y borradores antiguos) ----------
+
+prueba('modelo: apartados nuevos', () => {
+  const t = modelo.nuevoTajo();
+  cierto(t.id && t.id !== modelo.nuevoTajo().id, 'cada tajo con su id');
+  igual(cortos(val.faltasTajo(t)).length, 12, 'un tajo nuevo está todo por rellenar');
+  igual({ ...modelo.nuevoRealizado(), id: '' }, { id: '', via: '', pkInicio: '', pkFin: '', horaInicio: '', horaFin: '', trabajo: '', m3: '' });
+  igual(modelo.nuevaMaquinaVia(), { descripcion: '', uic: '', trabajo: '', horas: '', otro: false });
+  igual(modelo.persona({ nombre: ' Ana ', categoria: 'Oficial ', otro: 1 }),
+    { nombre: 'Ana', empresa: '', habilitacion: '', categoria: 'Oficial', otro: true });
+  igual(modelo.textoEquipo({ descripcion: 'Furgoneta', matricula: '0000-XXX' }), 'Furgoneta · 0000-XXX');
+  igual(modelo.textoMedidas({ medidas: ['Batefuegos'], medidasOtrasSi: true, medidasOtras: ' Cuba ' }), 'Batefuegos; Otras: Cuba');
+  igual(modelo.textoMedidas({ medidas: [], medidasOtrasSi: false, medidasOtras: 'Cuba' }), '');
+});
+
+prueba('modelo: borradores de versiones antiguas', () => {
+  const viejo = { estado: 'borrador', usaMaquinaria: true, vehiculos: [{ descripcion: 'Furgoneta' }], antiincendios: 'Extintor' };
+  modelo.normalizarParte(viejo);
+  igual(viejo, {
+    estado: 'borrador', usaMaquinaria: null, vehiculos: [{ descripcion: 'Furgoneta' }], antiincendios: 'Extintor',
+    maquinas: [], usaVehiculos: true, extras: [], usaExtras: null, formato1: [],
+    medidas: [], medidasOtras: 'Extintor', medidasOtrasSi: true,
+  });
+  const cerrado = { estado: 'cerrado', usaMaquinaria: true };
+  modelo.normalizarParte(cerrado);
+  igual(cerrado, { estado: 'cerrado', usaMaquinaria: true }, 'un parte cerrado no se toca');
+  const actual = { ...ej.parteInfra(), estado: 'borrador' };
+  const antes = JSON.stringify(actual);
+  igual(JSON.stringify(modelo.normalizarParte(actual)), antes, 'un borrador actual no cambia');
 });
 
 // ---------- referencia, carpeta y nombres ----------

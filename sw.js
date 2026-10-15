@@ -18,6 +18,7 @@ const ARCHIVOS = [
   './js/envio.js',
   './js/fallos.js',
   './js/fotos.js',
+  './js/modelo.js',
   './js/pdf.js',
   './js/salida.js',
   './js/servidor.js',

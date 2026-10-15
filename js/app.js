@@ -19,11 +19,14 @@ import {
   horaValida, numeroValido, aNumero, textoBool, semanaIso, nombrePuesto, puestosDe, SUBTIPOS_MAQ, subtipoDe,
   extrasDelParte, faltasTrabajo, validar, faltasTajo, faltasRealizado, validarMaq, validarLD,
 } from './validaciones.js';
+import {
+  FASES, PREFIJO_REF, LINEAS, MAQUINAS_VIA_PROVISIONALES, nuevaMaquinaVia, nuevoTajo, MODOS_NIVELADO, MODOS_ALINEADO,
+  CUANDO_REGISTRO, nuevoRealizado, MAX_TOLVA, persona, EQUIPOS, textoEquipo, TIPOS_EXTRA, MEDIDAS_PROVISIONALES,
+  textoMedidas, normalizarParte,
+} from './modelo.js';
 
 const APP_VERSION = '0.11.3';
 const ITER_PIN = 150000;
-const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
-const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
 const app = document.getElementById('app');
 
 const estado = {
@@ -811,16 +814,6 @@ function vParte() {
 // Sigue el orden del papel: jornada (fecha y horario), máquinas con sus horas, viaje, tajos,
 // observaciones y personal por puesto. Normalmente es una máquina por noche, pero caben varias.
 
-// Cada máquina abre su parte: «via» (tren de bateo: tajos con nivelado, alineado…),
-// «locomotora» (vagones y balasto) o «dresina» (plataforma y telefonemas).
-// Mientras la oficina no ponga las máquinas en la hoja («MaquinasVia»), se usan estas.
-const MAQUINAS_VIA_PROVISIONALES = [
-  { descripcion: 'Bateadora 08-475-4S', uic: '99713011401-7', trabajo: 'Bateo', parte: 'via' },
-  { descripcion: 'Perfiladora PDB-110', uic: '99713011302-7', trabajo: 'Perfilado', parte: 'via' },
-  { descripcion: 'Estabilizador DGS-62N', uic: '97180150217-2', trabajo: 'Estabilizado', parte: 'via' },
-  { descripcion: 'Dresina', uic: '99719231001-6', trabajo: '', parte: 'dresina' },
-];
-
 const maquinasDeVia = () => maquinasViaCfg().filter((c) => (c.parte || 'via') === 'via');
 
 function maquinasViaCfg() {
@@ -834,19 +827,6 @@ function personalMaqCfg() {
   return (c.personalMaquinaria && c.personalMaquinaria.length ? c.personalMaquinaria : c.trabajadores) || [];
 }
 
-const nuevaMaquinaVia = () => ({ descripcion: '', uic: '', trabajo: '', horas: '', otro: false });
-
-function nuevoTajo() {
-  return {
-    id: uuid(), llegada: '', inicio: '', fin: '', salida: '', via: '', pkInicio: '', pkFin: '', desvio: '',
-    nivelado: { si: null, modo: '', max: '', pk: '' },
-    alineado: { si: null, modo: '', max: '', pk: '' },
-    estabilizado: { si: null, programada: null },
-    registro: { si: null, cuando: '', texto: '' },
-    perfilado: { si: null, cepillado: null },
-  };
-}
-
 /** Sí / No que vuelve a pintar la pantalla (para mostrar u ocultar lo que depende de la respuesta). */
 function siNo(ruta, v) {
   return `<div class="segmentado">${radio(ruta, 'si', 'Sí', textoBool(v), 'data-tipo="bool" data-rerender')}${radio(ruta, 'no', 'No', textoBool(v), 'data-tipo="bool" data-rerender')}</div>`;
@@ -855,10 +835,6 @@ function siNo(ruta, v) {
 function opciones(ruta, lista, actual) {
   return `<div class="segmentado">${lista.map(([v, t]) => radio(ruta, v, t, actual, 'data-rerender')).join('')}</div>`;
 }
-
-const MODOS_NIVELADO = [['calculado', 'Calculado'], ['manual', 'Manual'], ['visor', 'Visor']];
-const MODOS_ALINEADO = [['calculado', 'Calculado'], ['auto', 'Auto'], ['visor', 'Visor']];
-const CUANDO_REGISTRO = [['antes', 'Antes'], ['despues', 'Después'], ['ambos', 'Ambos']];
 
 /** Una operación del tajo: Sí/No y, si es que sí, sus detalles. */
 function operacion(titulo, ruta, o, detalle) {
@@ -1029,8 +1005,6 @@ function vElegirMaquina() {
   </div></div>`;
 }
 
-const nuevoRealizado = () => ({ id: uuid(), via: '', pkInicio: '', pkFin: '', horaInicio: '', horaFin: '', trabajo: '', m3: '' });
-
 function seccionRealizado(r, i, total, loco) {
   const b = `realizados.${i}`;
   const faltas = faltasRealizado(r);
@@ -1047,8 +1021,6 @@ function seccionRealizado(r, i, total, loco) {
       ${faltas.length ? `<p class="falta">Falta: ${esc(faltas.map((f) => f.corto).join(', '))}</p>` : '<p class="listo">Trabajo completo</p>'}
     </div>`;
 }
-
-const MAX_TOLVA = 35;   // m³ por tolva (en el papel: «35 / Tolva»)
 
 function seccionVagones(p) {
   const filas = p.vagones.map((v, i) => `
@@ -1200,34 +1172,11 @@ function catalogo() {
   return base.concat(estado.otros.filter((x) => !vistos.has(normaliza(x.nombre))).map((x) => ({ ...x, otro: true })));
 }
 
-function persona(x) {
-  return {
-    nombre: (x.nombre || '').trim(),
-    empresa: (x.empresa || '').trim(),
-    habilitacion: (x.habilitacion || '').trim(),
-    categoria: (x.categoria || '').trim(),
-    otro: Boolean(x.otro),
-  };
-}
-
 function capatazComoPersona() {
   const n = normaliza(estado.perfil.capataz);
   const t = ((estado.config && estado.config.trabajadores) || []).find((x) => normaliza(x.nombre) === n);
   return persona(t || { nombre: estado.perfil.capataz, categoria: 'Capataz' });
 }
-
-// Maquinaria y vehículos: dos secciones con Sí/No obligatorio y desplegables con la lista de la
-// oficina, más la opción «Otra» para escribirla a mano.
-const EQUIPOS = {
-  maquinas: {
-    titulo: 'Maquinaria', pregunta: '¿Se ha usado maquinaria?', usa: 'usaMaquinaria',
-    elegir: 'Elige la máquina…', otra: 'Otra (escribirla)', anadir: '+ Añadir otra máquina', conMatricula: false,
-  },
-  vehiculos: {
-    titulo: 'Vehículos', pregunta: '¿Se han usado vehículos?', usa: 'usaVehiculos',
-    elegir: 'Elige el vehículo…', otra: 'Otro (escribirlo)', anadir: '+ Añadir otro vehículo', conMatricula: true,
-  },
-};
 
 function equiposCfg(lista) {
   const c = estado.config || {};
@@ -1235,8 +1184,6 @@ function equiposCfg(lista) {
   if (!c.maquinas) return lista === 'maquinas' ? (c.vehiculos || []) : [];
   return c[lista] || [];
 }
-
-const textoEquipo = (x) => [x.descripcion, x.matricula].filter(Boolean).join(' · ');
 
 /** Posición en la lista de la oficina del equipo elegido (-1 si es «otro» o no está). */
 function indiceEquipo(lista, x) {
@@ -1278,7 +1225,6 @@ function seccionEquipos(lista) {
 
 // Horas extra: opcionales, por persona del parte, con tipo (normales, nocturnas o festivas)
 // y motivo opcional. Se guardan por nombre para que no se descoloquen al quitar a alguien.
-const TIPOS_EXTRA = [['normales', 'Normales'], ['nocturnas', 'Nocturnas'], ['festivas', 'Festivas']];
 
 const textoTotalExtras = (t) => (t ? `Total del equipo: <strong>${String(t).replace('.', ',')} h</strong>` : '');
 
@@ -1372,53 +1318,9 @@ function extrasATodos() {
   toast(n ? `Puestas ${String(base.horas).replace('.', ',')} h ${base.tipo} a ${n} persona(s)` : 'Ya tenían todos horas puestas');
 }
 
-/**
- * Borradores de antes de separar maquinaria y vehículos (v0.5.0 y anteriores): lo apuntado
- * queda como vehículos y se vuelve a preguntar por la maquinaria. Los partes ya cerrados no se
- * tocan: su PDF sale con la tabla única de antes.
- */
-function normalizarParte(p) {
-  if (!p || p.estado !== 'borrador') return p;
-  if (!p.maquinas) {
-    p.maquinas = [];
-    p.usaVehiculos = p.usaMaquinaria;
-    p.usaMaquinaria = null;
-  }
-  if (!p.extras) {
-    p.extras = [];
-    p.usaExtras = null;
-  }
-  if (!p.formato1) p.formato1 = [];
-  // Antes de v0.7.0 las medidas antiincendios eran texto libre: pasa a «Otras».
-  if (!p.medidas) {
-    p.medidas = [];
-    p.medidasOtras = p.antiincendios || '';
-    p.medidasOtrasSi = Boolean(p.medidasOtras.trim());
-  }
-  return p;
-}
-
-// Medidas antiincendios: casillas con la lista de la oficina (varias a la vez) más «Otras».
-// Mientras la oficina no ponga su lista en la hoja, se usa esta.
-const MEDIDAS_PROVISIONALES = [
-  'Extintor en el vehículo',
-  'Batefuegos',
-  'Mochila extintora de agua',
-  'Cuba o depósito de agua',
-  'Zona de trabajo despejada de vegetación',
-  'Vigilancia tras trabajos con riesgo de chispas',
-  'Revisión de la zona al terminar',
-];
-
 function medidasCfg() {
   const m = estado.config && estado.config.antiincendios;
   return m && m.length ? m : MEDIDAS_PROVISIONALES;
-}
-
-/** Texto de las medidas para el PDF y los datos: «Extintor en el vehículo; Batefuegos; Otras: …». */
-function textoMedidas(p) {
-  const otras = p.medidasOtrasSi && (p.medidasOtras || '').trim();
-  return [...p.medidas, otras && `Otras: ${otras}`].filter(Boolean).join('; ');
 }
 
 function motivosCfg(tipo) {
@@ -1584,9 +1486,6 @@ function campoAparato(t, b) {
         ${otro ? `<input data-bind="${b}.aparato" value="${esc(a)}" placeholder="Escribe el aparato" autocomplete="off">` : ''}
       </div>`;
 }
-
-/** Líneas que se ofrecen en botones, en Infra y en Super (las de la cabecera del PDF no cuentan aquí). */
-const LINEAS = ['040', '038'];
 
 /**
  * Horas con el teclado numérico en vez del reloj: se escriben las cifras («2330») y los dos
