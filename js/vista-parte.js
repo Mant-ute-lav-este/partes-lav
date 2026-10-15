@@ -12,7 +12,7 @@ import {
 import { cabeceraParte, refParte, radio, vErrores } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 import { vParteMaq } from './vista-maquinaria.js';
-import { vFotoGrande } from './app.js';
+import { vFotoGrande } from './vista-trabajo.js';
 
 // ---------- Parte ----------
 

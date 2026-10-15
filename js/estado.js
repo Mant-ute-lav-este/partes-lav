@@ -14,8 +14,9 @@ import {
 } from './vista-acceso.js';
 import { vInicio } from './vista-inicio.js';
 // Pendiente de partir: estas vistas siguen en app.js.
-import { vTrabajo, vEnvio, cargarMiniaturas, liberarFotos, prepararEnvioActual } from './app.js';
+import { vEnvio, prepararEnvioActual } from './app.js';
 import { vParte, pintarResultados } from './vista-parte.js';
+import { vTrabajo, cargarMiniaturas, liberarFotos } from './vista-trabajo.js';
 
 export const app = document.getElementById('app');
 
