@@ -27,6 +27,7 @@ const ARCHIVOS = [
   './js/util.js',
   './js/validaciones.js',
   './js/vista-acceso.js',
+  './js/vista-envio.js',
   './js/vista-extras.js',
   './js/vista-inicio.js',
   './js/vista-maquinaria.js',

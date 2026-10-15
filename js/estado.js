@@ -13,10 +13,9 @@ import {
   vSetupCapataz, vSetupPin, vPin, pintarNombres,
 } from './vista-acceso.js';
 import { vInicio } from './vista-inicio.js';
-// Pendiente de partir: estas vistas siguen en app.js.
-import { vEnvio, prepararEnvioActual } from './app.js';
 import { vParte, pintarResultados } from './vista-parte.js';
 import { vTrabajo, cargarMiniaturas, liberarFotos } from './vista-trabajo.js';
+import { vEnvio, prepararEnvioActual } from './vista-envio.js';
 
 export const app = document.getElementById('app');
 
