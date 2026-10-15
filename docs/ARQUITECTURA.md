@@ -32,7 +32,13 @@ Carpeta sincronizada en el OneDrive de quien la tenga sincronizada
 |---|---|
 | `index.html`, `manifest.webmanifest`, `icons/` | Página y datos de instalación |
 | `sw.js` | Service worker: caché sin conexión y envío en segundo plano. **Script clásico, sin `import`.** |
-| `js/app.js` | Pantallas y lógica del parte |
+| `js/app.js` | Arranque de la app (y `APP_VERSION`) |
+| `js/estado.js` | Estado compartido, navegación (`ir`/`render`), guardado del parte, sincronización y lista de la oficina |
+| `js/vista-acceso.js`, `vista-inicio.js`, `vista-parte.js`, `vista-maquinaria.js`, `vista-trabajo.js`, `vista-extras.js`, `vista-envio.js` | Pantallas: registro y PIN, inicio y menú, parte INFRA/SUPER y cierre, maquinaria (vía, locomotora, dresina), trabajo y fotos, horas extra, envío |
+| `js/campos.js` | Piezas de formulario comunes (horas, PK, Sí/No, lista de faltas) |
+| `js/eventos.js` | Botones, campos y formularios |
+| `js/validaciones.js` | Lo que falta para cerrar cada tipo de parte (funciones puras, con pruebas) |
+| `js/modelo.js` | Listas fijas, apartados nuevos y arreglo de borradores antiguos |
 | `js/db.js` | IndexedDB `partes-lav`: kv, partes, fotos, salida |
 | `js/servidor.js` | Llamadas al servidor, con reintentos e identificador de petición |
 | `js/envio.js`, `js/salida.js` | Cola de envío |
@@ -47,6 +53,7 @@ Carpeta sincronizada en el OneDrive de quien la tenga sincronizada
 - **Nunca datos reales en el repositorio** (es público): nombres, correos, matrículas, claves. Van en la hoja o en `privado/`.
 - **Al publicar hay que subir la versión** en `sw.js` y `js/app.js`, o los móviles seguirán con la copia guardada (`privado/herramientas/publicar.ps1` lo hace y lo comprueba).
 - **Todo archivo nuevo de `js/` o `css/` hay que añadirlo a `ARCHIVOS` en `sw.js`**, si no, no funciona sin cobertura. `publicar.ps1 -Comprobar` lo avisa.
+- **Las vistas y `estado.js` se importan entre sí**: no se puede usar nada de otro módulo al cargarlo, solo dentro de funciones. `privado/herramientas/revisar-imports.ps1` avisa de nombres usados sin importar, y las pruebas «pantallas» pintan cada pantalla de la app real.
 - **No usar `<datalist>`**: en Android se ve en horizontal. Usar `<select>`.
 - **Horas decimales** en campos de texto con `inputmode="decimal"`: `type=number` rechaza «1,5».
 - **El servidor no repite peticiones**: cada una lleva un `peticion` (UUID) y se guarda 30 minutos.
