@@ -2,6 +2,14 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.15.0 · 2026-10-16
+- **EVB (entrega de vía bloqueada)** en los partes de maquinaria de vía y de dresina: pregunta obligatoria en «Jornada», «¿Va en entrega de vía bloqueada (EVB)?» Sí / No, una por parte.
+- Puestos obligatorios según la EVB (en «Personal» salen marcados como OBLIGATORIO). Vía: con EVB, Encargado de trabajo y OMI; sin EVB, Maquinista tipo A. Dresina: con EVB, «ET / al amparo de» (el encargado) y OMI; sin EVB, Maquinista. El Piloto y los operarios, siempre opcionales. La locomotora no cambia: sin pregunta y con el maquinista obligatorio.
+- La dresina tiene dos puestos nuevos: **Piloto** (opcional) y **OMI**. Orden: Maquinista · ET / al amparo de · Piloto · OMI · Operario/s.
+- PDF: «EVB SÍ / NO» en la cabecera de vía y de dresina; el personal de la dresina incluye Piloto y OMI.
+- Arreglo: en locomotora y dresina los avisos decían «Maquinista tipo A»; ahora dicen «Maquinista» (en vía sigue «Maquinista tipo A»).
+- Campo nuevo en el parte: `evb` (true/false; sin contestar = vacío). Los partes enviados no cambian; los borradores antiguos de vía o dresina piden contestar la EVB al cerrar.
+
 ## 0.14.0 · 2026-10-16
 - **Repetir el parte anterior** (INFRA y SUPER): al crear un parte, si hay uno anterior del mismo tipo, sale «¿Empezar igual que el último parte?» con casillas (todas marcadas) para copiar el personal, la maquinaria, los vehículos y las medidas antiincendios (también «Otras»). «No, empezar en blanco» lo crea como siempre; tocar fuera cancela sin gastar número.
 - No se copian los trabajos, las horas extra, las fotos, el formato 1 ni las observaciones; la fecha y la jornada nocturna salen como en cualquier parte nuevo. Las medidas que ya no estén en la lista de la oficina no se copian.
