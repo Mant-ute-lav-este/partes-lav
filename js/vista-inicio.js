@@ -4,7 +4,7 @@
 import * as db from './db.js';
 import { esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora } from './util.js';
 import { SUBTIPOS_MAQ, subtipoDe } from './validaciones.js';
-import { PREFIJO_REF, nuevoTajo, nuevoRealizado } from './modelo.js';
+import { PREFIJO_REF, nuevaMaquinaVia, nuevoTajo, nuevoRealizado } from './modelo.js';
 import { estado, ir, guardarYa, maquinasViaCfg, capatazComoPersona } from './estado.js';
 import { inputConfig } from './vista-acceso.js';
 import { APP_VERSION } from './app.js';

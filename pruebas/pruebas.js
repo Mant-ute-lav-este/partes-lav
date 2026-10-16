@@ -658,7 +658,7 @@ async function appEnMarco() {
   // Un script del propio marco: así el módulo es el mismo que usa la app, no una copia.
   const s = f.contentDocument.createElement('script');
   s.type = 'module';
-  s.textContent = "import * as m from './js/estado.js'; window.moduloEstado = m;";
+  s.textContent = "import * as m from './js/estado.js'; import * as i from './js/vista-inicio.js'; window.moduloInicio = i; window.moduloEstado = m;";
   f.contentDocument.head.append(s);
   while (!f.contentWindow.moduloEstado) {
     if (Date.now() - inicio > 10000) throw new Error('no se puede cargar js/estado.js en el marco');
@@ -727,6 +727,27 @@ prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo');
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco()); }, 'LOC-9001', 'Vagones', 'Trabajo realizado', 'Responsable de trabajos');
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco('dresina')); }, 'DRE-9001', 'Telefonemas', 'ET / al amparo de');
+});
+
+prueba('pantallas: parte nuevo de los 5 tipos', async () => {
+  const { f, m, errores } = await appEnMarco();
+  const { nuevoParte } = f.contentWindow.moduloInicio;
+  f.contentWindow.confirm = () => true;   // «Ya tienes un parte… ¿Quieres empezar otro?»
+  const casos = [
+    ['INFRA', null, 'INF-', 'Medidas antiincendios'], ['SUPER', null, 'SUP-', 'Jornada nocturna'],
+    ['MAQUINARIA', { descripcion: 'Bateadora prueba', uic: '0', trabajo: 'Bateo', parte: 'via' }, 'MAQ-', 'Tajo 1'],
+    ['MAQUINARIA', { descripcion: '', uic: '', parte: 'locomotora', otro: true }, 'LOC-', 'Vagones'],
+    ['MAQUINARIA', { descripcion: 'Dresina prueba', uic: '0', trabajo: '', parte: 'dresina' }, 'DRE-', 'Telefonemas'],
+  ];
+  for (const [tipo, maquina, prefijo, texto] of casos) {
+    Object.assign(m.estado, { config: ej.config, perfil: perfilEjemplo(), parte: null, vista: 'inicio', errores: [] });
+    await nuevoParte(tipo, maquina);
+    await new Promise((r) => setTimeout(r, 100));
+    if (errores.length) throw new Error(`errores al crear ${prefijo}: ${errores.splice(0).join(' | ')}`);
+    igual(m.estado.vista, 'parte', `${prefijo} abre el parte`);
+    cierto(m.estado.parte.ref.startsWith(prefijo), `referencia ${m.estado.parte.ref}`);
+    cierto(m.app.textContent.includes(texto), `en el parte ${prefijo} falta «${texto}»`);
+  }
 });
 
 prueba('pantallas: envío', async () => {
