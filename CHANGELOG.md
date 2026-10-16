@@ -2,6 +2,12 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.14.0 · 2026-10-16
+- **Repetir el parte anterior** (INFRA y SUPER): al crear un parte, si hay uno anterior del mismo tipo, sale «¿Empezar igual que el último parte?» con casillas (todas marcadas) para copiar el personal, la maquinaria, los vehículos y las medidas antiincendios (también «Otras»). «No, empezar en blanco» lo crea como siempre; tocar fuera cancela sin gastar número.
+- No se copian los trabajos, las horas extra, las fotos, el formato 1 ni las observaciones; la fecha y la jornada nocturna salen como en cualquier parte nuevo. Las medidas que ya no estén en la lista de la oficina no se copian.
+- El parte copiado muestra arriba «Copiado del REF (fecha). Revisa quién ha venido hoy y los equipos.». Sigue el botón «Copiar el personal del último parte».
+- Sin campos nuevos en los partes guardados. Maquinaria de vía, locomotora y dresina, sin cambios (más adelante).
+
 ## 0.13.1 · 2026-10-16
 - **Guía rápida (PDF)**: explica «No realizado» (con su motivo, sin horas de vía, PK ni fotos) y la casilla «No se han podido hacer fotos» (con motivo; sale en rojo para la oficina).
 
