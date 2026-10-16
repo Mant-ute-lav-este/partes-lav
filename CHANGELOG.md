@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.12.0 · 2026-10-16
+- **Orden interno, sin cambios para el capataz**: `js/app.js` (unas 2750 líneas) se reparte en módulos por tema (estado, validaciones, modelo, campos, una vista por pantalla y eventos). Las pantallas, los textos y el formato de los partes guardados son los mismos.
+- **Pruebas automáticas**: de 31 a 50. Se prueban las validaciones de los 5 tipos de parte con sus textos exactos, se pintan todas las pantallas y se crea un parte nuevo de cada tipo.
+
 ## Servidor · 2026-10-15
 - **Copia de cada parte** a otros correos: fila `copia` en la pestaña Ajustes de la hoja (uno o varios correos separados por comas; se ignoran los mal escritos). Se cambia editando la hoja, sin tocar la app.
   - La copia es un **correo aparte** con el PDF y las **fotos sueltas en .jpg** con nombre completo (p. ej. `INF-0012_2026-10-15_T1_SIOS-12345_antes_1.jpg`). El correo de la oficina, el que lee Power Automate, no cambia.
