@@ -28,15 +28,43 @@ export const PUESTOS_MAQ = [
   ['omi', 'OMI', false],
   ['operario', 'Operario/s', true],   // el único puesto con varias personas
 ];
-export const nombrePuesto = (clave) => ([...PUESTOS_MAQ, ...PUESTOS_LD.locomotora, ...PUESTOS_LD.dresina]
-  .find((x) => x[0] === clave) || [, 'Personal'])[1];
-
 // Puestos de cada parte: [clave, título, admite varias personas]
 export const PUESTOS_LD = {
   locomotora: [['maquinista', 'Maquinista', false], ['responsable', 'Responsable de trabajos', false], ['operario', 'Operario/s', true]],
-  dresina: [['maquinista', 'Maquinista', false], ['amparo', 'ET / al amparo de', false], ['operario', 'Operario/s', true]],
+  dresina: [['maquinista', 'Maquinista', false], ['amparo', 'ET / al amparo de', false], ['piloto', 'Piloto', false],
+    ['omi', 'OMI', false], ['operario', 'Operario/s', true]],
 };
 export const puestosDe = (p) => (subtipoDe(p) === 'via' ? PUESTOS_MAQ : PUESTOS_LD[subtipoDe(p)]);
+/** Título del puesto en ese parte («Maquinista tipo A» en vía, «Maquinista» en locomotora y dresina). */
+export const nombrePuesto = (p, clave) => (puestosDe(p).find((x) => x[0] === clave) || [, 'Personal'])[1];
+
+/** Los partes de vía y de dresina preguntan si se va en entrega de vía bloqueada (EVB). */
+export const llevaEvb = (p) => subtipoDe(p) !== 'locomotora';
+
+/**
+ * Puestos que no pueden quedar vacíos. Con EVB conduce el OMI y hace falta el encargado de
+ * trabajos (en la dresina, «ET / al amparo de»); sin EVB, el maquinista. La locomotora siempre
+ * lleva maquinista. Mientras no se conteste a la EVB, ninguno.
+ */
+export function puestosObligatorios(p) {
+  if (!llevaEvb(p)) return ['maquinista'];
+  if (p.evb === true) return [subtipoDe(p) === 'dresina' ? 'amparo' : 'encargado', 'omi'];
+  if (p.evb === false) return ['maquinista'];
+  return [];
+}
+
+/** Avisos de la EVB y de los puestos obligatorios que están vacíos. */
+function faltasPuestos(p) {
+  if (llevaEvb(p) && p.evb !== true && p.evb !== false) return ['Indica si va en entrega de vía bloqueada (EVB).'];
+  return puestosObligatorios(p)
+    .filter((clave) => !p.personal.some((x) => x.puesto === clave && String(x.nombre || '').trim()))
+    .map((clave) => {
+      if (!llevaEvb(p)) return 'Elige al maquinista (en «Personal»).';
+      const n = nombrePuesto(p, clave);
+      const nombre = /^.[a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n;   // «OMI» y «ET» se quedan igual
+      return `${p.evb ? 'Con' : 'Sin'} EVB hace falta el ${nombre} (en «Personal»).`;
+    });
+}
 
 export const SUBTIPOS_MAQ = {
   via: { prefijo: 'MAQ', titulo: 'Parte de maquinaria de vía' },
@@ -186,6 +214,7 @@ export function validarMaq(p) {
   const vacio = (s) => !String(s == null ? '' : s).trim();
   if (!p.fecha) add('Falta la fecha de la jornada.');
   if (!horaValida(p.horaInicio) || !horaValida(p.horaFin)) add('Falta el horario de la jornada (inicio y fin).');
+  faltasPuestos(p).forEach(add);
   const maquinas = p.maquinasVia.filter((m) => !vacio(m.descripcion));
   if (!maquinas.length) add('Elige al menos una máquina.');
   p.maquinasVia.forEach((m, i) => {
@@ -199,7 +228,7 @@ export function validarMaq(p) {
   if (vacio(v.lugarLlegada)) add('Viaje: falta el lugar de llegada.');
   if (!p.tajos.length) add('Añade al menos un tajo.');
   p.tajos.forEach((t, i) => faltasTajo(t).forEach((f) => add(`Tajo ${i + 1}: ${f.largo}`)));
-  p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(x.puesto)}: escribe el nombre o quítalo.`); });
+  p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(p, x.puesto)}: escribe el nombre o quítalo.`); });
   if (p.usaExtras) {
     const hs = extrasDelParte(p);
     if (!hs.length) add('Has marcado horas extra: pon las horas de quien las haya hecho (o marca «No»).');
@@ -216,7 +245,7 @@ export function validarLD(p) {
   if (!p.fecha) add('Falta la fecha.');
   if (vacio(p.maquina.descripcion)) add('Escribe qué locomotora es.');
   if (vacio(p.acta)) add('Falta el nº de acta.');
-  if (!p.personal.some((x) => x.puesto === 'maquinista' && !vacio(x.nombre))) add('Elige al maquinista (en «Personal»).');
+  faltasPuestos(p).forEach(add);
   if (!horaValida(p.salida.hora)) add('Falta la hora de salida.');
   if (vacio(p.salida.lugar)) add('Falta el lugar de salida.');
   if (!horaValida(p.apartado.hora)) add('Falta la hora de apartado.');
@@ -232,7 +261,7 @@ export function validarLD(p) {
   p.realizados.forEach((r, i) => faltasRealizado(r).forEach((f) => add(`Trabajo ${i + 1}: ${f.largo}`)));
   if (!numeroValido(p.combustible.salida) || !numeroValido(p.combustible.llegada)) add('Falta el combustible de salida y de llegada.');
   if (!numeroValido(p.km.salida) || !numeroValido(p.km.llegada)) add('Faltan los kilómetros de salida y de llegada.');
-  p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(x.puesto)}: escribe el nombre o quítalo.`); });
+  p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(p, x.puesto)}: escribe el nombre o quítalo.`); });
   if (p.usaExtras) {
     const hs = extrasDelParte(p);
     if (!hs.length) add('Has marcado horas extra: pon las horas de quien las haya hecho (o marca «No»).');

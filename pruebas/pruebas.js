@@ -98,10 +98,21 @@ prueba('validaciones: horas, PK, números y semana', () => {
 prueba('validaciones: puestos, subtipos y horas extra', () => {
   igual(val.subtipoDe({}), 'via', 'parte de maquinaria antiguo, sin subtipo');
   igual(val.subtipoDe({ subtipo: 'dresina' }), 'dresina');
-  igual(val.puestosDe({ subtipo: 'dresina' }).map((x) => x[0]), ['maquinista', 'amparo', 'operario']);
+  igual(val.puestosDe({ subtipo: 'dresina' }).map((x) => x[0]), ['maquinista', 'amparo', 'piloto', 'omi', 'operario']);
   igual(val.puestosDe({}).map((x) => x[0]), ['encargado', 'maquinista', 'piloto', 'omi', 'operario']);
-  igual([val.nombrePuesto('omi'), val.nombrePuesto('amparo'), val.nombrePuesto('responsable'), val.nombrePuesto('nada')],
+  const via = {}, loco = { subtipo: 'locomotora' }, dre = { subtipo: 'dresina' };
+  igual([val.nombrePuesto(via, 'omi'), val.nombrePuesto(dre, 'amparo'), val.nombrePuesto(loco, 'responsable'), val.nombrePuesto(via, 'nada')],
     ['OMI', 'ET / al amparo de', 'Responsable de trabajos', 'Personal']);
+  igual([val.nombrePuesto(via, 'maquinista'), val.nombrePuesto(loco, 'maquinista'), val.nombrePuesto(dre, 'maquinista')],
+    ['Maquinista tipo A', 'Maquinista', 'Maquinista'], '«tipo A» solo en vía');
+  // Puestos obligatorios según la EVB (entrega de vía bloqueada).
+  igual([val.llevaEvb(via), val.llevaEvb(dre), val.llevaEvb(loco)], [true, true, false]);
+  igual(val.puestosObligatorios({ evb: true }), ['encargado', 'omi']);
+  igual(val.puestosObligatorios({ evb: false }), ['maquinista']);
+  igual(val.puestosObligatorios({}), [], 'sin contestar la EVB');
+  igual(val.puestosObligatorios({ subtipo: 'dresina', evb: true }), ['amparo', 'omi']);
+  igual(val.puestosObligatorios({ subtipo: 'dresina', evb: false }), ['maquinista']);
+  igual(val.puestosObligatorios({ subtipo: 'locomotora', evb: true }), ['maquinista'], 'la locomotora no cambia');
   igual(val.SUBTIPOS_MAQ.locomotora.prefijo, 'LOC');
   // Solo cuentan las personas que siguen en el parte y tienen horas.
   const p = { personal: [{ nombre: 'A' }, { nombre: 'B' }, { nombre: 'C' }],
@@ -249,6 +260,18 @@ prueba('validaciones: parte de maquinaria de vía', () => {
   solo((p) => { p.tajos = []; }, ['Añade al menos un tajo.']);
   solo((p) => { p.tajos[0].via = ''; p.tajos[0].nivelado.si = null; }, ['Tajo 1: elige la vía (1 o 2).', 'Tajo 1: Nivelado: contesta Sí o No.']);
   solo((p) => { p.personal.push({ nombre: '', puesto: 'piloto', otro: true }); }, ['Piloto: escribe el nombre o quítalo.']);
+  solo((p) => { p.personal.push({ nombre: '', puesto: 'maquinista', otro: true }); }, ['Maquinista tipo A: escribe el nombre o quítalo.']);
+  // EVB: sin contestar (borradores antiguos), sin EVB hace falta el maquinista tipo A; con EVB, encargado y OMI.
+  solo((p) => { delete p.evb; }, ['Indica si va en entrega de vía bloqueada (EVB).']);
+  solo((p) => { p.evb = null; p.personal[1].puesto = 'piloto'; }, ['Indica si va en entrega de vía bloqueada (EVB).']);
+  solo((p) => { p.personal[1].puesto = 'piloto'; },
+    ['Sin EVB hace falta el maquinista tipo A (en «Personal»).']);
+  solo((p) => { p.evb = true; }, ['Con EVB hace falta el OMI (en «Personal»).']);
+  solo((p) => { p.evb = true; p.personal = [{ nombre: 'Luis Ejemplo', puesto: 'omi' }]; },
+    ['Con EVB hace falta el encargado de trabajo (en «Personal»).']);
+  solo((p) => { p.evb = true; p.personal = [{ nombre: 'Ana Prueba', puesto: 'encargado' }, { nombre: 'Luis Ejemplo', puesto: 'omi' }]; },
+    [], 'con EVB el maquinista y el piloto son opcionales');
+  solo((p) => { p.personal.push({ nombre: 'Eva Prueba', puesto: 'piloto' }); }, [], 'el piloto es opcional');
   solo((p) => { p.extras = []; }, ['Has marcado horas extra: pon las horas de quien las haya hecho (o marca «No»).']);
   solo((p) => { p.extras[0].tipo = ''; }, ['Horas extra de Luis Ejemplo: elige si son normales, nocturnas o festivas.']);
 });
@@ -269,6 +292,9 @@ prueba('validaciones: parte de locomotora', () => {
   solo((p) => { p.maquina.descripcion = ''; }, ['Escribe qué locomotora es.']);
   solo((p) => { p.acta = ' '; }, ['Falta el nº de acta.']);
   solo((p) => { p.personal[0].puesto = 'responsable'; }, ['Elige al maquinista (en «Personal»).']);
+  solo((p) => { p.evb = true; p.personal[0].puesto = 'responsable'; }, ['Elige al maquinista (en «Personal»).'],
+    'la locomotora no pregunta la EVB: el maquinista siempre es obligatorio');
+  solo((p) => { p.personal.push({ nombre: '', puesto: 'maquinista', otro: true }); }, ['Maquinista: escribe el nombre o quítalo.']);
   solo((p) => { p.salida.hora = ''; }, ['Falta la hora de salida.']);
   solo((p) => { p.salida.lugar = ''; }, ['Falta el lugar de salida.']);
   solo((p) => { p.apartado.hora = '5'; }, ['Falta la hora de apartado.']);
@@ -290,8 +316,17 @@ prueba('validaciones: parte de locomotora', () => {
 prueba('validaciones: parte de dresina', () => {
   igual(val.validarLD(loco('dresina')), [], 'parte completo (sin vagones)');
   const solo = (cambiar, esperado) => { const p = loco('dresina'); cambiar(p); igual(msgs(val.validarLD(p)), esperado); };
-  solo((p) => { p.personal[0].puesto = 'operario'; }, ['Elige al maquinista (en «Personal»).']);
+  solo((p) => { p.personal[0].puesto = 'operario'; }, ['Sin EVB hace falta el maquinista (en «Personal»).']);
   solo((p) => { p.personal.push({ nombre: '', puesto: 'amparo', otro: true }); }, ['ET / al amparo de: escribe el nombre o quítalo.']);
+  solo((p) => { p.personal.push({ nombre: '', puesto: 'maquinista', otro: true }); }, ['Maquinista: escribe el nombre o quítalo.'],
+    'en la dresina es «Maquinista», sin «tipo A»');
+  solo((p) => { p.personal.push({ nombre: '', puesto: 'omi', otro: true }); }, ['OMI: escribe el nombre o quítalo.']);
+  // EVB: con EVB hacen falta «ET / al amparo de» (el encargado) y el OMI; el maquinista y el piloto, opcionales.
+  solo((p) => { delete p.evb; }, ['Indica si va en entrega de vía bloqueada (EVB).']);
+  solo((p) => { p.evb = true; },
+    ['Con EVB hace falta el ET / al amparo de (en «Personal»).', 'Con EVB hace falta el OMI (en «Personal»).']);
+  solo((p) => { p.evb = true; p.personal = [{ nombre: 'Ana Prueba', puesto: 'amparo' }, { nombre: 'Luis Ejemplo', puesto: 'omi' }]; }, []);
+  solo((p) => { p.personal.push({ nombre: 'Eva Prueba', puesto: 'piloto' }); }, [], 'el piloto es opcional');
   solo((p) => { p.realizados[0].via = ''; }, ['Trabajo 1: elige la vía (1 o 2).']);
   solo((p) => { p.acta = ''; p.combustible.salida = ''; }, ['Falta el nº de acta.', 'Falta el combustible de salida y de llegada.']);
   // Comportamiento actual: el texto habla de «locomotora» también en la dresina.

@@ -59,7 +59,7 @@ export function parteSuper() {
 export function parteMaqVia() {
   const p = base('MAQUINARIA', 'MAQ-9001');
   Object.assign(p, {
-    subtipo: 'via', personal: [persona('Ana Prueba', { puesto: 'encargado' }), persona('Luis Ejemplo', { puesto: 'maquinista' })],
+    subtipo: 'via', evb: false, personal: [persona('Ana Prueba', { puesto: 'encargado' }), persona('Luis Ejemplo', { puesto: 'maquinista' })],
     horaInicio: '22:00', horaFin: '06:00',
     maquinasVia: [{ descripcion: 'Bateadora prueba', uic: '00000000000-0', trabajo: 'Bateo', horas: '6', otro: false }],
     viaje: { horaSalida: '21:00', lugarSalida: 'Base', horaLlegada: '06:30', lugarLlegada: 'Base' },
@@ -75,7 +75,7 @@ export function parteMaqVia() {
 export function parteLoco(subtipo = 'locomotora') {
   const p = base('MAQUINARIA', subtipo === 'locomotora' ? 'LOC-9001' : 'DRE-9001');
   Object.assign(p, {
-    subtipo, personal: [persona('Ana Prueba', { puesto: 'maquinista' }), persona('Luis Ejemplo', { puesto: 'operario' })],
+    subtipo, ...(subtipo === 'dresina' ? { evb: false } : {}), personal: [persona('Ana Prueba', { puesto: 'maquinista' }), persona('Luis Ejemplo', { puesto: 'operario' })],
     maquina: { descripcion: subtipo === 'locomotora' ? 'Locomotora prueba' : 'Dresina prueba', uic: '00000000000-0', otro: true },
     acta: 'A-1', salida: { hora: '22:00', lugar: 'Base' }, apartado: { hora: '05:00', lugar: 'Base' },
     realizados: [{ id: 'r1', via: '2', pkInicio: '300+000', pkFin: '300+800', horaInicio: '23:00', horaFin: '02:00', trabajo: 'Descarga de balasto', m3: '30' }],

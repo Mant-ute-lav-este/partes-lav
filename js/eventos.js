@@ -142,7 +142,7 @@ export async function onChange(e) {
     const puesto = el.dataset.puesto;
     const c = personalMaqCfg()[Number(el.value)];
     if (el.value !== 'otro' && c && p.personal.some((x) => x.puesto === puesto && x.nombre === c.nombre)) {
-      toast(`${c.nombre} ya está en ${nombrePuesto(puesto)}`);
+      toast(`${c.nombre} ya está en ${nombrePuesto(p, puesto)}`);
       render();
       return;
     }
