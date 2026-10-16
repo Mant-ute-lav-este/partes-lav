@@ -1,6 +1,7 @@
 // PDF A4 apaisado con el aspecto del parte en papel. Se genera en el móvil con jsPDF.
 
 import { fmtFecha, fmtFechaHora, FORMATO1 } from './util.js';
+import { puestosDe } from './validaciones.js';
 
 const PT = 0.3528;              // 1 punto tipográfico en mm
 const M = 8;                    // margen
@@ -451,7 +452,8 @@ function cuerpoLocoDresina(c, parte, cab) {
   fila(c, [
     { ...L, w: 22, t: 'ÁMBITO' }, { w: 45, t: cab.ambito || '', b: true },
     { ...L, w: 22, t: 'Nº ACTA' }, { w: 40, t: parte.acta || '', b: true },
-    { ...L, w: 22, t: 'LO RELLENA' }, { w: 70, t: parte.capataz, b: true },
+    { ...L, w: 22, t: 'LO RELLENA' }, { w: loco ? 70 : 50, t: parte.capataz, b: true },
+    ...(loco ? [] : [{ ...L, w: 10, t: 'EVB' }, { w: 10, t: SI_NO(parte.evb), b: true, a: 'center' }]),
     { ...L, w: 30, t: 'CIERRE (MÓVIL)' }, { w: AN - 251, t: fmtFechaHora(parte.cierre) || '—', b: true },
   ], { minH: 8 });
   fila(c, [
@@ -525,9 +527,7 @@ function cuerpoLocoDresina(c, parte, cab) {
     { ...L, w: 35, t: 'KM LLEGADA' }, { w: AN - 245, t: num(parte.km.llegada), b: true, a: 'center' },
   ], { minH: 8 });
 
-  tablaPersonalPuestos(c, parte, loco
-    ? [['maquinista', 'Maquinista'], ['responsable', 'Responsable de trabajos'], ['operario', 'Operario/s']]
-    : [['maquinista', 'Maquinista'], ['amparo', 'ET / al amparo de'], ['operario', 'Operario/s']]);
+  tablaPersonalPuestos(c, parte, puestosDe(parte));
   pdfHorasExtra(c, parte);
 }
 
@@ -541,7 +541,8 @@ function cuerpoMaquinaria(c, parte, cab) {
   ], { minH: 13 });
   fila(c, [
     { ...L, w: 22, t: 'EMPRESA' }, { w: 70, t: cab.empresa || '', b: true },
-    { ...L, w: 22, t: 'LO RELLENA' }, { w: 70, t: parte.capataz, b: true },
+    { ...L, w: 22, t: 'LO RELLENA' }, { w: 50, t: parte.capataz, b: true },
+    { ...L, w: 10, t: 'EVB' }, { w: 10, t: SI_NO(parte.evb), b: true, a: 'center' },
     { ...L, w: 40, t: 'HORA DE CIERRE (MÓVIL)' }, { w: AN - 224, t: fmtFechaHora(parte.cierre) || '—', b: true },
   ], { minH: 8 });
 
