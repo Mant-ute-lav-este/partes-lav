@@ -329,6 +329,67 @@ prueba('modelo: borradores de versiones antiguas', () => {
   igual(JSON.stringify(modelo.normalizarParte(actual)), antes, 'un borrador actual no cambia');
 });
 
+prueba('modelo: último parte del mismo tipo', () => {
+  const a = { ...ej.parteSuper(), ref: 'SUP-1', fecha: '2026-10-13' };
+  const b = { ...ej.parteSuper(), ref: 'SUP-2', fecha: '2026-10-14', modificado: '2026-10-14T09:00:00+02:00' };
+  const c = { ...ej.parteSuper(), ref: 'SUP-3', fecha: '2026-10-14', modificado: '2026-10-14T11:00:00+02:00' };
+  const otro = { ...ej.parteInfra(), fecha: '2026-10-20' };
+  igual(modelo.ultimoParteDe([a, c, otro, b], 'SUPER').ref, 'SUP-3', 'el de fecha más reciente y el último tocado');
+  igual(modelo.ultimoParteDe([a, b], 'INFRA'), null, 'sin partes de ese tipo');
+});
+
+prueba('modelo: qué se puede copiar del parte anterior', () => {
+  const lista = modelo.MEDIDAS_PROVISIONALES;
+  const previo = ej.parteSuper();
+  previo.personal.push({ nombre: 'Eva Inventada' }, { nombre: 'Pau Ficticio' }, { nombre: 'Rosa Supuesta' });
+  previo.medidasOtrasSi = true;
+  previo.medidasOtras = 'Cuba';
+  igual(modelo.apartadosCopiables(previo, 'Ana Prueba', lista), [
+    { clave: 'personal', titulo: 'Personal', detalle: '4 persona(s): Luis Ejemplo, Eva Inventada, Pau Ficticio y 1 más' },
+    { clave: 'maquinas', titulo: 'Maquinaria', detalle: 'Sí · Bateadora pequeña' },
+    { clave: 'vehiculos', titulo: 'Vehículos', detalle: 'Sí · Furgoneta prueba · 0000-XXX' },
+    { clave: 'medidas', titulo: 'Medidas antiincendios', detalle: '1 medida(s) y otras' },
+  ]);
+  // Solo el capataz, maquinaria sin contestar, vehículos «No» y medidas que ya no están en la lista.
+  const flojo = { ...ej.parteInfra(), personal: [{ nombre: 'ANA PRUEBA' }], usaMaquinaria: null, usaVehiculos: false, medidas: ['Medida antigua'] };
+  igual(modelo.apartadosCopiables(flojo, 'Ana Prueba', lista), [{ clave: 'vehiculos', titulo: 'Vehículos', detalle: 'No' }]);
+  // Un parte de antes de v0.6.0 (sin maquinas) ni de v0.7.0 (sin medidas): nada de equipos ni medidas.
+  igual(modelo.apartadosCopiables({ tipo: 'INFRA', personal: [], usaMaquinaria: true, vehiculos: [] }, 'Ana Prueba', lista), []);
+});
+
+prueba('modelo: repetir el parte anterior', () => {
+  const lista = modelo.MEDIDAS_PROVISIONALES;
+  const previo = ej.parteSuper();
+  previo.medidas = ['Batefuegos', 'Medida antigua'];
+  previo.medidasOtrasSi = true;
+  previo.medidasOtras = 'Cuba';
+  const antes = JSON.stringify(previo);
+  const nuevo = {
+    ...ej.parteSuper(), ref: 'SUP-9002', estado: 'borrador', fecha: '2026-10-15', nocturna: false,
+    personal: [modelo.persona({ nombre: 'Ana Prueba', categoria: 'Capataz' })], trabajos: [], formato1: [],
+    usaMaquinaria: null, maquinas: [], usaVehiculos: null, vehiculos: [], usaExtras: null, extras: [],
+    medidas: [], medidasOtrasSi: false, medidasOtras: '', antiincendios: '', observaciones: '',
+  };
+  const nuevoAntes = JSON.stringify(nuevo);
+  const p = modelo.repetirParte(nuevo, previo, ['personal', 'maquinas', 'vehiculos', 'medidas'], lista);
+  igual(JSON.stringify(previo), antes, 'el anterior no cambia');
+  igual(JSON.stringify(nuevo), nuevoAntes, 'el nuevo de partida no cambia');
+  igual(p.personal.map((x) => x.nombre), ['Ana Prueba', 'Luis Ejemplo'], 'sin repetir al capataz');
+  igual([p.usaMaquinaria, p.maquinas], [true, [{ descripcion: 'Bateadora pequeña', otro: false }]]);
+  igual([p.usaVehiculos, p.vehiculos], [true, [{ descripcion: 'Furgoneta prueba', matricula: '0000-XXX', otro: false }]]);
+  cierto(p.maquinas[0] !== previo.maquinas[0], 'las máquinas son una copia, no las mismas');
+  igual([p.medidas, p.medidasOtrasSi, p.medidasOtras, p.antiincendios], [['Batefuegos'], true, 'Cuba', 'Batefuegos; Otras: Cuba']);
+  // Lo que no se copia: sigue como en el parte nuevo.
+  igual([p.ref, p.fecha, p.nocturna, p.trabajos, p.formato1, p.usaExtras, p.extras, p.observaciones],
+    ['SUP-9002', '2026-10-15', false, [], [], null, [], ''], 'fecha, trabajos, extras, formato 1 y observaciones');
+  // Solo lo marcado.
+  const q = modelo.repetirParte(nuevo, previo, ['vehiculos'], lista);
+  igual([q.personal.length, q.usaMaquinaria, q.usaVehiculos, q.medidas], [1, null, true, []]);
+  // «No» se copia como «No», sin lista.
+  const r = modelo.repetirParte(nuevo, { ...previo, usaMaquinaria: false, maquinas: [{ descripcion: 'x' }] }, ['maquinas'], lista);
+  igual([r.usaMaquinaria, r.maquinas], [false, []]);
+});
+
 // ---------- referencia, carpeta y nombres ----------
 
 prueba('referencia del trabajo', () => {

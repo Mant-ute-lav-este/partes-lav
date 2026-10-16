@@ -1,7 +1,7 @@
 // Datos del parte: listas fijas, partes nuevos de cada apartado y arreglos de los partes
 // guardados por versiones antiguas. Sin pantalla ni estado.
 
-import { uuid } from './util.js';
+import { uuid, normaliza } from './util.js';
 
 export const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 export const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
@@ -121,6 +121,86 @@ export function normalizarParte(p) {
     p.medidas = [];
     p.medidasOtras = p.antiincendios || '';
     p.medidasOtrasSi = Boolean(p.medidasOtras.trim());
+  }
+  return p;
+}
+
+// ---------- Repetir el parte anterior ----------
+// Al crear un INFRA o un SUPER se ofrece empezar igual que el último del mismo tipo: personal,
+// maquinaria, vehículos y medidas antiincendios. Trabajos, horas extra, fotos, formato 1 y
+// observaciones no se copian; la fecha y la jornada nocturna salen como en un parte nuevo.
+
+/** Último parte del tipo dado: el de fecha más reciente y, a igual fecha, el último tocado. */
+export function ultimoParteDe(partes, tipo) {
+  return partes
+    .filter((x) => x.tipo === tipo)
+    .sort((a, b) => `${b.fecha}${b.modificado}`.localeCompare(`${a.fecha}${a.modificado}`))[0] || null;
+}
+
+const nombres = (ps) => {
+  const n = ps.map((x) => x.nombre);
+  return n.length > 3 ? `${n.slice(0, 3).join(', ')} y ${n.length - 3} más` : n.join(', ');
+};
+const textoUsa = (usa, xs) => (usa ? `Sí · ${xs.map(textoEquipo).filter(Boolean).join(', ') || 'sin elegir'}` : 'No');
+
+/**
+ * Apartados del parte anterior que se pueden copiar, para la hoja «¿Empezar igual…?».
+ * Solo salen los que tienen algo: sin ninguno, no hace falta preguntar.
+ * @param {object} previo parte anterior
+ * @param {string} capataz el capataz no cuenta: ya va en el parte nuevo
+ * @param {string[]} medidasLista medidas de la lista de la oficina (las que ya no estén no se copian)
+ * @returns {{clave: string, titulo: string, detalle: string}[]}
+ */
+export function apartadosCopiables(previo, capataz, medidasLista) {
+  const r = [];
+  const ya = normaliza(capataz);
+  const gente = (previo.personal || []).filter((x) => x.nombre && normaliza(x.nombre) !== ya);
+  if (gente.length) r.push({ clave: 'personal', titulo: 'Personal', detalle: `${gente.length} persona(s): ${nombres(gente)}` });
+  // Los partes de antes de v0.6.0 no separaban maquinaria y vehículos: no se copian.
+  if (Array.isArray(previo.maquinas)) {
+    if (previo.usaMaquinaria != null) r.push({ clave: 'maquinas', titulo: 'Maquinaria', detalle: textoUsa(previo.usaMaquinaria, previo.maquinas) });
+    if (previo.usaVehiculos != null) r.push({ clave: 'vehiculos', titulo: 'Vehículos', detalle: textoUsa(previo.usaVehiculos, previo.vehiculos || []) });
+  }
+  const medidas = (previo.medidas || []).filter((m) => medidasLista.includes(m));
+  const otras = previo.medidasOtrasSi && (previo.medidasOtras || '').trim();
+  if (medidas.length || otras) {
+    r.push({ clave: 'medidas', titulo: 'Medidas antiincendios', detalle: [`${medidas.length} medida(s)`, otras && 'y otras'].filter(Boolean).join(' ') });
+  }
+  return r;
+}
+
+/**
+ * Parte nuevo con los apartados elegidos copiados del anterior. No cambia ni el nuevo ni el
+ * anterior: devuelve uno nuevo.
+ * @param {object} nuevo parte recién creado (con el capataz en el personal)
+ * @param {object} previo parte anterior
+ * @param {string[]} claves apartados que copiar: personal, maquinas, vehiculos, medidas
+ * @param {string[]} medidasLista medidas de la lista de la oficina
+ */
+export function repetirParte(nuevo, previo, claves, medidasLista) {
+  const p = structuredClone(nuevo);
+  const copia = (xs) => (xs || []).map((x) => ({ ...x }));
+  if (claves.includes('personal')) {
+    const ya = new Set(p.personal.map((x) => normaliza(x.nombre)));
+    for (const x of previo.personal || []) {
+      if (x.nombre && !ya.has(normaliza(x.nombre))) { p.personal.push(persona(x)); ya.add(normaliza(x.nombre)); }
+    }
+  }
+  if (Array.isArray(previo.maquinas)) {
+    if (claves.includes('maquinas') && previo.usaMaquinaria != null) {
+      p.usaMaquinaria = previo.usaMaquinaria;
+      p.maquinas = previo.usaMaquinaria ? copia(previo.maquinas) : [];
+    }
+    if (claves.includes('vehiculos') && previo.usaVehiculos != null) {
+      p.usaVehiculos = previo.usaVehiculos;
+      p.vehiculos = previo.usaVehiculos ? copia(previo.vehiculos) : [];
+    }
+  }
+  if (claves.includes('medidas')) {
+    p.medidas = (previo.medidas || []).filter((m) => medidasLista.includes(m));
+    p.medidasOtrasSi = Boolean(previo.medidasOtrasSi && (previo.medidasOtras || '').trim());
+    p.medidasOtras = p.medidasOtrasSi ? previo.medidasOtras : '';
+    p.antiincendios = textoMedidas(p);
   }
   return p;
 }
