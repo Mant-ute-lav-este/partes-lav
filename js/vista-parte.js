@@ -39,6 +39,7 @@ export function vParte() {
   return `
   ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
   <main class="contenido con-pie">
+    ${estado.avisoCopia ? `<div class="aviso">${esc(estado.avisoCopia)}</div>` : ''}
     ${p.rectificaA ? `<div class="aviso">Corrección del parte (revisión ${p.rectificaA.rev}). Al enviarla, la oficina guardará las dos versiones.</div>` : ''}
     <section class="tarjeta">
       <h2>Jornada</h2>

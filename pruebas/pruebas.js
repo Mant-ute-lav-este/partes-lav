@@ -784,7 +784,7 @@ async function pantalla(preparar, ...esperados) {
   Object.assign(estado, {
     vista: 'inicio', config: ej.config, perfil: perfilEjemplo(), reg: {}, otros: [], lista: [], parte: null, trabajoIdx: null,
     busqueda: '', otroAbierto: false, errores: [], menu: false, eligeMaquina: false, fotoVista: null, procesando: '',
-    envio: null, preguntaOtro: false, preguntaExtras: false,
+    envio: null, preguntaOtro: false, preguntaExtras: false, repetir: null, avisoCopia: '',
   });
   preparar(estado);
   render();
@@ -861,11 +861,50 @@ prueba('pantallas: parte nuevo de los 5 tipos', async () => {
   for (const [tipo, maquina, prefijo, texto] of casos) {
     Object.assign(m.estado, { config: ej.config, perfil: perfilEjemplo(), parte: null, vista: 'inicio', errores: [] });
     await nuevoParte(tipo, maquina);
+    // Si ya hay un parte anterior del mismo tipo, pregunta si copiarlo: aquí, en blanco.
+    if (m.estado.repetir) await f.contentWindow.moduloInicio.contestarRepetir(false);
     await new Promise((r) => setTimeout(r, 100));
     if (errores.length) throw new Error(`errores al crear ${prefijo}: ${errores.splice(0).join(' | ')}`);
     igual(m.estado.vista, 'parte', `${prefijo} abre el parte`);
     cierto(m.estado.parte.ref.startsWith(prefijo), `referencia ${m.estado.parte.ref}`);
     cierto(m.app.textContent.includes(texto), `en el parte ${prefijo} falta «${texto}»`);
+  }
+});
+
+prueba('pantallas: parte nuevo igual que el anterior', async () => {
+  const { f, m, errores } = await appEnMarco();
+  const { nuevoParte, contestarRepetir } = f.contentWindow.moduloInicio;
+  f.contentWindow.confirm = () => true;
+  const previo = { ...ej.parteSuper(), id: crypto.randomUUID(), ref: 'SUP-8001', fecha: '2099-01-01' };   // el más reciente
+  Object.assign(m.estado, { config: ej.config, perfil: perfilEjemplo(), parte: previo, vista: 'inicio', errores: [] });
+  await m.guardarYa();
+  m.estado.parte = null;
+  try {
+    await nuevoParte('SUPER');
+    igual(m.estado.vista, 'inicio', 'antes de crear, pregunta');
+    cierto(m.app.textContent.includes('¿Empezar igual que el último parte?') && m.app.textContent.includes('SUP-8001'), 'sale la hoja');
+    cierto(m.app.textContent.includes('Luis Ejemplo'), 'dice a quién copia');
+    // Desmarca vehículos y copia el resto.
+    m.app.querySelector('[data-repetir="vehiculos"]').checked = false;
+    await contestarRepetir(true);
+    await new Promise((r) => setTimeout(r, 100));
+    if (errores.length) throw new Error(errores.splice(0).join(' | '));
+    const p = m.estado.parte;
+    igual(m.estado.vista, 'parte');
+    cierto(p.id !== previo.id && p.ref !== 'SUP-8001', 'es un parte nuevo');
+    igual(p.personal.map((x) => x.nombre), ['Ana Prueba', 'Luis Ejemplo']);
+    igual([p.usaMaquinaria, p.maquinas.length, p.usaVehiculos, p.medidas], [true, 1, null, ['Extintor en el vehículo']]);
+    igual([p.trabajos.length, p.formato1.length, p.usaExtras], [0, 0, null], 'sin trabajos, formato 1 ni extras');
+    cierto(m.app.textContent.includes('Copiado del SUP-8001'), 'aviso en el parte');
+    // «No, empezar en blanco».
+    await m.ir('inicio');
+    await nuevoParte('SUPER');
+    await contestarRepetir(false);
+    igual(m.estado.parte.personal.length, 1, 'en blanco: solo el capataz');
+    cierto(!m.app.textContent.includes('Copiado del'), 'sin aviso');
+  } finally {
+    const db = await import('../js/db.js');
+    for (const p of await db.listarPartes()) if (p.fecha === '2099-01-01' || p.estado === 'borrador') await db.borrarParte(p.id);
   }
 });
 

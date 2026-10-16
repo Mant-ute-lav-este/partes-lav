@@ -15,7 +15,7 @@ import { aplicarHora, aplicarPk, conEspera } from './campos.js';
 import {
   ITER_PIN, pintarNombres, terminarAcceso, cerrarSesion, hashPin, cargarConfigArchivo, guardarConfig,
 } from './vista-acceso.js';
-import { nuevoParte } from './vista-inicio.js';
+import { nuevoParte, contestarRepetir } from './vista-inicio.js';
 import { aplicarExtra, extrasATodos } from './vista-extras.js';
 import { pintarResultados, copiarPersonal, anadirOtro, borrarParte, cerrarParte } from './vista-parte.js';
 import {
@@ -367,6 +367,9 @@ export async function onClick(e) {
       break;
     }
     case 'cerrar-eleccion': estado.eligeMaquina = false; render(); break;
+    case 'repetir-si': contestarRepetir(true); break;
+    case 'repetir-no': contestarRepetir(false); break;
+    case 'cerrar-repetir': estado.repetir = null; render(); break;
     case 'nuevo-realizado': p.realizados.push(nuevoRealizado()); await guardarYa(); render(); break;
     case 'quitar-realizado':
       if (confirm(`¿Quitar el trabajo ${i + 1}?`)) { p.realizados.splice(i, 1); guardarPronto(); render(); }

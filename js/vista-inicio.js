@@ -4,8 +4,10 @@
 import * as db from './db.js';
 import { esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora } from './util.js';
 import { SUBTIPOS_MAQ, subtipoDe } from './validaciones.js';
-import { PREFIJO_REF, nuevaMaquinaVia, nuevoTajo, nuevoRealizado } from './modelo.js';
-import { estado, ir, guardarYa, maquinasViaCfg, capatazComoPersona } from './estado.js';
+import {
+  PREFIJO_REF, nuevaMaquinaVia, nuevoTajo, nuevoRealizado, ultimoParteDe, apartadosCopiables, repetirParte,
+} from './modelo.js';
+import { estado, ir, render, guardarYa, maquinasViaCfg, capatazComoPersona, medidasCfg } from './estado.js';
 import { inputConfig } from './vista-acceso.js';
 import { APP_VERSION } from './app.js';
 
@@ -85,7 +87,8 @@ export function vInicio() {
     ${ps.length ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p>'}
   </main>
   ${estado.menu ? vMenu() : ''}
-  ${estado.eligeMaquina ? vElegirMaquina() : ''}`;
+  ${estado.eligeMaquina ? vElegirMaquina() : ''}
+  ${estado.repetir ? vRepetir() : ''}`;
 }
 
 export function vMenu() {
@@ -128,6 +131,33 @@ export async function nuevoParte(tipo, maquina = null) {
   const nombreTipo = sub && sub !== 'via' ? sub : tipo;
   if (lista.some((p) => p.tipo === tipo && (p.subtipo || 'via') === (sub || 'via') && p.fecha === fecha && !p.rectificaA) &&
       !confirm(`Ya tienes un parte ${nombreTipo} del ${fmtFecha(fecha)}. ¿Quieres empezar otro?`)) return;
+  // INFRA y SUPER: si hay un parte anterior del mismo tipo con algo que copiar, se pregunta antes.
+  if (!sub) {
+    const previo = ultimoParteDe(lista, tipo);
+    const apartados = previo ? apartadosCopiables(previo, estado.perfil.capataz, medidasCfg()) : [];
+    if (apartados.length) {
+      estado.repetir = { tipo, previoId: previo.id, ref: previo.ref, rev: previo.rev, fecha: previo.fecha, nocturna: previo.nocturna, apartados, nuevo: { fecha, nocturna } };
+      render();
+      return;
+    }
+  }
+  await crearParte(tipo, maquina, sub, fecha, nocturna);
+}
+
+/**
+ * Respuesta a «¿Empezar igual que el último parte?»: con `si`, copia los apartados marcados.
+ * El número de parte no se gasta hasta aquí.
+ */
+export async function contestarRepetir(si) {
+  const r = estado.repetir;
+  if (!r) return;
+  const claves = si ? [...document.querySelectorAll('[data-repetir]:checked')].map((x) => x.dataset.repetir) : [];
+  estado.repetir = null;
+  const previo = claves.length ? await db.getParte(r.previoId) : null;
+  await crearParte(r.tipo, null, null, r.nuevo.fecha, r.nuevo.nocturna, previo ? { previo, claves } : null);
+}
+
+async function crearParte(tipo, maquina, sub, fecha, nocturna, copia = null) {
   // Locomotora y dresina llevan su propia numeración (LOC-, DRE-); el de vía sigue con MAQ-.
   const prefijo = sub ? SUBTIPOS_MAQ[sub].prefijo : PREFIJO_REF[tipo];
   const clave = sub && sub !== 'via' ? `contador-${prefijo}` : `contador-${tipo}`;
@@ -193,8 +223,28 @@ export async function nuevoParte(tipo, maquina = null) {
         : { uicPlataforma: '', telefonemas: { entrada: { numero: '', hora: '' }, salida: { numero: '', hora: '' } } }),
     });
   }
+  if (copia) {
+    estado.parte = repetirParte(estado.parte, copia.previo, copia.claves, medidasCfg());
+    estado.avisoCopia = `Copiado del ${copia.previo.ref} (${fmtFecha(copia.previo.fecha)}). Revisa quién ha venido hoy y los equipos.`;
+  }
   await guardarYa();
   ir('parte');
+}
+
+/** «¿Empezar igual que el último parte?»: casillas con lo que se puede copiar, todas marcadas. */
+export function vRepetir() {
+  const r = estado.repetir;
+  return `
+  <div class="capa" data-action="cerrar-repetir"><div class="hoja" data-stop>
+    <h2>¿Empezar igual que el último parte?</h2>
+    <p class="nota">${esc(r.ref)}${r.rev > 1 ? ` rev. ${r.rev}` : ''} · ${fmtFecha(r.fecha)}${r.nocturna ? ' · noche' : ''}</p>
+    ${r.apartados.map((a) => `
+    <label class="check"><input type="checkbox" data-repetir="${a.clave}" checked>
+      <span>${esc(a.titulo)}<br><small>${esc(a.detalle)}</small></span></label>`).join('')}
+    <p class="nota">No se copian los trabajos, las horas extra, las fotos${r.tipo === 'SUPER' ? ', el formato 1' : ''} ni las observaciones.</p>
+    <button class="btn primario grande" data-action="repetir-si">Sí, copiar lo marcado</button>
+    <button class="btn secundario" data-action="repetir-no">No, empezar en blanco</button>
+  </div></div>`;
 }
 
 /** Al pulsar MAQUINARIA: primero la máquina, que decide qué parte se rellena. */

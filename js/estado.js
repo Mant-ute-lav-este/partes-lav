@@ -40,6 +40,8 @@ export const estado = {
   cambiandoPin: false,
   preguntaOtro: false,   // «¿Has hecho otro trabajo?» al terminar el último trabajo
   preguntaExtras: false, // «¿Ha habido horas extra?» al cerrar el parte
+  repetir: null,         // «¿Empezar igual que el último parte?» al crear un INFRA o SUPER
+  avisoCopia: '',        // aviso en el parte recién copiado del anterior
 };
 export const urls = new Map();   // id de foto → URL para las miniaturas
 
@@ -103,6 +105,7 @@ export async function ir(vista) {
   if (vista === 'inicio') {
     estado.parte = null;
     estado.envio = null;
+    estado.avisoCopia = '';
     liberarFotos();
     estado.lista = await db.listarPartes();
   }
@@ -117,6 +120,7 @@ export async function ir(vista) {
   estado.preguntaOtro = false;
   estado.preguntaExtras = false;
   estado.eligeMaquina = false;
+  estado.repetir = null;
   render();
   window.scrollTo(0, 0);
   if (vista === 'envio') prepararEnvioActual();
@@ -134,7 +138,7 @@ export function render() {
     (estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : '');
   window.scrollTo(0, y);
   document.body.classList.toggle('sin-scroll',
-    Boolean(estado.menu || estado.eligeMaquina || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
+    Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
   pintarResultados();
   pintarNombres();
   cargarMiniaturas();
