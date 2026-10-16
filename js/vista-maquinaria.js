@@ -2,7 +2,7 @@
 // (vagones y balasto) y de dresina (plataforma y telefonemas).
 
 import { esc } from './util.js';
-import { semanaIso, numeroValido, aNumero, faltasTajo, faltasRealizado, subtipoDe, puestosDe } from './validaciones.js';
+import { semanaIso, numeroValido, aNumero, faltasTajo, faltasRealizado, subtipoDe, puestosDe, puestosObligatorios, llevaEvb } from './validaciones.js';
 import { MAX_TOLVA, MODOS_NIVELADO, MODOS_ALINEADO, CUANDO_REGISTRO, normalizarParte } from './modelo.js';
 import { estado, maquinasDeVia, personalMaqCfg } from './estado.js';
 import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores } from './campos.js';
@@ -85,8 +85,15 @@ export function seccionMaquinasVia(p) {
     </section>`;
 }
 
+/** Vía y dresina: ¿va en entrega de vía bloqueada? De eso dependen los puestos obligatorios. */
+export function campoEvb(p) {
+  return `<div class="campo"><span>¿Va en entrega de vía bloqueada (EVB)? <span class="oblig">obligatorio</span></span>${siNo('evb', p.evb)}</div>`;
+}
+
 export function seccionPersonalMaq(p) {
   const lista = personalMaqCfg();
+  const oblig = puestosObligatorios(p);
+  const sinEvb = llevaEvb(p) && p.evb !== true && p.evb !== false;
   const bloques = puestosDe(p).map(([clave, titulo, varios]) => {
     const gente = p.personal.map((x, i) => ({ x, i })).filter(({ x }) => x.puesto === clave);
     const filas = gente.map(({ x, i }) => `
@@ -102,12 +109,13 @@ export function seccionPersonalMaq(p) {
           ${lista.map((c, j) => `<option value="${j}">${esc(c.nombre)}</option>`).join('')}
           <option value="otro">Otra persona (escribirla)</option>
         </select>` : '';
-    return `<div class="campo"><span>${titulo}</span>${filas}${anadir}</div>`;
+    return `<div class="campo"><span>${titulo}${oblig.includes(clave) ? ' <span class="oblig">obligatorio</span>' : ''}</span>${filas}${anadir}</div>`;
   }).join('');
   return `
     <section class="tarjeta">
       <h2>Personal <span class="contador">${p.personal.length}</span></h2>
-      <p class="nota">Elige quién ocupa cada puesto. Los puestos pueden quedar vacíos.</p>
+      <p class="nota">${sinEvb ? 'Contesta arriba si va en EVB: de eso depende qué puestos son obligatorios.'
+    : 'Elige quién ocupa cada puesto. Los que no son obligatorios pueden quedar vacíos.'}</p>
       ${bloques}
     </section>`;
 }
@@ -124,6 +132,7 @@ export function vParteMaq() {
       <h2>Jornada</h2>
       <label class="campo"><span>Fecha <small>(si es de noche, el día en que empieza)</small></span><input type="date" data-bind="fecha" value="${esc(p.fecha)}"></label>
       <div class="dos">${campoHora('Horario: inicio', 'horaInicio', p.horaInicio)}${campoHora('Horario: fin', 'horaFin', p.horaFin)}</div>
+      ${campoEvb(p)}
       <div class="campo"><span>Lo rellena</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
     </section>
 
@@ -224,6 +233,7 @@ export function vParteLD() {
       <label class="campo"><span>Fecha</span><input type="date" data-bind="fecha" data-rerender value="${esc(p.fecha)}"></label>
       <div class="dos"><div class="campo"><span>Semana</span><div class="valor-fijo">${semanaIso(p.fecha)}</div></div>
         ${campo('Nº de acta', 'acta', p.acta, 'autocomplete="off"')}</div>
+      ${loco ? '' : campoEvb(p)}
       <div class="campo"><span>Lo rellena</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
     </section>
 

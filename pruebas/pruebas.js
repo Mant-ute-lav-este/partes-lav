@@ -878,9 +878,9 @@ prueba('pantallas: trabajo de INFRA', async () => {
 });
 
 prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {
-  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo', 'entrega de vía bloqueada (EVB)');
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco()); }, 'LOC-9001', 'Vagones', 'Trabajo realizado', 'Responsable de trabajos');
-  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco('dresina')); }, 'DRE-9001', 'Telefonemas', 'ET / al amparo de');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco('dresina')); }, 'DRE-9001', 'Telefonemas', 'ET / al amparo de', 'entrega de vía bloqueada (EVB)', 'OMI', 'Piloto');
 });
 
 prueba('pantallas: parte nuevo de los 5 tipos', async () => {
