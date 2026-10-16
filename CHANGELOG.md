@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.13.1 · 2026-10-16
+- **Guía rápida (PDF)**: explica «No realizado» (con su motivo, sin horas de vía, PK ni fotos) y la casilla «No se han podido hacer fotos» (con motivo; sale en rojo para la oficina).
+
 ## 0.13.0 · 2026-10-16
 - **Trabajo no realizado** (INFRA y SUPER): «¿Trabajo finalizado?» tiene tres botones: Sí / No, sin terminar / No realizado. Con «No realizado» hay que elegir por qué (lluvia, sin corte de vía, falta de material, falta de personal o maquinaria, u otro escrito), y ya no se piden horas de vía, PK ni fotos. Se siguen pidiendo la referencia, la línea y el motivo de actuación. En el PDF, ¿FIN? pone «NO REALIZADO» y el motivo va en la descripción; en el correo, «[NO REALIZADO: motivo]».
 - **No se han podido hacer fotos**: casilla en las fotos de cada trabajo, con motivo obligatorio (prohibido fotografiar, móvil sin batería o sin cámara, sin luz, u otro escrito). Permite cerrar el parte sin esas fotos, pero sale **en rojo** en el PDF y como aviso en el correo para la oficina.
