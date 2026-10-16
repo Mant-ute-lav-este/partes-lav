@@ -164,7 +164,7 @@ export function apartadosCopiables(previo, capataz, medidasLista) {
   const medidas = (previo.medidas || []).filter((m) => medidasLista.includes(m));
   const otras = previo.medidasOtrasSi && (previo.medidasOtras || '').trim();
   if (medidas.length || otras) {
-    r.push({ clave: 'medidas', titulo: 'Medidas antiincendios', detalle: [`${medidas.length} medida(s)`, otras && 'y otras'].filter(Boolean).join(' ') });
+    r.push({ clave: 'medidas', titulo: 'Medidas antiincendios', detalle: [medidas.length && `${medidas.length} medida(s)`, otras && `Otras: ${otras}`].filter(Boolean).join(' · ') });
   }
   return r;
 }

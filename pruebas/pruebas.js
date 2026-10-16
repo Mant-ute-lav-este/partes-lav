@@ -348,7 +348,7 @@ prueba('modelo: qué se puede copiar del parte anterior', () => {
     { clave: 'personal', titulo: 'Personal', detalle: '4 persona(s): Luis Ejemplo, Eva Inventada, Pau Ficticio y 1 más' },
     { clave: 'maquinas', titulo: 'Maquinaria', detalle: 'Sí · Bateadora pequeña' },
     { clave: 'vehiculos', titulo: 'Vehículos', detalle: 'Sí · Furgoneta prueba · 0000-XXX' },
-    { clave: 'medidas', titulo: 'Medidas antiincendios', detalle: '1 medida(s) y otras' },
+    { clave: 'medidas', titulo: 'Medidas antiincendios', detalle: '1 medida(s) · Otras: Cuba' },
   ]);
   // Solo el capataz, maquinaria sin contestar, vehículos «No» y medidas que ya no están en la lista.
   const flojo = { ...ej.parteInfra(), personal: [{ nombre: 'ANA PRUEBA' }], usaMaquinaria: null, usaVehiculos: false, medidas: ['Medida antigua'] };
