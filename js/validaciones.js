@@ -55,7 +55,8 @@ export function extrasDelParte(p) {
 /**
  * Lo que le falta a un trabajo para poder cerrar el parte: { corto } para la lista de trabajos
  * y { largo } para el aviso al cerrar. Fotos: antes y después; si el trabajo no está terminado,
- * basta con una de durante o de después.
+ * basta con una de durante o de después. Un trabajo no realizado, o sin fotos posibles, pide el
+ * motivo en vez de las fotos (y el no realizado, tampoco horas, vía ni PK).
  */
 export function faltasTrabajo(t) {
   const e = [];
@@ -65,7 +66,9 @@ export function faltasTrabajo(t) {
   if (!r.tipo) add('referencia', 'elige la referencia (SIOS, incidencia o sin referencia).');
   else if (r.tipo === 'SIN_REF' && vacio(r.motivo)) add('referencia escrita', 'escribe la referencia (has elegido «Sin referencia»).');
   else if (r.tipo !== 'SIN_REF' && vacio(r.codigo)) add(`nº de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}`, `falta el número de ${r.tipo === 'SIOS' ? 'SIOS' : 'incidencia'}.`);
-  if (!t.sinVia) {
+  if (t.noRealizado) {
+    // Trabajo no realizado: horas, vía y PK son opcionales (se ponen si se llegó a ocupar la vía).
+  } else if (!t.sinVia) {
     if (!horaValida(t.entradaVia)) add('entrada en vía', 'falta la hora de entrada en vía.');
     if (!horaValida(t.salidaVia)) add('salida de vía', 'falta la hora de salida de vía.');
     if (vacio(t.via)) add('vía', 'falta la vía.');
@@ -79,6 +82,21 @@ export function faltasTrabajo(t) {
   if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');
   if (t.motivoOtro && vacio(t.motivoActuacion)) add('motivo', 'has elegido «Otro» motivo de actuación: escríbelo.');
   else if (vacio(t.motivoActuacion)) add('motivo', 'elige el motivo de actuación.');
+  // Sin realizar o sin fotos posibles: en vez de las fotos se pide el motivo.
+  if (t.noRealizado) {
+    if (vacio(t.motivoNoRealizado)) {
+      add('por qué no se ha realizado', t.noRealizadoOtro
+        ? 'has elegido «Otro» motivo de no realizado: escríbelo.' : 'indica por qué no se ha realizado.');
+    }
+    return e;
+  }
+  if (t.sinFotos) {
+    if (vacio(t.motivoSinFotos)) {
+      add('por qué no hay fotos', t.sinFotosOtro
+        ? 'has elegido «Otro» motivo para no hacer fotos: escríbelo.' : 'indica por qué no se han podido hacer fotos.');
+    }
+    return e;
+  }
   const hay = (fase) => t.fotos.some((f) => f.fase === fase);
   if (!hay('antes')) add('foto de antes', 'falta al menos una foto de ANTES.');
   if (t.finalizado === false) {

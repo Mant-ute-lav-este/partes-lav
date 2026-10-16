@@ -121,14 +121,16 @@ export function resumenTrabajo(t, i) {
   const ubic = [t.linea && `Línea ${t.linea}`, t.via && `vía ${t.via}`, t.aparato,
     t.pkInicio && `PK ${t.pkInicio}${t.pkFin ? ` – ${t.pkFin}` : ''}`].filter(Boolean).join(' · ');
   const n = (f) => t.fotos.filter((x) => x.fase === f).length;
-  const fin = t.finalizado === true ? 'Finalizado' : t.finalizado === false ? 'Sin finalizar' : '¿Finalizado?';
+  const fin = t.noRealizado ? `<span class="mini">No realizado${t.motivoNoRealizado ? ` · ${esc(t.motivoNoRealizado)}` : ''}</span>`
+    : t.finalizado === true ? 'Finalizado' : t.finalizado === false ? 'Sin finalizar' : '¿Finalizado?';
+  const sinFotos = !t.noRealizado && t.sinFotos ? ` · <span class="mini">Sin fotos${t.motivoSinFotos ? `: ${esc(t.motivoSinFotos)}` : ''}</span>` : '';
   const faltas = faltasTrabajo(t);
   return `
   <button class="item item-trabajo ${faltas.length ? 'incompleto' : 'completo'}" data-action="editar-trabajo" data-i="${i}">
     <span class="num">${faltas.length ? i + 1 : '✓'}</span>
     <span class="item-info"><strong>${esc(textoReferencia(t) || 'Sin referencia todavía')}</strong>
       ${ubic ? `<br><small>${esc(ubic)}</small>` : ''}
-      <br><small>${fin} · fotos: ${n('antes')} antes, ${n('durante')} durante, ${n('despues')} después</small>
+      <br><small>${fin} · fotos: ${n('antes')} antes, ${n('durante')} durante, ${n('despues')} después${sinFotos}</small>
       <br>${faltas.length
     ? `<small class="falta">Falta: ${esc(faltas.map((f) => f.corto).join(', '))}</small>`
     : '<small class="listo">Completo</small>'}</span>

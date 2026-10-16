@@ -2,6 +2,12 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.13.0 · 2026-10-16
+- **Trabajo no realizado** (INFRA y SUPER): «¿Trabajo finalizado?» tiene tres botones: Sí / No, sin terminar / No realizado. Con «No realizado» hay que elegir por qué (lluvia, sin corte de vía, falta de material, falta de personal o maquinaria, u otro escrito), y ya no se piden horas de vía, PK ni fotos. Se siguen pidiendo la referencia, la línea y el motivo de actuación. En el PDF, ¿FIN? pone «NO REALIZADO» y el motivo va en la descripción; en el correo, «[NO REALIZADO: motivo]».
+- **No se han podido hacer fotos**: casilla en las fotos de cada trabajo, con motivo obligatorio (prohibido fotografiar, móvil sin batería o sin cámara, sin luz, u otro escrito). Permite cerrar el parte sin esas fotos, pero sale **en rojo** en el PDF y como aviso en el correo para la oficina.
+- La columna ¿FIN? del PDF de INFRA/SUPER es algo más ancha (la descripción, algo más estrecha).
+- Campos nuevos en cada trabajo: `noRealizado`, `motivoNoRealizado`, `sinFotos`, `motivoSinFotos` (y `noRealizadoOtro`, `sinFotosOtro`). Los partes anteriores se leen como siempre.
+
 ## 0.12.0 · 2026-10-16
 - **Orden interno, sin cambios para el capataz**: `js/app.js` (unas 2750 líneas) se reparte en módulos por tema (estado, validaciones, modelo, campos, una vista por pantalla y eventos). Las pantallas, los textos y el formato de los partes guardados son los mismos.
 - **Pruebas automáticas**: de 31 a 50. Se prueban las validaciones de los 5 tipos de parte con sus textos exactos, se pintan todas las pantallas y se crea un parte nuevo de cada tipo.

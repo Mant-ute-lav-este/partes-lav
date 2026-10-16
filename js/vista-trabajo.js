@@ -6,7 +6,7 @@ import { procesarFoto } from './fotos.js';
 import { registrarFallo } from './fallos.js';
 import { esc, uuid, isoLocal, toast, FORMATO1, MAX_FORMATO1, LADO_FORMATO1 } from './util.js';
 import { faltasTrabajo } from './validaciones.js';
-import { FASES, LINEAS } from './modelo.js';
+import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS } from './modelo.js';
 import { app, estado, urls, ir, render, guardarYa, guardarPronto, motivosCfg } from './estado.js';
 import { cabeceraParte, campo, campoHora, campoPk, radio } from './campos.js';
 
@@ -38,6 +38,10 @@ export function nuevoTrabajo() {
     metrosLineales: null,
     motivoActuacion: '',
     finalizado: null,
+    noRealizado: false,       // «No realizado» (lluvia, sin corte…): pide el motivo en vez de horas, PK y fotos
+    motivoNoRealizado: '',
+    sinFotos: false,          // «No se han podido hacer fotos»: pide el motivo en vez de las fotos
+    motivoSinFotos: '',
     descripcion: '',
     fotos: [],
   });
@@ -61,6 +65,24 @@ export function campoMotivo(p, t, b) {
           <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
         </select>
         ${otro ? `<input data-bind="${b}.motivoActuacion" value="${esc(m)}" placeholder="Escribe el motivo" autocomplete="off">` : ''}
+      </div>`;
+}
+
+/**
+ * Motivo de una lista fija (no realizado, sin fotos) más «Otro» para escribirlo. Guarda el texto en
+ * t[campo] y si es «Otro» en t[campoOtro].
+ */
+function campoMotivoLista(titulo, b, t, campo, campoOtro, lista) {
+  const m = t[campo] || '';
+  const otro = t[campoOtro] || (m && !lista.includes(m));
+  return `
+      <div class="campo"><span>${titulo} <span class="oblig">obligatorio</span></span>
+        <select data-motivo-lista="${b}" data-campo="${campo}" data-otro="${campoOtro}" aria-label="${titulo}">
+          <option value="">Elige el motivo…</option>
+          ${lista.map((x) => `<option value="${esc(x)}" ${!otro && x === m ? 'selected' : ''}>${esc(x)}</option>`).join('')}
+          <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
+        </select>
+        ${otro ? `<input data-bind="${b}.${campo}" value="${esc(m)}" placeholder="Escribe el motivo" autocomplete="off">` : ''}
       </div>`;
 }
 
@@ -122,10 +144,12 @@ export function vTrabajo() {
   const b = `trabajos.${i}`;
   const r = t.referencia;
   const rr = `${b}.referencia.tipo`;
-  const fin = t.finalizado === true ? 'si' : t.finalizado === false ? 'no' : '';
+  const fin = t.noRealizado ? 'noreal' : t.finalizado === true ? 'si' : t.finalizado === false ? 'no' : '';
   const previo = i > 0 ? p.trabajos[i - 1] : null;
   const sinTocar = !t.via && !t.entradaVia && !t.salidaVia && !t.telefonema.numero && !t.pidame;
-  const sinTerminar = t.finalizado === false;
+  const sinTerminar = t.finalizado === false && !t.noRealizado;
+  const fotosOpcionales = t.noRealizado || t.sinFotos;
+  const opcionFin = (v, txt) => `<label><input type="radio" name="${b}.fin" value="${v}" data-fin="${b}" ${fin === v ? 'checked' : ''}><span>${txt}</span></label>`;
   return `
   ${cabeceraParte('volver-parte', 'Parte', `Trabajo ${i + 1} · ${esc(p.ref)}`)}
   <main class="contenido con-pie">
@@ -178,19 +202,25 @@ export function vTrabajo() {
       ${campo('Metros lineales <small>(opcional)</small>', `${b}.metrosLineales`, t.metrosLineales, 'type="number" inputmode="decimal" min="0" step="any"')}
       <label class="campo"><span>Descripción <small>(opcional)</small></span><textarea data-bind="${b}.descripcion" rows="3">${esc(t.descripcion)}</textarea></label>
       <div class="campo"><span>¿Trabajo finalizado?</span>
-        <div class="segmentado">${radio(`${b}.finalizado`, 'si', 'Sí', fin, 'data-tipo="bool" data-rerender')}${radio(`${b}.finalizado`, 'no', 'No', fin, 'data-tipo="bool" data-rerender')}</div></div>
+        <div class="segmentado">${opcionFin('si', 'Sí')}${opcionFin('no', 'No, sin terminar')}${opcionFin('noreal', 'No realizado')}</div></div>
+      ${t.noRealizado ? `
+      ${campoMotivoLista('¿Por qué no se ha realizado?', b, t, 'motivoNoRealizado', 'noRealizadoOtro', MOTIVOS_NO_REALIZADO)}
+      <p class="nota">No hace falta poner horas de vía, PK ni fotos. Si llegasteis a ocupar la vía, puedes ponerlas igual.</p>` : ''}
     </section>
 
     <section class="tarjeta">
       <h2>Fotos</h2>
-      <p class="nota">${sinTerminar
-    ? 'Trabajo sin terminar: al menos una de <strong>antes</strong> y una de <strong>durante</strong> o de <strong>después</strong>.'
-    : 'Obligatorio: al menos una de <strong>antes</strong> y una de <strong>después</strong>.'}
+      <p class="nota">${t.noRealizado ? 'Opcionales: el trabajo no se ha realizado.'
+    : t.sinFotos ? 'Opcionales: has marcado que no se han podido hacer fotos.'
+    : sinTerminar
+      ? 'Trabajo sin terminar: al menos una de <strong>antes</strong> y una de <strong>durante</strong> o de <strong>después</strong>.'
+      : 'Obligatorio: al menos una de <strong>antes</strong> y una de <strong>después</strong>.'}
         Cada foto lleva fecha, hora y referencia, y se le quita la ubicación.</p>
       ${FASES.map(([f, txt]) => {
     const fs = t.fotos.filter((x) => x.fase === f);
     let marca = '';
-    if (f === 'antes') marca = '<span class="oblig">mín. 1</span>';
+    if (fotosOpcionales) marca = '';
+    else if (f === 'antes') marca = '<span class="oblig">mín. 1</span>';
     else if (sinTerminar) marca = '<span class="oblig">esta o la otra</span>';
     else if (f === 'despues') marca = '<span class="oblig">mín. 1</span>';
     return `
@@ -204,6 +234,12 @@ export function vTrabajo() {
           <button class="mini-foto" data-action="ver-foto" data-id="${x.id}"><img data-foto-id="${x.id}" alt="Foto ${txt.toLowerCase()}"></button>`).join('')}</div>` : ''}
       </div>`;
   }).join('')}
+      ${t.noRealizado ? '' : `
+      <label class="check"><input type="checkbox" data-bind="${b}.sinFotos" data-rerender ${t.sinFotos ? 'checked' : ''}>
+        <span>No se han podido hacer fotos</span></label>
+      ${t.sinFotos ? `
+      ${campoMotivoLista('¿Por qué?', b, t, 'motivoSinFotos', 'sinFotosOtro', MOTIVOS_SIN_FOTOS)}
+      <p class="falta">Saldrá en rojo en el PDF y en el correo para que la oficina lo vea.</p>` : ''}`}
     </section>
 
     <button class="btn peligro-texto" data-action="borrar-trabajo">Eliminar este trabajo</button>

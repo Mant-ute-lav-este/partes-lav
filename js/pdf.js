@@ -70,7 +70,10 @@ function seccion(c, titulo, reserva = 14) {
   c.y += 6;
 }
 
-/** Tabla con cabecera que se repite al saltar de página. cols: [{ t, w, a }]. */
+/**
+ * Tabla con cabecera que se repite al saltar de página. cols: [{ t, w, a }]. Cada celda es un texto
+ * o { t, color, s } para escribirla en otro color (p. ej. los avisos en rojo para la oficina) o tamaño.
+ */
 function tabla(c, cols, filas, { s = 7.5, vacio = '' } = {}) {
   const cab = () => fila(c, cols.map((col) => ({ w: col.w, t: col.t, fill: GRIS, b: true, s: 6.5, a: 'center' })), { minH: 6 });
   if (c.y + 14 > FONDO) nuevaPagina(c);
@@ -80,7 +83,10 @@ function tabla(c, cols, filas, { s = 7.5, vacio = '' } = {}) {
     return;
   }
   for (const f of filas) {
-    const celdas = cols.map((col, i) => ({ w: col.w, t: f[i], s, a: col.a || 'left' }));
+    const celdas = cols.map((col, i) => {
+      const v = f[i] && typeof f[i] === 'object' ? f[i] : { t: f[i] };
+      return { w: col.w, t: v.t, s: v.s || s, a: col.a || 'left', color: v.color };
+    });
     if (c.y + altoFila(c.doc, celdas) > FONDO) { nuevaPagina(c); cab(); }
     fila(c, celdas, { valign: 'top' });
   }
@@ -105,7 +111,21 @@ function contarFotos(t) {
     `${sinFecha ? `\n${sinFecha} sin fecha original` : ''}`;
 }
 
-const FASE_TXT = { antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS' };
+/**
+ * Descripción del trabajo en la tabla: lo escrito, el motivo si no se ha realizado y las fotos.
+ * Sin fotos posibles, la celda va en rojo para que la oficina lo vea.
+ */
+function descripcionTrabajo(t) {
+  const sinFotos = !t.noRealizado && t.sinFotos;
+  const aviso = sinFotos ? `SIN FOTOS: ${t.motivoSinFotos || ''}` : t.noRealizado ? `No realizado: ${t.motivoNoRealizado || ''}` : null;
+  // Sin aviso queda como siempre: la descripción (aunque esté vacía) y debajo las fotos.
+  const texto = aviso
+    ? [aviso, (t.descripcion || '').trim(), contarFotos(t)].filter(Boolean).join('\n')
+    : `${t.descripcion || ''}\n${contarFotos(t)}`;
+  return sinFotos ? { t: texto, color: [170, 0, 0] } : texto;
+}
+
+const FASE_TXT ={ antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS' };
 
 /** Reduce la foto para el anexo del PDF (las originales van aparte, a tamaño completo). */
 async function reducir(blob, lado = 1100, calidad = 0.72) {
@@ -268,7 +288,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' }, { t: 'APARATO', w: 16 },
     { t: 'P.K. INICIO', w: 16, a: 'center' },
     { t: 'P.K. FIN', w: 16, a: 'center' }, { t: 'M. LIN', w: 11, a: 'center' }, { t: 'MOTIVO ACTUACIÓN', w: 26 },
-    { t: '¿FIN?', w: 10, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 218 - (conCoste ? ANCHO_COSTE : 0) },
+    { t: '¿FIN?', w: 17, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 225 - (conCoste ? ANCHO_COSTE : 0) },
   ], parte.trabajos.map((t, i) => [
     String(i + 1),
     textoReferencia(t),
@@ -285,8 +305,8 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     t.pkFin,
     t.metrosLineales == null ? '' : String(t.metrosLineales),
     t.motivoActuacion,
-    t.finalizado === true ? 'SÍ' : t.finalizado === false ? 'NO' : '',
-    `${t.descripcion || ''}\n${contarFotos(t)}`,
+    t.noRealizado ? { t: 'NO\nREALIZADO', s: 6.5 } : t.finalizado === true ? 'SÍ' : t.finalizado === false ? 'NO' : '',
+    descripcionTrabajo(t),
   ]), { vacio: 'Sin trabajos' });
 
   // Maquinaria y vehículos (los partes de antes de v0.6.0 los llevan juntos en una tabla)

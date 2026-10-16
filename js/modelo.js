@@ -65,7 +65,21 @@ export const EQUIPOS = {
 
 export const textoEquipo = (x) => [x.descripcion, x.matricula].filter(Boolean).join(' · ');
 
-export const TIPOS_EXTRA = [['normales', 'Normales'], ['nocturnas', 'Nocturnas'], ['festivas', 'Festivas']];
+// Trabajo que no se ha podido hacer, o sin fotos posibles: motivo de una lista fija (más «Otro»).
+// Se guarda el texto del motivo; con «Otro», lo que escriba el capataz.
+export const MOTIVOS_NO_REALIZADO = [
+  'Lluvia / meteorología',
+  'Sin corte de vía / sin autorización',
+  'Falta de material',
+  'Falta de personal o maquinaria',
+];
+export const MOTIVOS_SIN_FOTOS = [
+  'Prohibido fotografiar en la zona',
+  'Móvil sin batería / sin cámara',
+  'Sin luz suficiente',
+];
+
+export const TIPOS_EXTRA =[['normales', 'Normales'], ['nocturnas', 'Nocturnas'], ['festivas', 'Festivas']];
 
 // Medidas antiincendios: casillas con la lista de la oficina (varias a la vez) más «Otras».
 // Mientras la oficina no ponga su lista en la hoja, se usa esta.

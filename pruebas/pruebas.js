@@ -138,6 +138,36 @@ prueba('validaciones: trabajo de INFRA/SUPER', () => {
     [{ corto: 'foto de durante o después', largo: 'falta al menos una foto de DURANTE o de DESPUÉS.' }]);
 });
 
+prueba('validaciones: trabajo no realizado y sin fotos', () => {
+  const t = () => ej.parteInfra().trabajos[0];
+  const con = (cambios) => Object.assign(t(), cambios);
+  const noReal = { finalizado: false, noRealizado: true, motivoNoRealizado: 'Lluvia / meteorología' };
+  // No realizado: sin horas, vía, PK ni fotos, pero con motivo.
+  igual(val.faltasTrabajo(con({ ...noReal, entradaVia: '', salidaVia: '', via: '', pkInicio: '', pkFin: '', fotos: [] })), [],
+    'no realizado completo sin horas, PK ni fotos');
+  igual(val.faltasTrabajo(con({ ...noReal, motivoNoRealizado: ' ' })),
+    [{ corto: 'por qué no se ha realizado', largo: 'indica por qué no se ha realizado.' }]);
+  igual(val.faltasTrabajo(con({ ...noReal, motivoNoRealizado: '', noRealizadoOtro: true })),
+    [{ corto: 'por qué no se ha realizado', largo: 'has elegido «Otro» motivo de no realizado: escríbelo.' }]);
+  igual(cortos(val.faltasTrabajo(con({ ...noReal, referencia: { tipo: '', codigo: '', motivo: '' }, linea: '', motivoActuacion: '' }))),
+    ['referencia', 'línea', 'motivo'], 'sigue pidiendo referencia, línea y motivo de actuación');
+  // Sin fotos: hace falta el motivo; el resto se sigue pidiendo.
+  igual(val.faltasTrabajo(con({ fotos: [], sinFotos: true, motivoSinFotos: 'Sin luz suficiente' })), [], 'sin fotos con motivo');
+  igual(val.faltasTrabajo(con({ fotos: [], sinFotos: true, motivoSinFotos: '' })),
+    [{ corto: 'por qué no hay fotos', largo: 'indica por qué no se han podido hacer fotos.' }]);
+  igual(val.faltasTrabajo(con({ fotos: [], sinFotos: true, motivoSinFotos: '', sinFotosOtro: true })),
+    [{ corto: 'por qué no hay fotos', largo: 'has elegido «Otro» motivo para no hacer fotos: escríbelo.' }]);
+  igual(cortos(val.faltasTrabajo(con({ fotos: [], sinFotos: true, motivoSinFotos: 'Sin luz suficiente', entradaVia: '' }))),
+    ['entrada en vía'], 'sin fotos sigue pidiendo las horas');
+  // Partes de antes de la 0.13.0 (sin los campos nuevos): igual que siempre.
+  igual(cortos(val.faltasTrabajo(con({ fotos: [] }))), ['foto de antes', 'foto de después']);
+  const p = infra();
+  p.trabajos[0] = con({ ...noReal, fotos: [] });
+  p.trabajos[1].sinFotos = true;
+  p.trabajos[1].fotos = [];
+  igual(msgs(val.validar(p)), ['Trabajo 2: indica por qué no se han podido hacer fotos.']);
+});
+
 prueba('validaciones: parte INFRA', () => {
   igual(val.validar(infra()), [], 'parte completo');
   const solo = (cambiar, esperado) => { const p = infra(); cambiar(p); igual(msgs(val.validar(p)), esperado); };
@@ -347,6 +377,21 @@ for (const [nombre, hacer] of tipos) {
     if (p.formato1 && p.formato1.length) cierto(fotos.fotos.some((f) => f.archivo === 'Formato1_1.jpg'), 'falta Formato1_1.jpg');
   });
 }
+
+prueba('PDF y envío: trabajo no realizado y trabajo sin fotos', async () => {
+  const p = ej.parteInfra();
+  Object.assign(p.trabajos[0], { finalizado: false, noRealizado: true, motivoNoRealizado: 'Lluvia / meteorología', fotos: [] });
+  Object.assign(p.trabajos[1], { sinFotos: true, motivoSinFotos: 'Prohibido fotografiar en la zona', fotos: [] });
+  const leerFoto = async () => jpeg();
+  const pdf = await generarPDF(p, ej.config, 'prueba', leerFoto);
+  igual(await pdf.slice(0, 5).text(), '%PDF-', 'cabecera del PDF');
+  const r = await prepararEnvio(p, ej.config, leerFoto, 'prueba');
+  cierto(r.cuerpo.includes('[NO REALIZADO: Lluvia / meteorología]'), 'el correo dice que no se ha realizado');
+  cierto(r.cuerpo.includes('AVISO: trabajos sin fotos: trabajo 2 (Prohibido fotografiar en la zona).'), 'aviso de sin fotos en el correo');
+  const datos = JSON.parse(await r.archivos[1].text());
+  igual(JSON.parse(await r.archivos[2].text()).fotos.length, 0, 'sin fotos en el adjunto');
+  cierto(JSON.stringify(datos).includes('"noRealizado":true'), 'los datos llevan el campo nuevo');
+});
 
 prueba('envío: avisa si falta una foto', async () => {
   await falla(() => prepararEnvio(ej.parteInfra(), ej.config, async () => null, 'prueba'), 'foto que falta');
@@ -721,6 +766,19 @@ prueba('pantallas: parte INFRA y SUPER', async () => {
 prueba('pantallas: trabajo de INFRA', async () => {
   await pantalla((e) => { e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 0; }, 'Trabajo 1 · INF-9001');
   await pantalla((e) => { e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 1; e.preguntaOtro = true; }, '¿Has hecho otro trabajo en esta jornada?');
+  await pantalla((e) => {
+    e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 0;
+    Object.assign(e.parte.trabajos[0], { finalizado: false, noRealizado: true, motivoNoRealizado: 'Falta de material' });
+  }, 'No realizado', '¿Por qué no se ha realizado?', 'No hace falta poner horas de vía');
+  await pantalla((e) => {
+    e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 0;
+    Object.assign(e.parte.trabajos[0], { sinFotos: true, motivoSinFotos: 'algo escrito', sinFotosOtro: true });
+  }, 'No se han podido hacer fotos', 'Saldrá en rojo en el PDF');
+  await pantalla((e) => {
+    e.vista = 'parte'; e.parte = borrador(ej.parteInfra());
+    Object.assign(e.parte.trabajos[0], { finalizado: false, noRealizado: true, motivoNoRealizado: 'Falta de material' });
+    Object.assign(e.parte.trabajos[1], { sinFotos: true, motivoSinFotos: 'Sin luz suficiente' });
+  }, 'No realizado · Falta de material', 'Sin fotos: Sin luz suficiente');
 });
 
 prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {

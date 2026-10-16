@@ -65,6 +65,8 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
     ...parte.trabajos.map((t, i) => ({ nombre: `trabajo ${i + 1}`, n: t.fotos.filter(sinFechaOriginal).length, de: t.fotos.length })),
     { nombre: FORMATO1.toLowerCase(), n: (parte.formato1 || []).filter(sinFechaOriginal).length, de: (parte.formato1 || []).length },
   ].filter((x) => x.n);
+  // Aviso para la oficina: trabajos hechos sin fotos (el capataz ha dicho por qué).
+  const sinFotos = (parte.trabajos || []).map((t, i) => ({ t, i })).filter(({ t }) => t.sinFotos && !t.noRealizado);
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
     parte.tipo === 'MAQUINARIA' && parte.subtipo && parte.subtipo !== 'via'
@@ -74,7 +76,9 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
       : parte.tipo === 'MAQUINARIA'
       ? `Lo rellena: ${parte.capataz}. Máquinas: ${(parte.maquinasVia || []).filter((m) => m.descripcion).map((m) => `${m.descripcion} (${m.horas} h)`).join('; ')}. ` +
         `Tajos: ${(parte.tajos || []).map((t) => `vía ${t.via} PK ${t.pkInicio}-${t.pkFin}`).join('; ')}.`
-      : `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '')).join('; ')}.`,
+      : `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '') +
+        (t.noRealizado ? ` [NO REALIZADO: ${t.motivoNoRealizado || ''}]` : '')).join('; ')}.`,
+    ...(sinFotos.length ? [`AVISO: trabajos sin fotos: ${sinFotos.map(({ t, i }) => `trabajo ${i + 1} (${t.motivoSinFotos || ''})`).join(', ')}.`] : []),
     ...(sinFecha.length ? [`AVISO: fotos de galería sin fecha original (se ha usado la fecha del archivo): ${
       sinFecha.map((x) => `${x.nombre} (${x.n} de ${x.de})`).join(', ')}.`] : []),
     ...((parte.formato1 || []).length ? [`${FORMATO1} adjunto: ${parte.formato1.length} foto(s).`] : []),

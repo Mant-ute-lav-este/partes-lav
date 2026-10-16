@@ -90,6 +90,28 @@ export async function onChange(e) {
     if (t.aparatoOtro) { const inp = app.querySelector(`[data-bind="${el.dataset.aparato}.aparato"]`); if (inp) inp.focus(); }
     return;
   }
+  // ¿Trabajo finalizado? Sí / No, sin terminar / No realizado (un no realizado tampoco está finalizado).
+  if (el.dataset.fin) {
+    const t = trabajoActual();
+    if (!t || estado.parte.estado !== 'borrador' || !el.checked) return;
+    t.finalizado = el.value === 'si';
+    t.noRealizado = el.value === 'noreal';
+    guardarPronto();
+    render();
+    return;
+  }
+  if (el.dataset.motivoLista) {
+    const t = trabajoActual();
+    if (!t || estado.parte.estado !== 'borrador') return;
+    const motivo = el.dataset.campo;
+    const esOtro = el.dataset.otro;
+    t[esOtro] = el.value === '__otro';
+    t[motivo] = t[esOtro] ? '' : el.value;
+    guardarPronto();
+    render();
+    if (t[esOtro]) { const inp = app.querySelector(`[data-bind="${el.dataset.motivoLista}.${motivo}"]`); if (inp) inp.focus(); }
+    return;
+  }
   if (el.dataset.motivo) {
     const t = trabajoActual();
     if (!t || estado.parte.estado !== 'borrador') return;
