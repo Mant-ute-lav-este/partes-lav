@@ -248,11 +248,10 @@ export async function cerrarParte() {
   ir('envio');
 }
 
-export async function borrarParte() {
-  const p = estado.parte;
-  if (!confirm('¿Borrar este borrador y sus fotos? No se puede deshacer.')) return;
-  for (const f of await db.fotosDeParte(p.id)) await db.borrarFoto(f.id);
-  await db.borrarParte(p.id);
+export async function borrarParte(id = estado.parte && estado.parte.id) {
+  if (!id || !confirm('¿Borrar este borrador y sus fotos? No se puede deshacer.')) return;
+  for (const f of await db.fotosDeParte(id)) await db.borrarFoto(f.id);
+  await db.borrarParte(id);
   estado.parte = null;
   ir('inicio');
 }

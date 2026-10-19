@@ -456,6 +456,7 @@ export async function onClick(e) {
     case 'cerrar-foto': estado.fotoVista = null; render(); break;
     case 'borrar-foto': borrarFoto(el.dataset.id); break;
     case 'borrar-parte': borrarParte(); break;
+    case 'borrar-borrador': borrarParte(el.dataset.id); break;
     case 'cerrar-parte': cerrarParte(); break;
     case 'guardar-salir':
       await guardarYa();

@@ -856,7 +856,7 @@ prueba('pantallas: registro, acceso y PIN', async () => {
 
 prueba('pantallas: inicio, menú y elegir máquina', async () => {
   const lista = [borrador(ej.parteInfra()), ej.parteSuper(), { ...ej.parteMaqVia(), estado: 'en-cola' }, { ...ej.parteLoco(), estado: 'enviado' }];
-  await pantalla((e) => { e.lista = lista; }, 'Partes LAV', 'INF-9001', 'SUP-9001');
+  await pantalla((e) => { e.lista = lista; }, 'Partes LAV', 'INF-9001', 'SUP-9001', '🗑');
   await pantalla((e) => { e.lista = lista; e.menu = true; }, 'Guía rápida');
   await pantalla((e) => { e.eligeMaquina = true; }, '¿Con qué máquina?', 'Bateadora 08-475-4S', 'Dresina');
   await pantalla((e) => { e.perfil.cuenta = 'pendiente'; }, 'pendiente de que lo apruebe');

@@ -166,6 +166,12 @@ a.btn { display: flex; align-items: center; justify-content: center; text-decora
   padding: 12px 14px; margin-bottom: 10px; font: inherit; color: var(--texto); cursor: pointer;
 }
 .item-parte.cerrado { border-color: var(--infra); background: var(--pendiente-fondo); }
+.fila-parte { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+.fila-parte .item { margin-bottom: 0; flex: 1; width: auto; min-width: 0; }
+.papelera {
+  flex: none; width: 56px; font-size: 1.5rem; cursor: pointer; color: var(--peligro);
+  background: var(--superficie); border: 1.5px solid var(--borde); border-radius: 12px;
+}
 .item-info { flex: 1; min-width: 0; }
 .flecha { font-size: 1.6rem; color: var(--suave); }
 .etiqueta { color: #fff; font-weight: 800; font-size: .8rem; border-radius: 8px; padding: 6px 8px; }

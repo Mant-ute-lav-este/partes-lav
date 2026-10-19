@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.16.1 · (sin publicar)
+- **Papelera en los borradores**: cada borrador de la lista de inicio lleva una papelera a la derecha para borrarlo sin abrirlo (pide confirmación y borra también sus fotos). Solo en borradores: los cerrados, en cola y enviados no la llevan.
+
 ## 0.16.0 · 2026-10-19
 - **Numeración tras reinstalar**: al descargar la lista de la oficina, el servidor dice el número más alto que ese capataz ya ha enviado de cada tipo (INF, SUP, MAQ, LOC, DRE) y el móvil sigue desde ahí. Antes, al reinstalar la app, volvía a la 0001 y podía pisar carpetas en Teams. Necesita el servidor versión 12; con el anterior la app funciona igual que antes.
 - **Cerrar sesión con partes sin enviar**: ya no se deja (sale «Tienes N partes sin enviar. Envíalos antes de cerrar sesión.»), porque saldrían con la cuenta del siguiente que entre. Si hay borradores, avisa de que quien entre después los verá.

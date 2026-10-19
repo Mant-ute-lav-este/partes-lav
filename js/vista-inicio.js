@@ -32,13 +32,17 @@ export function textoCuenta(p) {
 }
 
 export function itemParte(p) {
-  return `
+  const abrir = `
   <button class="item item-parte ${p.estado}" data-action="abrir" data-id="${p.id}">
     <span class="etiqueta ${p.tipo.toLowerCase()}">${p.tipo === 'MAQUINARIA' ? SUBTIPOS_MAQ[subtipoDe(p)].prefijo : p.tipo}</span>
     <span class="item-info"><strong>${fmtFecha(p.fecha)}${p.nocturna ? ' · noche' : ''}</strong> · ${esc(p.ref)}${p.rev > 1 ? ` rev. ${p.rev}` : ''}
       <br><small>${textoCuenta(p)} · ${estadoTexto(p)}</small></span>
     <span class="flecha">›</span>
   </button>`;
+  // Papelera solo en borradores: lo cerrado o enviado no se borra desde la lista.
+  return p.estado === 'borrador'
+    ? `<div class="fila-parte">${abrir}<button class="papelera" data-action="borrar-borrador" data-id="${p.id}" aria-label="Borrar borrador ${esc(p.ref)}">🗑</button></div>`
+    : abrir;
 }
 
 export function grupo(titulo, partes) {
