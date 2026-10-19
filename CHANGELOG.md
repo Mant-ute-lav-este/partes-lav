@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.16.2 · (sin publicar)
+- Arreglo: en el parte de dresina, el aviso de máquina sin escribir decía «Escribe qué locomotora es»; ahora dice «Escribe qué dresina es». La locomotora no cambia.
+
 ## 0.16.1 · 2026-10-19
 - **Papelera en los borradores**: cada borrador de la lista de inicio lleva una papelera a la derecha para borrarlo sin abrirlo (pide confirmación y borra también sus fotos). Solo en borradores: los cerrados, en cola y enviados no la llevan.
 

@@ -329,8 +329,7 @@ prueba('validaciones: parte de dresina', () => {
   solo((p) => { p.personal.push({ nombre: 'Eva Prueba', puesto: 'piloto' }); }, [], 'el piloto es opcional');
   solo((p) => { p.realizados[0].via = ''; }, ['Trabajo 1: elige la vía (1 o 2).']);
   solo((p) => { p.acta = ''; p.combustible.salida = ''; }, ['Falta el nº de acta.', 'Falta el combustible de salida y de llegada.']);
-  // Comportamiento actual: el texto habla de «locomotora» también en la dresina.
-  solo((p) => { p.maquina.descripcion = ''; }, ['Escribe qué locomotora es.']);
+  solo((p) => { p.maquina.descripcion = ''; }, ['Escribe qué dresina es.']);
 });
 
 // ---------- modelo (partes nuevos y borradores antiguos) ----------

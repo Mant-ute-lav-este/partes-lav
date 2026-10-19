@@ -243,7 +243,7 @@ export function validarLD(p) {
   const vacio = (s) => !String(s == null ? '' : s).trim();
   const loco = subtipoDe(p) === 'locomotora';
   if (!p.fecha) add('Falta la fecha.');
-  if (vacio(p.maquina.descripcion)) add('Escribe qué locomotora es.');
+  if (vacio(p.maquina.descripcion)) add(`Escribe qué ${loco ? 'locomotora' : 'dresina'} es.`);
   if (vacio(p.acta)) add('Falta el nº de acta.');
   faltasPuestos(p).forEach(add);
   if (!horaValida(p.salida.hora)) add('Falta la hora de salida.');
