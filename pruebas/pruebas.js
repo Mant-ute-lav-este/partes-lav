@@ -373,6 +373,11 @@ prueba('modelo: último parte del mismo tipo', () => {
   igual(modelo.ultimoParteDe([a, b], 'INFRA'), null, 'sin partes de ese tipo');
 });
 
+prueba('modelo: contador del móvil de cada prefijo', () => {
+  igual(['INF', 'SUP', 'MAQ', 'LOC', 'DRE'].map(modelo.claveContador),
+    ['contador-INFRA', 'contador-SUPER', 'contador-MAQUINARIA', 'contador-LOC', 'contador-DRE']);
+});
+
 prueba('modelo: qué se puede copiar del parte anterior', () => {
   const lista = modelo.MEDIDAS_PROVISIONALES;
   const previo = ej.parteSuper();
@@ -773,6 +778,17 @@ prueba('servidor: limpieza de sesiones', async () => {
   const quedan = E.s.tabla_('Sesiones').filas.filter((s) => s.TokenHash).map((s) => s.TokenHash);
   cierto(quedan.includes('hUSADA') && quedan.length === 2, 'quedan: ' + quedan);
   igual(E.post({ accion: 'estado', token: E.token }).ok, true, 'la sesión reciente sigue valiendo');
+});
+
+prueba('servidor: la lista trae el último número enviado de cada prefijo', async () => {
+  const E = await servidorListo();
+  E.post(E.parte({ ref: 'INF-0012' }));
+  E.post(E.parte({ ref: 'INF-0003' }));
+  E.post(E.parte({ ref: 'LOC-0002' }));
+  E.hojas.Envios.appendRow(['x', 'otro@ejemplo.test', 'Otro', 'INF-0099', 'a', '1', 'f']);
+  const r = E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() });
+  igual(r.ok, true, r.error);
+  igual(r.ultimos, { INF: 12, LOC: 2 }, 'solo los de este capataz, el más alto');
 });
 
 // ---------- pantallas (pruebas de humo) ----------

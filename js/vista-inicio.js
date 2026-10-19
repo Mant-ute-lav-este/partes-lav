@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora } from './util.js';
 import { SUBTIPOS_MAQ, subtipoDe } from './validaciones.js';
 import {
-  PREFIJO_REF, nuevaMaquinaVia, nuevoTajo, nuevoRealizado, ultimoParteDe, apartadosCopiables, repetirParte,
+  PREFIJO_REF, claveContador, nuevaMaquinaVia, nuevoTajo, nuevoRealizado, ultimoParteDe, apartadosCopiables, repetirParte,
 } from './modelo.js';
 import { estado, ir, render, guardarYa, maquinasViaCfg, capatazComoPersona, medidasCfg } from './estado.js';
 import { inputConfig } from './vista-acceso.js';
@@ -160,7 +160,7 @@ export async function contestarRepetir(si) {
 async function crearParte(tipo, maquina, sub, fecha, nocturna, copia = null) {
   // Locomotora y dresina llevan su propia numeración (LOC-, DRE-); el de vía sigue con MAQ-.
   const prefijo = sub ? SUBTIPOS_MAQ[sub].prefijo : PREFIJO_REF[tipo];
-  const clave = sub && sub !== 'via' ? `contador-${prefijo}` : `contador-${tipo}`;
+  const clave = claveContador(prefijo);
   const n = ((await db.kvGet(clave)) || 0) + 1;
   await db.kvSet(clave, n);
   const iso = isoLocal();

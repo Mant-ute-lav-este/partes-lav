@@ -340,6 +340,7 @@ function config_(d) {
   return {
     estado: String(u.Estado),
     nombre: String(u.Nombre),
+    ultimos: ultimosNumeros_(u.Email),
     config: {
       formato: 'config-partes-lav',
       version: 1,
@@ -376,6 +377,20 @@ function config_(d) {
       motivos: motivos,
     },
   };
+}
+
+/**
+ * Número más alto que este capataz ya ha enviado de cada prefijo ({INF: 12, LOC: 3…}). Con él, un
+ * móvil reinstalado sigue la numeración en vez de volver a la 0001 y pisar carpetas en Teams.
+ */
+function ultimosNumeros_(email) {
+  const e = String(email).toLowerCase();
+  const ultimos = {};
+  tabla_('Envios').filas.forEach((f) => {
+    const m = /^([A-Z]+)-(\d+)$/.exec(String(f.Ref || ''));
+    if (m && String(f.Email).toLowerCase() === e) ultimos[m[1]] = Math.max(ultimos[m[1]] || 0, Number(m[2]));
+  });
+  return ultimos;
 }
 
 /**

@@ -7,7 +7,7 @@ import { api } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import { enviarFallos } from './fallos.js';
 import { esc, isoLocal, normaliza, debounce, toast } from './util.js';
-import { MAQUINAS_VIA_PROVISIONALES, MEDIDAS_PROVISIONALES, persona } from './modelo.js';
+import { MAQUINAS_VIA_PROVISIONALES, MEDIDAS_PROVISIONALES, persona, claveContador } from './modelo.js';
 import {
   vBienvenida, vRegEmail, vRegCodigo, vRegNombre, vRegPin, vLogin, vRecEmail, vRecPin, vSetupDatos,
   vSetupCapataz, vSetupPin, vPin, pintarNombres,
@@ -73,6 +73,11 @@ export async function cargarConfigServidor() {
   const r = await api('config', { token: estado.perfil.token });
   estado.config = r.config;
   await db.kvSet('config', r.config);
+  // Tras reinstalar, el contador del móvil vuelve a 0: se sigue por el último número ya enviado.
+  for (const [prefijo, n] of Object.entries(r.ultimos || {})) {
+    const clave = claveContador(prefijo);
+    if (Number(n) > ((await db.kvGet(clave)) || 0)) await db.kvSet(clave, Number(n));
+  }
   const perfil = estado.perfil;
   if (r.estado && r.estado !== perfil.cuenta) {
     const aprobado = perfil.cuenta === 'pendiente' && r.estado === 'activo';

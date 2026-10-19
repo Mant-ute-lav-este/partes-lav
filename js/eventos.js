@@ -340,9 +340,23 @@ export async function onClick(e) {
       if (ok) toast(`Lista actualizada: ${estado.config.trabajadores.length} trabajadores`);
       break;
     }
-    case 'cerrar-sesion':
-      if (confirm('Se cerrará la sesión en este móvil. Los partes no se borran. ¿Seguir?')) cerrarSesion();
+    case 'cerrar-sesion': {
+      // Lo que está en cola sale con la cuenta que haya al enviarlo: no se deja cerrar con partes sin enviar.
+      const ps = await db.listarPartes();
+      const sinEnviar = ps.filter((x) => x.estado === 'cerrado' || x.estado === 'en-cola').length;
+      if (sinEnviar) {
+        estado.menu = false;
+        render();
+        toast(`Tienes ${sinEnviar === 1 ? '1 parte' : `${sinEnviar} partes`} sin enviar. Envíalos antes de cerrar sesión.`, 6000);
+        break;
+      }
+      const borradores = ps.filter((x) => x.estado === 'borrador').length;
+      const aviso = borradores
+        ? `Hay ${borradores === 1 ? '1 borrador' : `${borradores} borradores`} sin terminar: quien entre después en este móvil los verá. `
+        : '';
+      if (confirm(`${aviso}Se cerrará la sesión en este móvil. Los partes no se borran. ¿Seguir?`)) cerrarSesion();
       break;
+    }
     case 'reintentar-salida': registrarSync(); await procesarYMostrar(p.id); break;
     case 'enviar-gmail': enviarPorGmail(); break;
     case 'menu': estado.menu = true; render(); break;

@@ -6,6 +6,12 @@ import { uuid, normaliza } from './util.js';
 export const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
 export const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
 
+/** Clave del contador del móvil para un prefijo: INF, SUP y MAQ van por tipo (como siempre); LOC y DRE, por prefijo. */
+export function claveContador(prefijo) {
+  const tipo = Object.keys(PREFIJO_REF).find((t) => PREFIJO_REF[t] === prefijo);
+  return `contador-${tipo || prefijo}`;
+}
+
 /** Líneas que se ofrecen en botones, en Infra y en Super (las de la cabecera del PDF no cuentan aquí). */
 export const LINEAS = ['040', '038'];
 
