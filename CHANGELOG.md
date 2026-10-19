@@ -2,7 +2,7 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
-## 0.16.1 · (sin publicar)
+## 0.16.1 · 2026-10-19
 - **Papelera en los borradores**: cada borrador de la lista de inicio lleva una papelera a la derecha para borrarlo sin abrirlo (pide confirmación y borra también sus fotos). Solo en borradores: los cerrados, en cola y enviados no la llevan.
 
 ## 0.16.0 · 2026-10-19
