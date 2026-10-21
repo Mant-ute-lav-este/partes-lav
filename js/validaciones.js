@@ -175,7 +175,7 @@ export function faltasTajo(t) {
   const add = (corto, largo) => e.push({ corto, largo });
   [['llegada', 'llegada a tajo'], ['inicio', 'inicio de trabajo'], ['fin', 'fin de trabajo'], ['salida', 'salida de tajo']]
     .forEach(([k, txt]) => { if (!horaValida(t[k])) add(txt, `falta la hora de ${txt}.`); });
-  if (!t.via) add('vía', 'elige la vía (1 o 2).');
+  if (!t.via) add('vía', 'elige al menos una vía.');
   if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
   if (!pkValido(t.pkFin)) add('PK final', 'falta el PK final (km y metros).');
   const op = (nombre, o, si) => {
@@ -206,7 +206,7 @@ export function faltasTajo(t) {
 export function faltasRealizado(r) {
   const e = [];
   const add = (corto, largo) => e.push({ corto, largo });
-  if (!r.via) add('vía', 'elige la vía (1 o 2).');
+  if (!r.via) add('vía', 'elige al menos una vía.');
   if (!pkValido(r.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
   if (!pkValido(r.pkFin)) add('PK fin', 'falta el PK de fin (km y metros).');
   if (!horaValida(r.horaInicio)) add('hora inicio', 'falta la hora de inicio.');

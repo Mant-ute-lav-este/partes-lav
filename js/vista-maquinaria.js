@@ -40,7 +40,7 @@ export function seccionTajo(t, i, total) {
       <div class="dos">${campoHora('Llegada a tajo', `${b}.llegada`, t.llegada)}${campoHora('Inicio de trabajo', `${b}.inicio`, t.inicio)}</div>
       <div class="dos">${campoHora('Fin de trabajo', `${b}.fin`, t.fin)}${campoHora('Salida de tajo', `${b}.salida`, t.salida)}</div>
       <div class="campo"><span>Vía <small>(marca todas las que uses)</small></span>
-        ${casillasVias(`${b}.via`, t.via, ['1', '2'], { etiqueta: (v) => `Vía ${v}` })}</div>
+        ${casillasVias(`${b}.via`, t.via, ['1', '2', '3', '4', '5'], { etiqueta: (v) => `Vía ${v}`, compacto: true })}</div>
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK final', `${b}.pkFin`, t.pkFin)}</div>
       ${campo('Nombre del desvío / AD <small>(opcional)</small>', `${b}.desvio`, t.desvio, 'autocomplete="off"')}
       ${operacion('Nivelado', `${b}.nivelado`, t.nivelado, detalleGeometria(`${b}.nivelado`, t.nivelado, MODOS_NIVELADO, 'Lev. máx.'))}
@@ -180,7 +180,7 @@ export function seccionRealizado(r, i, total, loco) {
       <div class="tajo-cab"><h3>Trabajo ${i + 1}</h3>
         ${total > 1 ? `<button class="btn-quitar" data-action="quitar-realizado" data-i="${i}" aria-label="Quitar el trabajo ${i + 1}">✕</button>` : ''}</div>
       <div class="campo"><span>Vía <small>(marca todas las que uses)</small></span>
-        ${casillasVias(`${b}.via`, r.via, ['1', '2'], { etiqueta: (v) => `Vía ${v}` })}</div>
+        ${casillasVias(`${b}.via`, r.via, ['1', '2', '3', '4', '5'], { etiqueta: (v) => `Vía ${v}`, compacto: true })}</div>
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, r.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, r.pkFin)}</div>
       <div class="dos">${campoHora('Hora inicio', `${b}.horaInicio`, r.horaInicio)}${campoHora('Hora fin', `${b}.horaFin`, r.horaFin)}</div>
       ${campo('Trabajo', `${b}.trabajo`, r.trabajo, 'autocomplete="off"')}

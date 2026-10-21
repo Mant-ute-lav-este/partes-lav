@@ -117,9 +117,9 @@ prueba('varias vías: lista, validaciones, PDF y correo', async () => {
   // PDF y correo con varias vías (SUPER, tajo de vía y locomotora)
   const leerFoto = async () => jpeg();
   const sup = ej.parteSuper(); sup.trabajos[0].via = '1, 3, 5';
-  const maq = ej.parteMaqVia(); maq.tajos[0].via = '1, 2';
+  const maq = ej.parteMaqVia(); maq.tajos[0].via = '1, 2, 3, 4, 5';
   const loc = ej.parteLoco(); loc.realizados[0].via = '1, 2';
-  for (const [p, vias] of [[sup, '1, 3, 5'], [maq, '1, 2'], [loc, '1, 2']]) {
+  for (const [p, vias] of [[sup, '1, 3, 5'], [maq, '1, 2, 3, 4, 5'], [loc, '1, 2']]) {
     const pdf = await generarPDF(p, ej.config, 'prueba', leerFoto);
     igual(await pdf.slice(0, 5).text(), '%PDF-', `PDF de ${p.ref}`);
     const e = await prepararEnvio(p, ej.config, leerFoto, 'prueba');
@@ -257,7 +257,7 @@ prueba('validaciones: tajo de maquinaria de vía', () => {
   igual(val.faltasTajo(t()), [], 'tajo completo');
   igual(cortos(con((x) => { x.llegada = ''; x.inicio = '7'; x.fin = ''; x.salida = '24:00'; })),
     ['llegada a tajo', 'inicio de trabajo', 'fin de trabajo', 'salida de tajo']);
-  igual(con((x) => { x.via = ''; }), [{ corto: 'vía', largo: 'elige la vía (1 o 2).' }]);
+  igual(con((x) => { x.via = ''; }), [{ corto: 'vía', largo: 'elige al menos una vía.' }]);
   igual(con((x) => { x.pkFin = ''; }), [{ corto: 'PK final', largo: 'falta el PK final (km y metros).' }]);
   igual(con((x) => { x.nivelado.si = null; }), [{ corto: 'nivelado', largo: 'Nivelado: contesta Sí o No.' }]);
   igual(con((x) => { x.nivelado.modo = ''; }),
@@ -293,7 +293,7 @@ prueba('validaciones: parte de maquinaria de vía', () => {
   solo((p) => { p.viaje.horaLlegada = '6'; }, ['Viaje: falta la hora de llegada.']);
   solo((p) => { p.viaje.lugarLlegada = ''; }, ['Viaje: falta el lugar de llegada.']);
   solo((p) => { p.tajos = []; }, ['Añade al menos un tajo.']);
-  solo((p) => { p.tajos[0].via = ''; p.tajos[0].nivelado.si = null; }, ['Tajo 1: elige la vía (1 o 2).', 'Tajo 1: Nivelado: contesta Sí o No.']);
+  solo((p) => { p.tajos[0].via = ''; p.tajos[0].nivelado.si = null; }, ['Tajo 1: elige al menos una vía.', 'Tajo 1: Nivelado: contesta Sí o No.']);
   solo((p) => { p.personal.push({ nombre: '', puesto: 'piloto', otro: true }); }, ['Piloto: escribe el nombre o quítalo.']);
   solo((p) => { p.personal.push({ nombre: '', puesto: 'maquinista', otro: true }); }, ['Maquinista tipo A: escribe el nombre o quítalo.']);
   // EVB: sin contestar (borradores antiguos), sin EVB hace falta el maquinista tipo A; con EVB, encargado y OMI.
@@ -362,7 +362,7 @@ prueba('validaciones: parte de dresina', () => {
     ['Con EVB hace falta el ET / al amparo de (en «Personal»).', 'Con EVB hace falta el OMI (en «Personal»).']);
   solo((p) => { p.evb = true; p.personal = [{ nombre: 'Ana Prueba', puesto: 'amparo' }, { nombre: 'Luis Ejemplo', puesto: 'omi' }]; }, []);
   solo((p) => { p.personal.push({ nombre: 'Eva Prueba', puesto: 'piloto' }); }, [], 'el piloto es opcional');
-  solo((p) => { p.realizados[0].via = ''; }, ['Trabajo 1: elige la vía (1 o 2).']);
+  solo((p) => { p.realizados[0].via = ''; }, ['Trabajo 1: elige al menos una vía.']);
   solo((p) => { p.acta = ''; p.combustible.salida = ''; }, ['Falta el nº de acta.', 'Falta el combustible de salida y de llegada.']);
   solo((p) => { p.maquina.descripcion = ''; }, ['Escribe qué dresina es.']);
 });
