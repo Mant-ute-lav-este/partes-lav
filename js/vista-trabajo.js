@@ -8,7 +8,7 @@ import { esc, uuid, isoLocal, toast, FORMATO1, MAX_FORMATO1, LADO_FORMATO1 } fro
 import { faltasTrabajo } from './validaciones.js';
 import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS } from './modelo.js';
 import { app, estado, urls, ir, render, guardarYa, guardarPronto, motivosCfg } from './estado.js';
-import { cabeceraParte, campo, campoHora, campoPk, radio } from './campos.js';
+import { cabeceraParte, campo, campoHora, campoPk, radio, casillasVias } from './campos.js';
 
 // ---------- Trabajo ----------
 
@@ -188,8 +188,10 @@ export function vTrabajo() {
         ${campoHora('Salida de vía', `${b}.salidaVia`, t.salidaVia)}</div>`}
       <div class="campo"><span>Línea</span>
         <div class="segmentado">${LINEAS.map((l) => radio(`${b}.linea`, l, l, t.linea)).join('')}</div></div>
-      <div class="campo"><span>Vía</span>
-        <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>
+      ${p.tipo === 'SUPER'
+    ? `<div class="campo"><span>Vía <small>(marca todas las que uses)</small></span>${casillasVias(`${b}.via`, t.via, ['1', '2', '3', '4', '5'], { compacto: true })}</div>`
+    : `<div class="campo"><span>Vía</span>
+        <div class="segmentado compacto">${['1', '2', '3', '4', '5'].map((v) => radio(`${b}.via`, v, v, t.via)).join('')}</div></div>`}
       ${campoAparato(t, b)}
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, t.pkFin)}</div>
       ${t.sinVia ? `<div class="dos">${campoHora('Hora de inicio', `${b}.horaInicio`, t.horaInicio)}

@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { api, hayServidor } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import { setPath, toast, MAX_FORMATO1 } from './util.js';
-import { nombrePuesto } from './validaciones.js';
+import { nombrePuesto, unirVias } from './validaciones.js';
 import { nuevaMaquinaVia, nuevoTajo, nuevoRealizado, persona, EQUIPOS, textoMedidas } from './modelo.js';
 import {
   app, estado, entrarApp, sincronizar, cargarConfigServidor, refrescarVista, registrarSync, ir, render,
@@ -180,6 +180,15 @@ export async function onChange(e) {
     t.tipoCoste = el.checked ? el.dataset.coste : '';
     guardarPronto();
     render();
+    return;
+  }
+  // Vías (SUPER, tajo de vía, trabajo de locomotora/dresina): se pueden marcar varias.
+  if (el.dataset.viasOp) {
+    const p = estado.parte;
+    if (!p || p.estado !== 'borrador') return;
+    const marcadas = [...app.querySelectorAll(`input[data-vias-op="${el.dataset.viasOp}"]:checked`)].map((x) => x.value);
+    setPath(p, el.dataset.viasOp, unirVias(marcadas));
+    guardarPronto();
     return;
   }
   if (el.dataset.medida != null) {

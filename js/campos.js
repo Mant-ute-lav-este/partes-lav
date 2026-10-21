@@ -3,7 +3,7 @@
 
 import { alReintentar } from './servidor.js';
 import { esc, setPath, toast } from './util.js';
-import { horaValida, textoBool } from './validaciones.js';
+import { horaValida, textoBool, listaVias } from './validaciones.js';
 import { estado, guardarPronto } from './estado.js';
 
 export function barraSimple(titulo, volver) {
@@ -86,6 +86,16 @@ export function aplicarPk(el, final) {
 
 export function radio(ruta, valor, texto, actual, extra = '') {
   return `<label><input type="radio" name="${ruta}" value="${valor}" data-bind="${ruta}" ${extra} ${actual === valor ? 'checked' : ''}><span>${texto}</span></label>`;
+}
+
+/**
+ * Casillas de vía: se pueden marcar varias. Salen con el mismo aspecto que los botones de elegir
+ * una; el valor se guarda como «1, 2» (ver unirVias). `etiqueta` pone el texto de cada botón.
+ */
+export function casillasVias(ruta, valor, vias, { compacto = false, etiqueta = (v) => v } = {}) {
+  const marcadas = listaVias(valor);
+  return `<div class="segmentado${compacto ? ' compacto' : ''}">${vias.map((v) => `<label><input type="checkbox"
+    data-vias-op="${ruta}" value="${v}" ${marcadas.includes(v) ? 'checked' : ''}><span>${etiqueta(v)}</span></label>`).join('')}</div>`;
 }
 
 /** Sí / No que vuelve a pintar la pantalla (para mostrar u ocultar lo que depende de la respuesta). */

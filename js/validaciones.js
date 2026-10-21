@@ -8,7 +8,14 @@ export const pkValido = (s) => /^\s*\d+\s*[+.,/]\s*\d+\s*$/.test(String(s || '')
 export const numeroValido = (s) => /^\s*\d+([.,]\d+)?\s*$/.test(String(s == null ? '' : s));
 export const aNumero = (s) => Number(String(s == null ? '' : s).replace(',', '.'));
 
-export const textoBool = (v) => (v === true ? 'si' : v === false ? 'no' : '');
+/**
+ * Vías de un trabajo, tajo o trabajo realizado: texto con los números separados por comas
+ * («1», «1, 2»). Los partes antiguos, con una sola vía, ya lo cumplen.
+ */
+export const listaVias = (s) => String(s == null ? '' : s).split(/\D+/).filter(Boolean);
+export const unirVias = (lista) => [...new Set(lista.map(String))].sort((a, b) => Number(a) - Number(b)).join(', ');
+
+export const textoBool =(v) => (v === true ? 'si' : v === false ? 'no' : '');
 export const numeroOk = (s) => Number(String(s == null ? '' : s).replace(',', '.')) > 0;
 
 /** Número de semana (ISO) de una fecha «AAAA-MM-DD». */

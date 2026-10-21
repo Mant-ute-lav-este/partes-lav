@@ -3,6 +3,7 @@
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
 ## 0.16.2 · (sin publicar)
+- **Varias vías en un mismo trabajo** (SUPER, tajo de maquinaria de vía y trabajo de locomotora/dresina): la vía pasa de botones «elegir una» a casillas que se pueden marcar varias. Se guardan como texto ordenado («1, 2»), así los partes de antes se abren igual y el PDF y el correo lo escriben tal cual. INFRA sigue con una sola vía. La columna VÍA del PDF es algo más ancha en SUPER y en la tabla de tajos.
 - Arreglo: en el parte de dresina, el aviso de máquina sin escribir decía «Escribe qué locomotora es»; ahora dice «Escribe qué dresina es». La locomotora no cambia.
 
 ## 0.16.1 · 2026-10-19

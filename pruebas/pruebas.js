@@ -95,6 +95,41 @@ prueba('validaciones: horas, PK, números y semana', () => {
   igual(val.semanaIso(''), '');
 });
 
+prueba('varias vías: lista, validaciones, PDF y correo', async () => {
+  igual(val.listaVias('1, 2'), ['1', '2']);
+  igual(val.listaVias('2'), ['2']);
+  igual([val.listaVias(''), val.listaVias(null), val.listaVias(undefined)], [[], [], []]);
+  igual(val.unirVias(['2', '1']), '1, 2', 'se ordenan');
+  igual(val.unirVias(['3', '1', '3', '10', '2']), '1, 2, 3, 10', 'sin repetir y en orden numérico');
+  igual(val.unirVias([]), '', 'ninguna marcada');
+  // Una o varias vías valen igual para validar; sin vías sigue faltando.
+  const s = ej.parteSuper();
+  s.trabajos[0].via = '1, 2';
+  igual(val.faltasTrabajo(s.trabajos[0]), [], 'trabajo con 2 vías');
+  s.trabajos[0].via = '';
+  igual(cortos(val.faltasTrabajo(s.trabajos[0])), ['vía'], 'sin vía falta');
+  const t = ej.parteMaqVia().tajos[0]; t.via = '1, 2';
+  igual(val.faltasTajo(t), [], 'tajo con 2 vías');
+  t.via = '';
+  igual(cortos(val.faltasTajo(t)), ['vía']);
+  const r = ej.parteLoco().realizados[0]; r.via = '1, 2';
+  igual(val.faltasRealizado(r), [], 'trabajo realizado con 2 vías');
+  // PDF y correo con varias vías (SUPER, tajo de vía y locomotora)
+  const leerFoto = async () => jpeg();
+  const sup = ej.parteSuper(); sup.trabajos[0].via = '1, 3, 5';
+  const maq = ej.parteMaqVia(); maq.tajos[0].via = '1, 2';
+  const loc = ej.parteLoco(); loc.realizados[0].via = '1, 2';
+  for (const [p, vias] of [[sup, '1, 3, 5'], [maq, '1, 2'], [loc, '1, 2']]) {
+    const pdf = await generarPDF(p, ej.config, 'prueba', leerFoto);
+    igual(await pdf.slice(0, 5).text(), '%PDF-', `PDF de ${p.ref}`);
+    const e = await prepararEnvio(p, ej.config, leerFoto, 'prueba');
+    cierto((await e.archivos[1].text()).includes(`"via": "${vias}"`), `datos de ${p.ref} con las vías «${vias}»`);
+    if (p !== sup) cierto(e.cuerpo.includes(`vía ${vias} PK`), `correo de ${p.ref} con las vías`);
+  }
+  // Los partes de antes (una sola vía) siguen igual.
+  igual(val.listaVias(ej.parteInfra().trabajos[0].via), ['1']);
+});
+
 prueba('validaciones: puestos, subtipos y horas extra', () => {
   igual(val.subtipoDe({}), 'via', 'parte de maquinaria antiguo, sin subtipo');
   igual(val.subtipoDe({ subtipo: 'dresina' }), 'dresina');

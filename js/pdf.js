@@ -281,15 +281,17 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
   // Solo INFRA lleva la columna RREE/POI (trabajos de coste directo, que se facturan aparte).
   const conCoste = parte.tipo === 'INFRA';
   const ANCHO_COSTE = 14;
+  // SUPER admite varias vías («1, 2, 3»): la columna es algo más ancha. INFRA, una sola, como siempre.
+  const ANCHO_VIA = parte.tipo === 'SUPER' ? 14 : 9;
   tabla(c, [
     { t: 'Nº', w: 7, a: 'center' }, { t: 'REFERENCIA', w: 30 },
     ...(conCoste ? [{ t: 'RREE /\nPOI', w: ANCHO_COSTE, a: 'center' }] : []),
     { t: 'Nº PIDAME', w: 18 },
     { t: 'TELEFONEMAS', w: 20 }, { t: 'ENTRADA\nVÍA', w: 15, a: 'center' }, { t: 'SALIDA\nVÍA', w: 13, a: 'center' },
-    { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' }, { t: 'APARATO', w: 16 },
+    { t: 'LÍNEA', w: 11, a: 'center' }, { t: 'VÍA', w: ANCHO_VIA, a: 'center' }, { t: 'APARATO', w: 16 },
     { t: 'P.K. INICIO', w: 16, a: 'center' },
     { t: 'P.K. FIN', w: 16, a: 'center' }, { t: 'M. LIN', w: 11, a: 'center' }, { t: 'MOTIVO ACTUACIÓN', w: 26 },
-    { t: '¿FIN?', w: 17, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 225 - (conCoste ? ANCHO_COSTE : 0) },
+    { t: '¿FIN?', w: 17, a: 'center' }, { t: 'DESCRIPCIÓN', w: AN - 216 - ANCHO_VIA - (conCoste ? ANCHO_COSTE : 0) },
   ], parte.trabajos.map((t, i) => [
     String(i + 1),
     textoReferencia(t),
@@ -574,10 +576,10 @@ function cuerpoMaquinaria(c, parte, cab) {
 
   const tajos = parte.tajos || [];
   seccion(c, `TAJOS (${tajos.length})`, 20);
-  const op = (AN - 141) / 5;
+  const op = (AN - 144) / 5;
   tabla(c, [
     { t: 'Nº', w: 7, a: 'center' }, { t: 'LLEGADA\nTAJO', w: 15, a: 'center' }, { t: 'INICIO\nTRABAJO', w: 15, a: 'center' },
-    { t: 'FIN\nTRABAJO', w: 15, a: 'center' }, { t: 'SALIDA\nTAJO', w: 15, a: 'center' }, { t: 'VÍA', w: 9, a: 'center' },
+    { t: 'FIN\nTRABAJO', w: 15, a: 'center' }, { t: 'SALIDA\nTAJO', w: 15, a: 'center' }, { t: 'VÍA', w: 12, a: 'center' },
     { t: 'P.K. INICIO', w: 17, a: 'center' }, { t: 'P.K. FINAL', w: 17, a: 'center' }, { t: 'DESVÍO / AD', w: 31 },
     { t: 'NIVELADO', w: op }, { t: 'ALINEADO', w: op }, { t: 'ESTABILIZ.', w: op }, { t: 'REGISTRO', w: op }, { t: 'PERFILADO', w: op },
   ], tajos.map((t, i) => [

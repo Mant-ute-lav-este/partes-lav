@@ -5,7 +5,7 @@ import { esc } from './util.js';
 import { semanaIso, numeroValido, aNumero, faltasTajo, faltasRealizado, subtipoDe, puestosDe, puestosObligatorios, llevaEvb } from './validaciones.js';
 import { MAX_TOLVA, MODOS_NIVELADO, MODOS_ALINEADO, CUANDO_REGISTRO, normalizarParte } from './modelo.js';
 import { estado, maquinasDeVia, personalMaqCfg } from './estado.js';
-import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores } from './campos.js';
+import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores, casillasVias } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 
 // ---------- Parte de maquinaria de vía ----------
@@ -39,8 +39,8 @@ export function seccionTajo(t, i, total) {
         ${total > 1 ? `<button class="btn-quitar" data-action="quitar-tajo" data-i="${i}" aria-label="Quitar el tajo ${i + 1}">✕</button>` : ''}</div>
       <div class="dos">${campoHora('Llegada a tajo', `${b}.llegada`, t.llegada)}${campoHora('Inicio de trabajo', `${b}.inicio`, t.inicio)}</div>
       <div class="dos">${campoHora('Fin de trabajo', `${b}.fin`, t.fin)}${campoHora('Salida de tajo', `${b}.salida`, t.salida)}</div>
-      <div class="campo"><span>Vía</span>
-        <div class="segmentado">${radio(`${b}.via`, '1', 'Vía 1', t.via)}${radio(`${b}.via`, '2', 'Vía 2', t.via)}</div></div>
+      <div class="campo"><span>Vía <small>(marca todas las que uses)</small></span>
+        ${casillasVias(`${b}.via`, t.via, ['1', '2'], { etiqueta: (v) => `Vía ${v}` })}</div>
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK final', `${b}.pkFin`, t.pkFin)}</div>
       ${campo('Nombre del desvío / AD <small>(opcional)</small>', `${b}.desvio`, t.desvio, 'autocomplete="off"')}
       ${operacion('Nivelado', `${b}.nivelado`, t.nivelado, detalleGeometria(`${b}.nivelado`, t.nivelado, MODOS_NIVELADO, 'Lev. máx.'))}
@@ -179,8 +179,8 @@ export function seccionRealizado(r, i, total, loco) {
     <div class="sub-tarjeta tajo">
       <div class="tajo-cab"><h3>Trabajo ${i + 1}</h3>
         ${total > 1 ? `<button class="btn-quitar" data-action="quitar-realizado" data-i="${i}" aria-label="Quitar el trabajo ${i + 1}">✕</button>` : ''}</div>
-      <div class="campo"><span>Vía</span>
-        <div class="segmentado">${radio(`${b}.via`, '1', 'Vía 1', r.via)}${radio(`${b}.via`, '2', 'Vía 2', r.via)}</div></div>
+      <div class="campo"><span>Vía <small>(marca todas las que uses)</small></span>
+        ${casillasVias(`${b}.via`, r.via, ['1', '2'], { etiqueta: (v) => `Vía ${v}` })}</div>
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, r.pkInicio)}${campoPk('PK fin', `${b}.pkFin`, r.pkFin)}</div>
       <div class="dos">${campoHora('Hora inicio', `${b}.horaInicio`, r.horaInicio)}${campoHora('Hora fin', `${b}.horaFin`, r.horaFin)}</div>
       ${campo('Trabajo', `${b}.trabajo`, r.trabajo, 'autocomplete="off"')}
