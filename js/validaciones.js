@@ -15,6 +15,29 @@ export const aNumero = (s) => Number(String(s == null ? '' : s).replace(',', '.'
 export const listaVias = (s) => String(s == null ? '' : s).split(/\D+/).filter(Boolean);
 export const unirVias = (lista) => [...new Set(lista.map(String))].sort((a, b) => Number(a) - Number(b)).join(', ');
 
+/**
+ * Aparatos de un trabajo: texto con los nombres separados por comas («S2 MIN 2, S1 MIN 2»).
+ * Los partes antiguos, con un solo aparato, ya lo cumplen.
+ */
+export const listaAparatos = (s) => String(s == null ? '' : s).split(',').map((x) => x.trim()).filter(Boolean);
+export const unirAparatos = (lista) => lista.map((x) => String(x == null ? '' : x).trim()).filter(Boolean).join(', ');
+
+const pkAMetros = (s) => { const [km, m] = String(s).split(/\s*[+.,/]\s*/); return Number(km) * 1000 + Number(m); };
+const metrosAPk = (n) => `${Math.floor(n / 1000)}+${String(n % 1000).padStart(3, '0')}`;
+
+/**
+ * PK de los aparatos elegidos de la lista de la oficina: con uno, sus PK tal cual; con varios, del
+ * más bajo al más alto de todos, para que el trabajo los cubra. Null si ninguno está en la lista.
+ */
+export function pkDeAparatos(nombres, lista) {
+  const aps = nombres.map((n) => (lista || []).find((x) => x.nombre === n)).filter(Boolean);
+  if (!aps.length) return null;
+  if (aps.length === 1) return { pkInicio: aps[0].pkInicio, pkFin: aps[0].pkFin };
+  const ms = aps.flatMap((a) => [a.pkInicio, a.pkFin]).filter(pkValido).map(pkAMetros);
+  if (!ms.length) return null;
+  return { pkInicio: metrosAPk(Math.min(...ms)), pkFin: metrosAPk(Math.max(...ms)) };
+}
+
 export const textoBool =(v) => (v === true ? 'si' : v === false ? 'no' : '');
 export const numeroOk = (s) => Number(String(s == null ? '' : s).replace(',', '.')) > 0;
 

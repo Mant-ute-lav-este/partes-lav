@@ -130,6 +130,33 @@ prueba('varias vías: lista, validaciones, PDF y correo', async () => {
   igual(val.listaVias(ej.parteInfra().trabajos[0].via), ['1']);
 });
 
+// Aparatos de prueba (inventados), con PK en los dos sentidos como en la lista real.
+const APARATOS = [
+  { nombre: 'S2 PRU 2', pkInicio: '100+250', pkFin: '100+430' },
+  { nombre: 'S1 PRU 1', pkInicio: '100+820', pkFin: '100+640' },
+  { nombre: 'AD V2 200+050', pkInicio: '200+010', pkFin: '200+090' },
+];
+
+prueba('varios aparatos: lista, PK, PDF y datos', async () => {
+  igual(val.listaAparatos('S2 PRU 2, S1 PRU 1'), ['S2 PRU 2', 'S1 PRU 1']);
+  igual(val.listaAparatos('S2 PRU 2'), ['S2 PRU 2'], 'los partes de antes, con uno');
+  igual([val.listaAparatos(''), val.listaAparatos(null)], [[], []]);
+  igual(val.unirAparatos([' S2 PRU 2 ', '', 'aguja 3']), 'S2 PRU 2, aguja 3', 'sin huecos');
+  // Uno: sus PK tal cual (aunque vayan al revés). Varios: del más bajo al más alto.
+  igual(val.pkDeAparatos(['S1 PRU 1'], APARATOS), { pkInicio: '100+820', pkFin: '100+640' });
+  igual(val.pkDeAparatos(['S2 PRU 2', 'S1 PRU 1'], APARATOS), { pkInicio: '100+250', pkFin: '100+820' });
+  igual(val.pkDeAparatos(['S1 PRU 1', 'AD V2 200+050'], APARATOS), { pkInicio: '100+640', pkFin: '200+090' });
+  igual(val.pkDeAparatos(['aguja 3', 'S2 PRU 2'], APARATOS), { pkInicio: '100+250', pkFin: '100+430' }, 'los escritos a mano no cuentan');
+  igual(val.pkDeAparatos(['aguja 3'], APARATOS), null);
+  // PDF y Datos_ con dos aparatos.
+  const p = ej.parteInfra();
+  p.trabajos[0].aparato = 'S2 PRU 2, S1 PRU 1';
+  const pdf = await generarPDF(p, ej.config, 'prueba', async () => jpeg());
+  igual(await pdf.slice(0, 5).text(), '%PDF-');
+  const e = await prepararEnvio(p, ej.config, async () => jpeg(), 'prueba');
+  cierto((await e.archivos[1].text()).includes('"aparato": "S2 PRU 2, S1 PRU 1"'), 'datos con los dos aparatos');
+});
+
 prueba('validaciones: puestos, subtipos y horas extra', () => {
   igual(val.subtipoDe({}), 'via', 'parte de maquinaria antiguo, sin subtipo');
   igual(val.subtipoDe({ subtipo: 'dresina' }), 'dresina');
@@ -925,6 +952,37 @@ prueba('pantallas: trabajo de INFRA', async () => {
     Object.assign(e.parte.trabajos[0], { finalizado: false, noRealizado: true, motivoNoRealizado: 'Falta de material' });
     Object.assign(e.parte.trabajos[1], { sinFotos: true, motivoSinFotos: 'Sin luz suficiente' });
   }, 'No realizado · Falta de material', 'Sin fotos: Sin luz suficiente');
+});
+
+prueba('pantallas: varios aparatos en un trabajo', async () => {
+  const conAparatos = (e, aparato) => {
+    e.vista = 'trabajo'; e.config = { ...ej.config, aparatos: APARATOS }; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 0;
+    Object.assign(e.parte.trabajos[0], { aparato, pkInicio: '', pkFin: '' });
+  };
+  await pantalla((e) => conAparatos(e, ''), '+ Añadir otro aparato', 'Sin aparato');
+  await pantalla((e) => conAparatos(e, 'S2 PRU 2, aguja 3'), 'AD V2 200+050', 'PK del más bajo al más alto');
+  // Elegir, añadir otro, elegir y quitar, como lo haría el capataz.
+  const { m } = await appEnMarco();
+  const { app } = m;
+  const t = m.estado.parte.trabajos[0];
+  igual(t.filasAparato.map((f) => f.otro), [false, true], 'el escrito a mano sale como «Otro»');
+  const elegir = (i, valor) => {
+    const s = app.querySelector(`select[data-aparato="${i}"]`);
+    s.value = valor;
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const pulsar = (sel) => app.querySelector(sel).click();
+  pulsar('[data-action="quitar-aparato"][data-i="1"]');
+  igual([t.aparato, t.pkInicio, t.pkFin], ['S2 PRU 2', '100+250', '100+430'], 'queda uno: sus PK');
+  pulsar('[data-action="anadir-aparato"]');
+  igual(t.aparato, 'S2 PRU 2', 'la fila vacía no cuenta');
+  elegir(1, 'S1 PRU 1');
+  igual([t.aparato, t.pkInicio, t.pkFin], ['S2 PRU 2, S1 PRU 1', '100+250', '100+820'], 'dos: del más bajo al más alto');
+  elegir(1, '__otro');
+  const inp = app.querySelector('input[data-aparato-txt="1"]');
+  inp.value = 'aguja 3';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  igual(t.aparato, 'S2 PRU 2, aguja 3', 'escrito a mano');
 });
 
 prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {

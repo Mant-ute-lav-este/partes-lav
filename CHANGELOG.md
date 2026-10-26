@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.17.0 · 2026-10-26
+- **Varios aparatos en un mismo trabajo** (INFRA y SUPER): debajo del desplegable «Aparato» sale «+ Añadir otro aparato», y cada aparato lleva una ✕ para quitarlo (también «Otro (escribirlo)» en cada uno). Con uno, los PK se rellenan como siempre; con varios, del PK más bajo al más alto de todos (se pueden cambiar).
+- Se guardan como texto («S2 MIN 2, S1 MIN 2»), así los partes de antes se abren igual y el Datos_ no cambia de formato. En el PDF, la columna APARATO pone uno por línea.
+- Campo nuevo en el trabajo: `filasAparato` (las filas mientras se edita, también las vacías y las escritas a mano). Lo que vale es `aparato`.
+
 ## 0.16.4 · 2026-10-26
 - **Aparatos de dilatación**: los aparatos cuyo nombre empieza por «AD» (p. ej. «AD V2 287+641») salen en el desplegable en su propio grupo, «Aparatos de dilatación», en vez de agruparse por el segundo trozo del nombre. Al elegir uno se rellenan solos los PK, como con los desvíos.
 - Lista de la oficina (servidor, 2026-10-26): 18 aparatos de dilatación de la vía 2, Madrid-Valencia, del 287+641 al 393+818 (el del distribuidor Sur A-7 va con los dos nombres, 384+684 y 384+868, por una errata del listado en papel). Los PK de todos los aparatos se guardan como «km+mmm».

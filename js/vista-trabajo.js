@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { procesarFoto } from './fotos.js';
 import { registrarFallo } from './fallos.js';
 import { esc, uuid, isoLocal, toast, FORMATO1, MAX_FORMATO1, LADO_FORMATO1 } from './util.js';
-import { faltasTrabajo } from './validaciones.js';
+import { faltasTrabajo, listaAparatos, unirAparatos, pkDeAparatos } from './validaciones.js';
 import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS } from './modelo.js';
 import { app, estado, urls, ir, render, guardarYa, guardarPronto, motivosCfg } from './estado.js';
 import { cabeceraParte, campo, campoHora, campoPk, radio, casillasVias } from './campos.js';
@@ -110,30 +110,63 @@ export function etiquetaFoto(t) {
   return (r.motivo || '').trim().toUpperCase() || 'SIN REFERENCIA';
 }
 
+const aparatosCfg = () => (estado.config && estado.config.aparatos) || [];
+
 /**
- * Aparato (opcional): con la lista de la oficina sale un desplegable agrupado por estación y, al
- * elegir uno, se rellenan solos los PK de inicio y fin (que se pueden cambiar). Sin lista, o con
- * «Otro», se escribe a mano.
+ * Filas del campo Aparato mientras se edita ({ nombre, otro }). Lo que vale es `t.aparato`, el texto
+ * con los nombres separados por comas; las filas guardan además las vacías y las escritas a mano.
+ * Los trabajos de antes no las tienen y se sacan del texto.
+ */
+export function filasAparato(t) {
+  if (!Array.isArray(t.filasAparato)) {
+    const lista = aparatosCfg();
+    const ns = listaAparatos(t.aparato);
+    t.filasAparato = ns.length ? ns.map((n) => ({ nombre: n, otro: !lista.some((x) => x.nombre === n) }))
+      : [{ nombre: '', otro: !!t.aparatoOtro }];
+  }
+  return t.filasAparato;
+}
+
+/** Pasa las filas al texto `t.aparato` y, si `conPk`, rellena los PK con los de los aparatos de la lista. */
+export function aplicarAparatos(t, conPk) {
+  const filas = filasAparato(t);
+  t.aparato = unirAparatos(filas.map((f) => f.nombre));
+  delete t.aparatoOtro;   // de antes de 0.17.0: ahora va en cada fila
+  const pk = conPk && pkDeAparatos(filas.filter((f) => !f.otro).map((f) => f.nombre), aparatosCfg());
+  if (pk) Object.assign(t, pk);
+}
+
+/**
+ * Aparatos (opcional, uno o varios): con la lista de la oficina sale un desplegable agrupado por
+ * estación por cada aparato y, al elegirlos, se rellenan solos los PK de inicio y fin (con varios,
+ * del más bajo al más alto; se pueden cambiar). Sin lista, o con «Otro», se escribe a mano.
  */
 export function campoAparato(t, b) {
-  const lista = (estado.config && estado.config.aparatos) || [];
+  const lista = aparatosCfg();
   if (!lista.length) return campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"');
-  const a = t.aparato || '';
-  const otro = t.aparatoOtro || (a && !lista.some((x) => x.nombre === a));
   const grupos = new Map();
   lista.forEach((x) => {
     const est = /^AD\s/.test(x.nombre) ? 'Aparatos de dilatación' : x.nombre.split(/\s+/)[1] || 'Otros';
     if (!grupos.has(est)) grupos.set(est, []);
     grupos.get(est).push(x);
   });
+  const filas = filasAparato(t);
+  const opciones = (f) => `
+            <option value="">Sin aparato</option>
+            ${[...grupos].map(([est, xs]) => `<optgroup label="${esc(est)}">${xs.map((x) => `<option value="${esc(x.nombre)}" ${!f.otro && x.nombre === f.nombre ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</optgroup>`).join('')}
+            <option value="__otro" ${f.otro ? 'selected' : ''}>Otro (escribirlo)</option>`;
   return `
-      <div class="campo"><span>Aparato <small>(opcional)</small></span>
-        <select data-aparato="${b}" aria-label="Aparato">
-          <option value="">Sin aparato</option>
-          ${[...grupos].map(([est, xs]) => `<optgroup label="${esc(est)}">${xs.map((x) => `<option value="${esc(x.nombre)}" ${!otro && x.nombre === a ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</optgroup>`).join('')}
-          <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
-        </select>
-        ${otro ? `<input data-bind="${b}.aparato" value="${esc(a)}" placeholder="Escribe el aparato" autocomplete="off">` : ''}
+      <div class="campo"><span>Aparato <small>(opcional${filas.length > 1 ? '; PK del más bajo al más alto' : ''})</small></span>
+        ${filas.map((f, i) => `
+        <div class="fila-equipo fila-aparato">
+          <div class="equipo-campos">
+            <select data-aparato="${i}" aria-label="Aparato ${i + 1}">${opciones(f)}
+            </select>
+            ${f.otro ? `<input data-aparato-txt="${i}" value="${esc(f.nombre)}" placeholder="Escribe el aparato" autocomplete="off">` : ''}
+          </div>
+          ${filas.length > 1 ? `<button class="btn-quitar" data-action="quitar-aparato" data-i="${i}" aria-label="Quitar el aparato ${i + 1}">✕</button>` : ''}
+        </div>`).join('')}
+        <button class="btn secundario" data-action="anadir-aparato">+ Añadir otro aparato</button>
       </div>`;
 }
 

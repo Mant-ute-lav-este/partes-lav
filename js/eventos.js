@@ -20,6 +20,7 @@ import { aplicarExtra, extrasATodos } from './vista-extras.js';
 import { pintarResultados, copiarPersonal, anadirOtro, borrarParte, cerrarParte } from './vista-parte.js';
 import {
   trabajoActual, nuevoTrabajo, copiarTrabajoAnterior, anadirFotos, borrarFoto, borrarTrabajo,
+  filasAparato, aplicarAparatos,
 } from './vista-trabajo.js';
 import {
   enviarServidor, procesarYMostrar, enviarPorGmail, enviar, corregir, prepararEnvioActual,
@@ -56,6 +57,14 @@ export function onInput(e) {
   if (el.dataset.pk) { aplicarPk(el, false); return; }
   if (el.dataset.hora) { aplicarHora(el, false); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
+  if (el.dataset.aparatoTxt) {
+    const t = trabajoActual();
+    if (!t || estado.parte.estado !== 'borrador') return;
+    filasAparato(t)[Number(el.dataset.aparatoTxt)].nombre = el.value;
+    aplicarAparatos(t, false);
+    guardarPronto();
+    return;
+  }
   if (el.matches('[data-bind]') && el.type !== 'radio' && el.type !== 'checkbox') aplicarBind(el);
 }
 
@@ -76,18 +85,13 @@ export async function onChange(e) {
   if (el.dataset.aparato) {
     const t = trabajoActual();
     if (!t || estado.parte.estado !== 'borrador') return;
-    if (el.value === '__otro') {
-      t.aparatoOtro = true;
-      t.aparato = '';
-    } else {
-      t.aparatoOtro = false;
-      t.aparato = el.value;
-      const ap = ((estado.config || {}).aparatos || []).find((x) => x.nombre === el.value);
-      if (ap) { t.pkInicio = ap.pkInicio; t.pkFin = ap.pkFin; }
-    }
+    const i = Number(el.dataset.aparato);
+    const otro = el.value === '__otro';
+    filasAparato(t)[i] = { nombre: otro ? '' : el.value, otro };
+    aplicarAparatos(t, true);
     guardarPronto();
     render();
-    if (t.aparatoOtro) { const inp = app.querySelector(`[data-bind="${el.dataset.aparato}.aparato"]`); if (inp) inp.focus(); }
+    if (otro) { const inp = app.querySelector(`[data-aparato-txt="${i}"]`); if (inp) inp.focus(); }
     return;
   }
   // ¿Trabajo finalizado? Sí / No, sin terminar / No realizado (un no realizado tampoco está finalizado).
@@ -430,6 +434,15 @@ export async function onClick(e) {
     case 'cerrar-pregunta': estado.preguntaOtro = false; render(); break;
     case 'copiar-trabajo-anterior': copiarTrabajoAnterior(); break;
     case 'borrar-trabajo': borrarTrabajo(); break;
+    case 'anadir-aparato': filasAparato(trabajoActual()).push({ nombre: '', otro: false }); guardarPronto(); render(); break;
+    case 'quitar-aparato': {
+      const t = trabajoActual();
+      filasAparato(t).splice(i, 1);
+      aplicarAparatos(t, true);
+      guardarPronto();
+      render();
+      break;
+    }
     case 'nuevo-equipo': p[el.dataset.lista].push({ descripcion: '', matricula: '', otro: false }); guardarPronto(); render(); break;
     case 'quitar-equipo': p[el.dataset.lista].splice(i, 1); guardarPronto(); render(); break;
     case 'nueva-maqvia': p.maquinasVia.push(nuevaMaquinaVia()); guardarPronto(); render(); break;

@@ -1,7 +1,7 @@
 // PDF A4 apaisado con el aspecto del parte en papel. Se genera en el móvil con jsPDF.
 
 import { fmtFecha, fmtFechaHora, FORMATO1 } from './util.js';
-import { puestosDe } from './validaciones.js';
+import { puestosDe, listaAparatos } from './validaciones.js';
 
 const PT = 0.3528;              // 1 punto tipográfico en mm
 const M = 8;                    // margen
@@ -303,7 +303,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     t.sinVia ? (t.horaFin ? `Fin\n${t.horaFin}` : '-') : t.salidaVia,
     t.linea,
     t.sinVia && !t.via ? '-' : t.via,
-    t.aparato || '',
+    listaAparatos(t.aparato).join('\n'),   // uno por línea
     t.pkInicio,
     t.pkFin,
     t.metrosLineales == null ? '' : String(t.metrosLineales),
