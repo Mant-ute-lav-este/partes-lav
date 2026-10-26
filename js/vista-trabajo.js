@@ -122,7 +122,7 @@ export function campoAparato(t, b) {
   const otro = t.aparatoOtro || (a && !lista.some((x) => x.nombre === a));
   const grupos = new Map();
   lista.forEach((x) => {
-    const est = x.nombre.split(/\s+/)[1] || 'Otros';
+    const est = /^AD\s/.test(x.nombre) ? 'Aparatos de dilatación' : x.nombre.split(/\s+/)[1] || 'Otros';
     if (!grupos.has(est)) grupos.set(est, []);
     grupos.get(est).push(x);
   });

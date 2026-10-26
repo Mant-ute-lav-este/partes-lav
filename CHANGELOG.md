@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.16.4 · 2026-10-26
+- **Aparatos de dilatación**: los aparatos cuyo nombre empieza por «AD» (p. ej. «AD V2 287+641») salen en el desplegable en su propio grupo, «Aparatos de dilatación», en vez de agruparse por el segundo trozo del nombre. Al elegir uno se rellenan solos los PK, como con los desvíos.
+- Lista de la oficina (servidor, 2026-10-26): 18 aparatos de dilatación de la vía 2, Madrid-Valencia, del 287+641 al 393+818 (el del distribuidor Sur A-7 va con los dos nombres, 384+684 y 384+868, por una errata del listado en papel). Los PK de todos los aparatos se guardan como «km+mmm».
+
 ## 0.16.3 · 2026-10-21
 - **Vías 1 a 5 también en maquinaria**: el tajo de maquinaria de vía y el trabajo de locomotora/dresina, que solo tenían Vía 1 y Vía 2, ahora ofrecen las cinco (se pueden marcar varias). El aviso de «falta la vía» dice «elige al menos una vía».
 
