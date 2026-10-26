@@ -22,6 +22,7 @@ const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const ACCIONES = {
   codigo: pedirCodigo_,
   verificar: verificarCodigo_,
+  buscarNombre: buscarNombre_,
   registro: registrar_,
   estado: estado_,
   login: entrar_,
@@ -194,15 +195,50 @@ function comprobarCodigo_(email, codigo, consumir) {
   if (consumir) cache.remove(k);
 }
 
+/**
+ * Solo comprueba el código. Ya NO devuelve la lista de trabajadores: cualquiera con un Gmail podía
+ * pedir un código a su correo y llevarse los nombres de todos. Ahora cada uno escribe el suyo (buscarNombre).
+ * `nombres` va vacía para las apps de antes de la 0.18, que la esperan (al abrirse se actualizan solas).
+ */
 function verificarCodigo_(d) {
+  comprobarCodigo_(email_(d.email), d.codigo, false);
+  return { nombres: [] };
+}
+
+const MAX_BUSQUEDAS_NOMBRE = 10;   // por correo y hora: que no se pueda sacar la lista probando nombres
+
+/** «José  Pérez» → ['jose', 'perez']: sin tildes, mayúsculas ni espacios de más. */
+function palabras_(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .split(/[^a-z0-9ñ]+/).filter(Boolean);
+}
+
+/**
+ * Registro, paso 3: la persona escribe su nombre y al menos un apellido, en cualquier orden. Solo se
+ * contesta si encaja exactamente con UNA persona de la lista (palabras enteras): así no se puede
+ * sacar la lista probando letras. Devuelve el nombre tal como está en la lista.
+ */
+function buscarNombre_(d) {
   const email = email_(d.email);
   comprobarCodigo_(email, d.codigo, false);
-  const ocupados = new Set(tabla_('Usuarios').filas.filter((u) => u.Estado !== 'rechazado').map((u) => String(u.Nombre)));
-  const nombres = tabla_('Trabajadores').filas
-    .map((t) => String(t.Nombre))
-    .filter((n) => n && !ocupados.has(n))
-    .sort((a, b) => a.localeCompare(b, 'es'));
-  return { nombres: nombres };
+  const cache = CacheService.getScriptCache();
+  const kb = 'b:' + email;
+  const n = Number(cache.get(kb) || 0);
+  if (n >= MAX_BUSQUEDAS_NOMBRE) throw new Error('Demasiados intentos. Espera una hora o habla con la oficina.');
+  cache.put(kb, String(n + 1), 3600);
+  const buscadas = palabras_(d.texto);
+  if (buscadas.length < 2) throw new Error('Escribe tu nombre y al menos un apellido.');
+  const encajan = tabla_('Trabajadores').filas.map((t) => String(t.Nombre || '')).filter((nombre) => {
+    const suyas = palabras_(nombre);
+    return nombre && buscadas.every((p) => suyas.indexOf(p) >= 0);
+  });
+  if (!encajan.length) throw new Error('No te encontramos. Escríbelo como lo tiene la empresa o habla con la oficina.');
+  if (encajan.length > 1) throw new Error('Hay más de una persona con ese nombre: añade el otro apellido.');
+  const nombre = encajan[0];
+  if (tabla_('Usuarios').filas.some((u) => String(u.Nombre) === nombre && u.Estado !== 'rechazado')) {
+    throw new Error('Ese nombre ya tiene una cuenta. Habla con la oficina.');
+  }
+  return { nombre: nombre };
 }
 
 function registrar_(d) {
@@ -382,15 +418,35 @@ function config_(d) {
 /**
  * Número más alto que este capataz ya ha enviado de cada prefijo ({INF: 12, LOC: 3…}). Con él, un
  * móvil reinstalado sigue la numeración en vez de volver a la 0001 y pisar carpetas en Teams.
+ *
+ * Se guarda en las propiedades del script («ult:<correo>») y se pone al día en cada envío, para no
+ * leer la hoja Envios entera, que no para de crecer. Si no está (la primera vez), se calcula una vez
+ * desde Envios. Va una propiedad por capataz para que los envíos de dos capataces a la vez, que van
+ * sin bloqueo, no se pisen: los de un mismo móvil salen de uno en uno.
  */
 function ultimosNumeros_(email) {
   const e = String(email).toLowerCase();
+  const guardado = props_().getProperty('ult:' + e);
+  if (guardado) {
+    try { return JSON.parse(guardado); } catch (x) { /* ilegible: se vuelve a calcular */ }
+  }
   const ultimos = {};
   tabla_('Envios').filas.forEach((f) => {
     const m = /^([A-Z]+)-(\d+)$/.exec(String(f.Ref || ''));
     if (m && String(f.Email).toLowerCase() === e) ultimos[m[1]] = Math.max(ultimos[m[1]] || 0, Number(m[2]));
   });
+  props_().setProperty('ult:' + e, JSON.stringify(ultimos));
   return ultimos;
+}
+
+/** Tras un envío: sube el número guardado si este es más alto (un rectificativo de uno viejo no lo baja). */
+function apuntarUltimo_(email, ref) {
+  const m = /^([A-Z]+)-(\d+)$/.exec(String(ref || ''));
+  if (!m) return;
+  const ultimos = ultimosNumeros_(email);
+  if ((ultimos[m[1]] || 0) >= Number(m[2])) return;
+  ultimos[m[1]] = Number(m[2]);
+  props_().setProperty('ult:' + String(email).toLowerCase(), JSON.stringify(ultimos));
 }
 
 /**
@@ -473,12 +529,17 @@ function asegurarHoja_(nombre, cabeceras) {
  *  3. Apuntar en Envios (appendRow no depende de números de fila, no necesita bloqueo).
  * La reserva dura 10 minutos en la caché: si un reintento llega mientras el primero aún está
  * mandando el correo, recibe «ocupado» y la app vuelve a probar más tarde, cuando ya figura en Envios.
+ *
+ * Para no mandar nunca un parte dos veces, nada más salir el correo se deja la marca «ya enviado»
+ * en la caché (6 horas). Así, aunque luego falle el apunte en Envios, el reintento no lo vuelve a
+ * mandar. Pasadas esas horas lo encuentra en Envios (buscando solo ese identificador).
  */
 function enviar_(d) {
   const envioId = String(d.envioId || '');
   if (!/^[0-9a-f-]{36}$/i.test(envioId)) throw new Error('Envío sin identificador.');
   const cache = CacheService.getScriptCache();
   const reserva = 'e:' + envioId;
+  const hecho = 'h:' + envioId;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw ocupado_('El servidor está ocupado. Se reintentará.');
   let u, aj;
@@ -486,8 +547,8 @@ function enviar_(d) {
     u = usuarioDeSesion_(d.token, true);
     // Si la app reintenta un envío que ya llegó (p. ej. se cortó la cobertura al recibir
     // la respuesta), no se manda dos veces.
-    const previo = tabla_('Envios').filas.find((f) => f.EnvioId === envioId);
-    if (previo) return { recibido: String(previo.Recibido), repetido: true };
+    const previo = cache.get(hecho) || recibidoEnEnvios_(envioId);
+    if (previo) return { recibido: String(previo), repetido: true };
     if (cache.get(reserva)) throw ocupado_('Este parte se está enviando. Se comprobará en un momento.');
     aj = ajustes_();
     if (!aj.destinatario) throw new Error('Falta el correo de destino en los ajustes del servidor.');
@@ -502,10 +563,45 @@ function enviar_(d) {
     cache.remove(reserva);   // el correo no ha salido: se puede volver a intentar ya
     throw err;
   }
-  // Si esto fallara, la reserva sigue 10 minutos y evita mandar el correo dos veces enseguida.
-  hoja_('Envios').appendRow([envioId, String(u.Email), String(u.Nombre), String(d.ref || ''), r.asunto, String(r.bytes), r.fecha]);
-  cache.remove(reserva);
+  // A partir de aquí el correo YA ha salido: nada puede devolver error, o la app lo reenviaría.
+  try { cache.put(hecho, r.fecha, 21600); } catch (x) { /* sin caché: queda la reserva y Envios */ }
+  const fila = [envioId, String(u.Email), String(u.Nombre), String(d.ref || ''), r.asunto, String(r.bytes), r.fecha];
+  let apuntado = false;
+  for (let i = 0; i < 3 && !apuntado; i++) {
+    try {
+      if (i) Utilities.sleep(1000 * i);
+      hoja_('Envios').appendRow(fila);
+      apuntado = true;
+    } catch (err) {
+      if (i === 2) apuntarError_('envios', String(d.ref || '') + ' (' + envioId + ') no está en Envios: ' + String((err && err.message) || err));
+    }
+  }
+  // Sin apunte, la reserva se alarga 6 horas: otra defensa más, además de la marca «ya enviado».
+  if (apuntado) cache.remove(reserva);
+  else try { cache.put(reserva, '1', 21600); } catch (x) { /* nada más que hacer */ }
+  // El parte ya ha salido y está apuntado: si esto falla no se puede dar error (la app lo reenviaría).
+  // Sin el número guardado, la próxima vez se vuelve a calcular desde Envios.
+  try {
+    apuntarUltimo_(u.Email, d.ref);
+  } catch (err) {
+    try { props_().deleteProperty('ult:' + String(u.Email).toLowerCase()); } catch (x) { /* nada más que hacer */ }
+    apuntarError_('ultimos', String(d.ref || '') + ': ' + String((err && err.message) || err));
+  }
   return { recibido: r.fecha };
+}
+
+/**
+ * Fecha de recepción si ese envío ya está en Envios o en su archivo ('' si no). Busca solo ese
+ * identificador, sin leer la hoja entera.
+ */
+function recibidoEnEnvios_(envioId) {
+  const hojas = ['Envios', 'EnviosArchivo'];
+  for (let i = 0; i < hojas.length; i++) {
+    const h = hoja_(hojas[i]);
+    const celda = h && h.createTextFinder(envioId).matchEntireCell(true).findNext();
+    if (celda) return String(h.getRange(celda.getRow(), 7).getValue() || 'sí');
+  }
+  return '';
 }
 
 function ocupado_(mensaje) {
@@ -639,6 +735,48 @@ function copiaSeguridad() {
   copias.sort((a, b) => b.getDateCreated() - a.getDateCreated());
   copias.slice(COPIAS_A_GUARDAR).forEach((f) => f.setTrashed(true));
   Logger.log('Copia hecha: ' + fecha + ' (' + Math.min(copias.length, COPIAS_A_GUARDAR) + ' guardadas)');
+  // Con la copia ya hecha, se archivan los envíos viejos. Si falla, la copia vale igual.
+  try {
+    Logger.log('Envíos archivados: ' + archivarEnvios());
+  } catch (err) {
+    apuntarError_('archivo', String((err && err.message) || err));
+  }
+}
+
+// ---------- Archivo de envíos ----------
+
+const MESES_ENVIOS = 12;   // en la hoja Envios se quedan solo los envíos de este tiempo
+
+/**
+ * Pasa a la hoja «EnviosArchivo» los envíos de hace más de MESES_ENVIOS meses, para que Envios no
+ * crezca sin fin. Se ejecuta solo cada lunes, tras la copia de seguridad; también se puede a mano.
+ * Antes se aseguran los últimos números de cada capataz, que la primera vez se calculan desde Envios.
+ * Las filas viejas están arriba (se apuntan por orden de llegada) y se quitan con deleteRows, sin
+ * reescribir la hoja: así no se pierde un envío que se esté apuntando a la vez (eso va sin bloqueo).
+ * Devuelve cuántos ha archivado.
+ */
+function archivarEnvios() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try {
+    const t = tabla_('Envios');
+    if (!t.h || !t.filas.length) return 0;
+    const correos = {};
+    t.filas.forEach((f) => { if (f.Email) correos[String(f.Email).toLowerCase()] = true; });
+    Object.keys(correos).forEach((e) => ultimosNumeros_(e));
+    const limite = new Date();
+    limite.setMonth(limite.getMonth() - MESES_ENVIOS);
+    let n = 0;
+    while (n < t.filas.length && new Date(String(t.filas[n].Recibido)).getTime() < limite.getTime()) n++;
+    if (!n) return 0;
+    const archivo = asegurarHoja_('EnviosArchivo', t.cab);
+    const viejas = t.filas.slice(0, n).map((f) => t.cab.map((c) => String(f[c] == null ? '' : f[c])));
+    archivo.getRange(archivo.getLastRow() + 1, 1, n, t.cab.length).setValues(viejas);
+    t.h.deleteRows(2, n);
+    return n;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** Se ejecuta una vez a mano: crea el activador que hace la copia cada lunes a las 3 de la madrugada. */
@@ -839,7 +977,14 @@ function correosValidos_(s) {
 }
 
 function props_() { return PropertiesService.getScriptProperties(); }
-function libro_() { return SpreadsheetApp.openById(props_().getProperty('HOJA_ID')); }
+
+// La hoja se abre una sola vez por petición (abrirla es lo más lento de Google). No se queda vieja:
+// Apps Script empieza cada petición y cada activador desde cero, con esta variable vacía.
+let libroAbierto_ = null;
+function libro_() {
+  if (!libroAbierto_) libroAbierto_ = SpreadsheetApp.openById(props_().getProperty('HOJA_ID'));
+  return libroAbierto_;
+}
 function hoja_(nombre) { return libro_().getSheetByName(nombre); }
 function ahora_() { return Utilities.formatDate(new Date(), ZONA, "yyyy-MM-dd'T'HH:mm:ssXXX"); }
 function hex_(bytes) { return bytes.map((b) => ('0' + (b & 0xff).toString(16)).slice(-2)).join(''); }

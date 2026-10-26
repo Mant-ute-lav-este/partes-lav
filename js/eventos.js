@@ -13,7 +13,7 @@ import {
 } from './estado.js';
 import { aplicarHora, aplicarPk, conEspera } from './campos.js';
 import {
-  ITER_PIN, pintarNombres, terminarAcceso, cerrarSesion, hashPin, cargarConfigArchivo, guardarConfig,
+  ITER_PIN, terminarAcceso, cerrarSesion, hashPin, cargarConfigArchivo, guardarConfig,
 } from './vista-acceso.js';
 import { nuevoParte, contestarRepetir } from './vista-inicio.js';
 import { aplicarExtra, extrasATodos } from './vista-extras.js';
@@ -47,11 +47,6 @@ export function onInput(e) {
   if (el.id === 'buscar-persona') {
     estado.busqueda = el.value;
     pintarResultados();
-    return;
-  }
-  if (el.id === 'buscar-nombre') {
-    estado.reg.filtro = el.value;
-    pintarNombres();
     return;
   }
   if (el.dataset.pk) { aplicarPk(el, false); return; }
@@ -256,7 +251,13 @@ export async function onSubmit(e) {
   } else if (tipo === 'reg-codigo') {
     const codigo = f.codigo.value.trim();
     const r = await conEspera('Comprobando…', () => api('verificar', { email: estado.reg.email, codigo }));
-    if (r) { Object.assign(estado.reg, { codigo, nombres: r.nombres, filtro: '' }); ir('reg-nombre'); }
+    if (r) { estado.reg.codigo = codigo; ir('reg-nombre'); }
+  } else if (tipo === 'reg-nombre') {
+    const texto = f.texto.value.trim();
+    estado.reg.texto = texto;
+    const { email, codigo } = estado.reg;
+    const r = await conEspera('Buscando…', () => api('buscarNombre', { email, codigo, texto }));
+    if (r) { estado.reg.nombre = r.nombre; ir('reg-pin'); }
   } else if (tipo === 'reg-pin') {
     const pin1 = f.pin1.value.trim();
     const pin2 = f.pin2.value.trim();
@@ -333,7 +334,6 @@ export async function onClick(e) {
       if (ok) toast('Te hemos enviado otro código', 3500);
       break;
     }
-    case 'elegir-nombre': estado.reg.nombre = el.dataset.nombre; ir('reg-pin'); break;
     case 'comprobar-cuenta': await conEspera('Comprobando…', () => sincronizar({ avisar: true })); break;
     case 'enviar-pendientes':
       await conEspera('Enviando…', async () => {

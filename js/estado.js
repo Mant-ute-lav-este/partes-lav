@@ -10,7 +10,7 @@ import { esc, isoLocal, normaliza, debounce, toast } from './util.js';
 import { MAQUINAS_VIA_PROVISIONALES, MEDIDAS_PROVISIONALES, persona, claveContador } from './modelo.js';
 import {
   vBienvenida, vRegEmail, vRegCodigo, vRegNombre, vRegPin, vLogin, vRecEmail, vRecPin, vSetupDatos,
-  vSetupCapataz, vSetupPin, vPin, pintarNombres,
+  vSetupCapataz, vSetupPin, vPin,
 } from './vista-acceso.js';
 import { vInicio } from './vista-inicio.js';
 import { vParte, pintarResultados } from './vista-parte.js';
@@ -23,7 +23,7 @@ export const estado = {
   vista: 'cargando',
   config: null,          // lista de la oficina
   perfil: null,          // { capataz, pin: { salt, hash, iter } } + con registro: { email, token, cuenta }
-  reg: {},               // datos del registro en curso: { email, codigo, nombres, nombre, filtro }
+  reg: {},               // datos del registro en curso: { email, codigo, texto (lo escrito), nombre (el de la lista) }
   otros: [],             // personas añadidas a mano, para no reescribirlas
   lista: [],             // partes (pantalla de inicio)
   parte: null,           // parte abierto
@@ -145,7 +145,6 @@ export function render() {
   document.body.classList.toggle('sin-scroll',
     Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
   pintarResultados();
-  pintarNombres();
   cargarMiniaturas();
   const auto = app.querySelector('[data-autofocus]');
   if (auto) auto.focus();

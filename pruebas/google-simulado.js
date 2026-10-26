@@ -12,20 +12,34 @@ function crearEntorno(codigo) {
   const cache = {};
   const correos = [];
   let bloqueado = false;
+  let aperturas = 0;   // veces que se abre la hoja (openById)
   const g = {};
 
   const hoja = () => {
     const d = [];
-    return {
+    const h = {
       _d: d,
-      getDataRange: () => ({ getValues: () => d.map((r) => r.slice()) }),
+      _lecturas: 0,   // veces que se ha leído la hoja entera
+      getDataRange: () => ({ getValues: () => { h._lecturas++; return d.map((r) => r.slice()); } }),
       appendRow: (r) => d.push(r.map(String)),
       getLastRow: () => d.length,
       getMaxRows: () => Math.max(d.length, 1000),
       getMaxColumns: () => 26,
       getLastColumn: () => Math.max(0, ...d.map((r) => r.length)),
       setFrozenRows: () => {},
+      deleteRows: (desde, n) => { d.splice(desde - 1, n); },
+      createTextFinder: (texto) => {
+        const f = {
+          matchEntireCell: () => f,
+          findNext: () => {
+            const i = d.findIndex((fila) => fila.some((v) => String(v) === String(texto)));
+            return i < 0 ? null : { getRow: () => i + 1 };
+          },
+        };
+        return f;
+      },
       getRange: (r, c, nr = 1, nc = 1) => ({
+        getValue: () => ((d[r - 1] || [])[c - 1] ?? ''),
         setNumberFormat: () => {},
         setValue: (v) => { while (d.length < r) d.push([]); d[r - 1][c - 1] = String(v); },
         setValues: (vals) => vals.forEach((fila, i) => fila.forEach((v, j) => {
@@ -37,6 +51,7 @@ function crearEntorno(codigo) {
         },
       }),
     };
+    return h;
   };
   const libro = {
     getSheetByName: (n) => hojas[n] || null,
@@ -54,8 +69,14 @@ function crearEntorno(codigo) {
   };
   const p2 = (n) => String(n).padStart(2, '0');
   Object.assign(g, {
-    SpreadsheetApp: { openById: () => libro, create: () => libro },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = String(v); } }) },
+    SpreadsheetApp: { openById: () => { aperturas++; return libro; }, create: () => libro },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => (k in props ? props[k] : null),
+        setProperty: (k, v) => { props[k] = String(v); },
+        deleteProperty: (k) => { delete props[k]; },
+      }),
+    },
     CacheService: { getScriptCache: () => ({ get: (k) => (k in cache ? cache[k] : null), put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
     LockService: {
       getScriptLock: () => ({
@@ -73,6 +94,7 @@ function crearEntorno(codigo) {
         return `${Y}-${M}-${D}T${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}+02:00`;
       },
       getUuid: () => crypto.randomUUID(),
+      sleep: () => {},
       computeDigest: (a, s) => bytesDe('d' + s),
       computeHmacSha256Signature: (s, k) => bytesDe('h' + k + s),
       base64Decode: (b) => Array.from(atob(b), (c) => c.charCodeAt(0)),
@@ -92,7 +114,7 @@ function crearEntorno(codigo) {
   });
   const nombres = Object.keys(g);
   const s = new Function(...nombres, `${codigo}
-    return { doPost, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_ };`)(...nombres.map((n) => g[n]));
+    return { doPost, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_, archivarEnvios };`)(...nombres.map((n) => g[n]));
   const post = (o) => JSON.parse(s.doPost({ postData: { contents: JSON.stringify(o) } }));
-  return { s, post, g, hojas, props, cache, correos, bloqueado: () => bloqueado };
+  return { s, post, g, hojas, props, cache, correos, bloqueado: () => bloqueado, aperturas: () => aperturas };
 }

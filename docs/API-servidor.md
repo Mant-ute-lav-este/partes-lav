@@ -35,7 +35,8 @@ Google a veces pierde la respuesta aunque haya hecho la acción (llega una pági
 | Acción | Datos | Devuelve | Notas |
 |---|---|---|---|
 | `codigo` | `email`; `para: 'pin'` si es para recuperar el PIN | `{}` | Envía un código de 6 cifras al correo (caduca en 10 min). Máximo 3 por correo y hora. |
-| `verificar` | `email`, `codigo` | `nombres[]` | Comprueba el código y devuelve los nombres de la lista de trabajadores que aún no tienen cuenta. |
+| `verificar` | `email`, `codigo` | `nombres: []` | Solo comprueba el código. **Desde el servidor v13 ya no devuelve la lista de trabajadores** (la lista va siempre vacía); usa `buscarNombre`. |
+| `buscarNombre` | `email`, `codigo`, `texto` | `nombre` | (v13) La persona escribe su nombre y al menos un apellido; da igual el orden, las tildes y las mayúsculas, pero van palabras enteras. Solo contesta si encaja con **una** persona de la lista que aún no tiene cuenta, y devuelve el nombre tal como está en la lista (es el que se pasa a `registro`). Máximo 10 intentos por correo y hora. |
 | `registro` | `email`, `codigo`, `nombre`, `pin` (4–6 cifras) | `token`, `estado: 'pendiente'`, `nombre` | Crea la cuenta como **pendiente**; la oficina la aprueba desde un enlace que le llega por correo. |
 | `login` | `email`, `pin` | `token`, `estado`, `nombre` | 5 PIN erróneos bloquean 15 minutos. |
 | `estado` | `token` | `estado`, `nombre` | Para saber si ya la han aprobado. |

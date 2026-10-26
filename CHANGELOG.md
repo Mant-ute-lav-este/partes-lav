@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.18.0 · 2026-10-26 (con el servidor versión 13)
+- **Registro sin la lista de trabajadores**: en el paso «¿Quién eres?» ya no sale la lista para elegir. Se escribe el nombre y al menos un apellido («Tu nombre y apellidos» → «Buscarme») y el servidor busca a esa persona (da igual el orden, las tildes y las mayúsculas). En el paso del PIN sale el nombre encontrado con «Si no eres tú, pulsa «Atrás»». Antes, cualquiera con un Gmail podía ver los nombres de todos.
+- Servidor v13 (sin cambios para el capataz): abre la hoja de Google una sola vez por petición; los últimos números de cada capataz se guardan aparte en vez de leer la hoja Envios entera; un parte ya enviado no se puede mandar dos veces aunque falle su apunte en Envios; los envíos de más de 12 meses pasan solos cada lunes a la hoja «EnviosArchivo». La copia a ivandesvios la manda ahora Power Automate desde Outlook (el servidor gasta 1 correo por parte en vez de 2).
+- Necesita el servidor versión 13: con el 12 el paso «Buscarme» da «Acción desconocida».
+
 ## 0.17.1 · 2026-10-26
 - Los aparatos de dilatación se llaman ahora por el viaducto, el estribo y el PK («Sobre Río Magro E1 · 322+013») y siguen saliendo juntos en el grupo «Aparatos de dilatación».
 - Lista de la oficina (servidor): 17 aparatos de dilatación con esos nombres (el del distribuidor Sur A-7 queda uno solo, con el PK 384+684); 86 aparatos en total.

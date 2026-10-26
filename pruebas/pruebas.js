@@ -779,6 +779,36 @@ prueba('servidor: un reintento no manda el correo dos veces', async () => {
   igual(E.correos.length, 1);
 });
 
+prueba('servidor: reintento horas después (sin caché) lo encuentra en Envios sin leerla entera', async () => {
+  const E = await servidorListo();
+  const p = E.parte();
+  const r1 = E.post(p);
+  for (const k of Object.keys(E.cache)) delete E.cache[k];   // la caché de Google ha caducado
+  const lecturas = E.hojas.Envios._lecturas;
+  const r2 = E.post({ ...p, peticion: crypto.randomUUID() });
+  igual(r2.repetido, true, r2.error);
+  igual(r2.recibido, r1.recibido, 'misma fecha de recepción');
+  igual(E.correos.length, 1);
+  igual(E.hojas.Envios._lecturas, lecturas, 'ha leído Envios entera para buscar un envío');
+});
+
+prueba('servidor: si falla el apunte en Envios, el reintento no manda el parte otra vez', async () => {
+  const E = await servidorListo();
+  E.post(E.parte({ ref: 'INF-0005' }));   // los últimos números ya guardados
+  const normal = E.hojas.Envios.appendRow;
+  E.hojas.Envios.appendRow = () => { throw new Error('Google no responde'); };
+  const p = E.parte({ ref: 'INF-0006' });
+  const r1 = E.post(p);
+  igual(r1.ok, true, 'el correo salió: no puede dar error');
+  igual(E.correos.length, 2);
+  cierto(/INF-0006.*no está en Envios/.test(E.hojas.Errores._d.at(-1)[5]), 'aviso en Errores');
+  E.hojas.Envios.appendRow = normal;
+  const r2 = E.post({ ...p, peticion: crypto.randomUUID() });
+  igual(r2.repetido, true, 'el reintento debe saber que ya salió');
+  igual(E.correos.length, 2, 'no se manda dos veces');
+  igual(E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() }).ultimos, { INF: 6 }, 'el número 6 no se puede reutilizar');
+});
+
 prueba('servidor: envío en curso → «ocupado», sin guardar esa respuesta', async () => {
   const E = await servidorListo();
   const p = E.parte();
@@ -853,6 +883,112 @@ prueba('servidor: la lista trae el último número enviado de cada prefijo', asy
   igual(r.ultimos, { INF: 12, LOC: 2 }, 'solo los de este capataz, el más alto');
 });
 
+prueba('servidor: los últimos números no leen la hoja Envios en cada config', async () => {
+  const E = await servidorListo();
+  E.post(E.parte({ ref: 'INF-0012' }));
+  const config = () => E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() });
+  const antes = E.hojas.Envios._lecturas;
+  igual(config().ultimos, { INF: 12 });
+  igual(config().ultimos, { INF: 12 });
+  igual(E.hojas.Envios._lecturas, antes, 'config ha leído Envios');
+  E.post(E.parte({ ref: 'INF-0013' }));
+  igual(config().ultimos, { INF: 13 }, 'se pone al día al enviar');
+});
+
+prueba('servidor: últimos números desde un servidor viejo (sin guardar) y rectificativos', async () => {
+  const E = await servidorListo();
+  // Envíos de antes del cambio: están en Envios pero no en las propiedades.
+  E.hojas.Envios.appendRow(['v1', 'ana@ejemplo.test', 'Ana', 'INF-0040', 'a', '1', 'f']);
+  E.hojas.Envios.appendRow(['v2', 'ANA@ejemplo.test', 'Ana', 'SUP-0007', 'a', '1', 'f']);
+  // Rectificativo de un parte viejo: no puede dejar el número en 3.
+  igual(E.post(E.parte({ ref: 'INF-0003' })).ok, true);
+  const r = E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() });
+  igual(r.ultimos, { INF: 40, SUP: 7 });
+  // Si se pierde lo guardado, se vuelve a calcular.
+  delete E.props['ult:ana@ejemplo.test'];
+  igual(E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() }).ultimos, { INF: 40, SUP: 7 });
+});
+
+/** Registro hasta el paso del código: devuelve una función que pide buscarNombre con lo escrito. */
+function registroConCodigo(E, email = 'nuevo@ejemplo.test') {
+  E.hojas.Trabajadores.appendRow(['José Pérez Gil', 'UTE', '', '']);
+  E.hojas.Trabajadores.appendRow(['José Martínez Gil', 'UTE', '', '']);
+  E.hojas.Trabajadores.appendRow(['Ana Prueba', 'UTE', '', '']);
+  igual(E.post({ accion: 'codigo', email, peticion: crypto.randomUUID() }).ok, true);
+  const codigo = /(\d{6})/.exec(E.correos.at(-1).subject)[1];
+  return { codigo, buscar: (texto) => E.post({ accion: 'buscarNombre', email, codigo, texto, peticion: crypto.randomUUID() }) };
+}
+
+prueba('servidor: el código ya no devuelve la lista de trabajadores', async () => {
+  const E = await servidorListo();
+  const { codigo } = registroConCodigo(E);
+  const r = E.post({ accion: 'verificar', email: 'nuevo@ejemplo.test', codigo, peticion: crypto.randomUUID() });
+  igual(r.ok, true, r.error);
+  igual(r.nombres, [], 'la lista de nombres sale del servidor');
+  cierto(!/José|Ana/.test(JSON.stringify(r)), 'hay nombres en la respuesta');
+});
+
+prueba('servidor: buscar el nombre al registrarse (tildes, orden, ambiguos, ya registrados)', async () => {
+  const E = await servidorListo();
+  const { codigo, buscar } = registroConCodigo(E);
+  igual(buscar('perez jose').nombre, 'José Pérez Gil', 'sin tildes y en otro orden');
+  igual(buscar('  JOSÉ   pérez  gil ').nombre, 'José Pérez Gil', 'mayúsculas y espacios');
+  cierto(/más de una persona/.test(buscar('José Gil').error), 'dos José Gil');
+  cierto(/al menos un apellido/.test(buscar('José').error), 'una sola palabra');
+  cierto(/No te encontramos/.test(buscar('Jo Pe').error), 'trozos de palabra no valen');
+  cierto(/ya tiene una cuenta/.test(buscar('Ana Prueba').error), 'Ana ya está registrada');
+  cierto(/código/.test(E.post({ accion: 'buscarNombre', email: 'nuevo@ejemplo.test', codigo: '000000', texto: 'jose perez', peticion: crypto.randomUUID() }).error), 'código malo');
+  // Con el nombre encontrado, el registro termina como siempre.
+  const r = E.post({ accion: 'registro', email: 'nuevo@ejemplo.test', codigo, nombre: 'José Pérez Gil', pin: '1234', peticion: crypto.randomUUID() });
+  igual(r.ok, true, r.error);
+  igual(r.estado, 'pendiente');
+});
+
+prueba('servidor: no se puede sacar la lista probando nombres', async () => {
+  const E = await servidorListo();
+  const { buscar } = registroConCodigo(E);
+  for (let i = 0; i < 9; i++) buscar('nadie ' + i);
+  cierto(/No te encontramos/.test(buscar('nadie 9').error), 'el intento 10 aún vale');
+  cierto(/Demasiados intentos/.test(buscar('jose perez').error), 'el 11 se corta, aunque sea bueno');
+});
+
+prueba('servidor: archivo anual de Envios (sin perder números ni duplicar partes)', async () => {
+  const E = await servidorListo();
+  const viejo = (id, ref, fecha) => E.hojas.Envios.appendRow([id, 'ana@ejemplo.test', 'Ana', ref, 'a', '1', fecha]);
+  const idViejo = crypto.randomUUID();
+  viejo(idViejo, 'INF-0099', '2024-03-01T08:00:00+01:00');
+  viejo(crypto.randomUUID(), 'SUP-0050', '2024-05-01T08:00:00+02:00');
+  viejo(crypto.randomUUID(), 'INF-0100', '2025-01-10T08:00:00+01:00');
+  const p = E.parte({ ref: 'INF-0101' });
+  E.post(p);   // envío de hoy: se queda en Envios
+  delete E.props['ult:ana@ejemplo.test'];   // como en un servidor recién actualizado
+
+  igual(E.s.archivarEnvios(), 3, 'archivados');
+  igual(E.hojas.Envios._d.slice(1).map((f) => f[3]), ['INF-0101'], 'en Envios queda solo el de hoy');
+  igual(E.hojas.EnviosArchivo._d[0][0], 'EnvioId', 'el archivo lleva cabecera');
+  igual(E.hojas.EnviosArchivo._d.slice(1).map((f) => f[3]), ['INF-0099', 'SUP-0050', 'INF-0100']);
+  igual(E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() }).ultimos, { INF: 101, SUP: 50 }, 'los números viejos no se pierden');
+  igual(E.s.archivarEnvios(), 0, 'segunda pasada');
+
+  // Un reintento de un envío archivado tampoco se manda otra vez.
+  for (const k of Object.keys(E.cache)) delete E.cache[k];
+  const r = E.post(E.parte({ envioId: idViejo, ref: 'INF-0099' }));
+  igual(r.repetido, true, r.error);
+  igual(E.correos.length, 1, 'solo el envío de hoy');
+});
+
+prueba('servidor: cada petición abre la hoja una sola vez', async () => {
+  // Un entorno simulado es una sola ejecución de Google: el libro se abre una vez (al preparar la
+  // prueba) y ninguna petición más lo vuelve a abrir. Antes, config lo abría una vez por cada hoja.
+  const E = await servidorListo();
+  const antes = E.aperturas();
+  igual(antes, 1, 'al preparar la prueba');
+  const r = E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() });
+  igual(r.ok, true, r.error);
+  igual(E.post(E.parte()).ok, true);
+  igual(E.aperturas(), antes, 'config y enviar no deben volver a abrir el libro');
+});
+
 // ---------- pantallas (pruebas de humo) ----------
 // La app de verdad, en un marco: se pinta cada pantalla con los partes de ejemplo y se comprueba
 // que sale sin errores. Así salta cualquier función que falte o que no se importe al partir
@@ -908,10 +1044,12 @@ async function pantalla(preparar, ...esperados) {
 }
 
 prueba('pantallas: registro, acceso y PIN', async () => {
-  const reg = { email: 'ana@ejemplo.test', codigo: '123456', nombres: ['Ana Prueba', 'Luis Ejemplo'], nombre: 'Ana Prueba', filtro: '' };
-  for (const vista of ['bienvenida', 'reg-email', 'reg-codigo', 'reg-nombre', 'reg-pin', 'login', 'rec-email', 'rec-pin']) {
+  const reg = { email: 'ana@ejemplo.test', codigo: '123456', texto: 'ana prueba', nombre: 'Ana Prueba' };
+  for (const vista of ['bienvenida', 'reg-email', 'reg-codigo', 'login', 'rec-email', 'rec-pin']) {
     await pantalla((e) => { e.vista = vista; e.perfil = null; e.reg = { ...reg }; });
   }
+  await pantalla((e) => { e.vista = 'reg-nombre'; e.perfil = null; e.reg = { ...reg }; }, 'Tu nombre y apellidos', 'Buscarme');
+  await pantalla((e) => { e.vista = 'reg-pin'; e.perfil = null; e.reg = { ...reg }; }, 'Ana Prueba', 'Si no eres tú');
   await pantalla((e) => { e.vista = 'pin'; }, 'Ana Prueba');
   for (const vista of ['setup-datos', 'setup-capataz', 'setup-pin']) await pantalla((e) => { e.vista = vista; e.perfil = null; });
 });

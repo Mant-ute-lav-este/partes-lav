@@ -3,7 +3,7 @@
 
 import * as db from './db.js';
 import { hayServidor } from './servidor.js';
-import { esc, normaliza, toast } from './util.js';
+import { esc, toast } from './util.js';
 import { estado, ir, sincronizar, cargarConfigServidor } from './estado.js';
 import { barraSimple, conEspera } from './campos.js';
 
@@ -64,22 +64,14 @@ export function vRegNombre() {
   <main class="contenido">
     <section class="tarjeta">
       <h2>¿Quién eres?</h2>
-      <label class="campo"><span>Busca tu nombre en la lista</span>
-        <input type="search" id="buscar-nombre" placeholder="Escribe tu nombre o apellido" autocomplete="off" value="${esc(estado.reg.filtro || '')}"></label>
-      <div id="lista-nombres" class="resultados"></div>
-      <p class="nota">Si no sales en la lista, habla con la oficina para que te añadan.</p>
+      <form data-form="reg-nombre">
+        <label class="campo"><span>Tu nombre y apellidos</span>
+          <input name="texto" placeholder="Por ejemplo: Juan García" autocomplete="name" autocapitalize="words" required value="${esc(estado.reg.texto || '')}" data-autofocus></label>
+        <button class="btn primario grande">Buscarme</button>
+      </form>
+      <p class="nota">Escribe tu nombre y al menos un apellido, como los tiene la empresa. Si no te encuentra, habla con la oficina.</p>
     </section>
   </main>`;
-}
-
-export function pintarNombres() {
-  const cont = document.getElementById('lista-nombres');
-  if (!cont) return;
-  const q = normaliza(estado.reg.filtro);
-  const nombres = (estado.reg.nombres || []).filter((n) => !q || normaliza(n).includes(q));
-  cont.innerHTML = nombres.length
-    ? nombres.map((n) => `<button class="resultado" data-action="elegir-nombre" data-nombre="${esc(n)}"><strong>${esc(n)}</strong></button>`).join('')
-    : '<p class="vacio">No hay nadie con ese nombre.</p>';
 }
 
 export function vRegPin() {
@@ -88,6 +80,7 @@ export function vRegPin() {
   <main class="contenido">
     <section class="tarjeta">
       <h2>${esc(estado.reg.nombre)}</h2>
+      <p class="nota">Si no eres tú, pulsa «Atrás» y escríbelo de nuevo.</p>
       <p>Crea tu PIN de 4 a 6 cifras. Es tu contraseña: te lo pedirá la app al abrirla y
         para entrar desde otro móvil.</p>
       <form data-form="reg-pin">
