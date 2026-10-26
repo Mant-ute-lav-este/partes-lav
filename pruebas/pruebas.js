@@ -135,6 +135,7 @@ const APARATOS = [
   { nombre: 'S2 PRU 2', pkInicio: '100+250', pkFin: '100+430' },
   { nombre: 'S1 PRU 1', pkInicio: '100+820', pkFin: '100+640' },
   { nombre: 'AD V2 200+050', pkInicio: '200+010', pkFin: '200+090' },
+  { nombre: 'Sobre el Barranco de Prueba E1 · 210+050', pkInicio: '210+010', pkFin: '210+090' },
 ];
 
 prueba('varios aparatos: lista, PK, PDF y datos', async () => {
@@ -961,6 +962,12 @@ prueba('pantallas: varios aparatos en un trabajo', async () => {
   };
   await pantalla((e) => conAparatos(e, ''), '+ Añadir otro aparato', 'Sin aparato');
   await pantalla((e) => conAparatos(e, 'S2 PRU 2, aguja 3'), 'AD V2 200+050', 'PK del más bajo al más alto');
+  {
+    // Los de dilatación, con el nombre del viaducto o el antiguo «AD …», van juntos en su grupo.
+    const { m } = await appEnMarco();
+    const grupo = m.app.querySelector('select[data-aparato="0"] optgroup[label="Aparatos de dilatación"]');
+    igual([...grupo.querySelectorAll('option')].map((o) => o.value), ['AD V2 200+050', 'Sobre el Barranco de Prueba E1 · 210+050']);
+  }
   // Elegir, añadir otro, elegir y quitar, como lo haría el capataz.
   const { m } = await appEnMarco();
   const { app } = m;

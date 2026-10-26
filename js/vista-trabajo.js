@@ -146,7 +146,9 @@ export function campoAparato(t, b) {
   if (!lista.length) return campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"');
   const grupos = new Map();
   lista.forEach((x) => {
-    const est = /^AD\s/.test(x.nombre) ? 'Aparatos de dilatación' : x.nombre.split(/\s+/)[1] || 'Otros';
+    // Los de dilatación llevan el nombre del viaducto, el estribo y el PK («Sobre Río Magro E1 · 322+013»).
+    const dilatacion = /^AD\s/.test(x.nombre) || /\sE\d\s·\s\d+\+\d{3}$/.test(x.nombre);
+    const est = dilatacion ? 'Aparatos de dilatación' : x.nombre.split(/\s+/)[1] || 'Otros';
     if (!grupos.has(est)) grupos.set(est, []);
     grupos.get(est).push(x);
   });

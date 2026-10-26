@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.17.1 · 2026-10-26
+- Los aparatos de dilatación se llaman ahora por el viaducto, el estribo y el PK («Sobre Río Magro E1 · 322+013») y siguen saliendo juntos en el grupo «Aparatos de dilatación».
+- Lista de la oficina (servidor): 17 aparatos de dilatación con esos nombres (el del distribuidor Sur A-7 queda uno solo, con el PK 384+684); 86 aparatos en total.
+
 ## 0.17.0 · 2026-10-26
 - **Varios aparatos en un mismo trabajo** (INFRA y SUPER): debajo del desplegable «Aparato» sale «+ Añadir otro aparato», y cada aparato lleva una ✕ para quitarlo (también «Otro (escribirlo)» en cada uno). Con uno, los PK se rellenan como siempre; con varios, del PK más bajo al más alto de todos (se pueden cambiar).
 - Se guardan como texto («S2 MIN 2, S1 MIN 2»), así los partes de antes se abren igual y el Datos_ no cambia de formato. En el PDF, la columna APARATO pone uno por línea.
