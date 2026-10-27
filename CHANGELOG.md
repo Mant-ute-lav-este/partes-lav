@@ -2,9 +2,13 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v15 · 2026-10-27 (la app no cambia)
+- Arreglo de la v14: un solo toque llegaba como dos clics y daba de baja sin confirmar. Ahora el segundo toque solo cuenta si llega medio segundo después del primero. Probado en la página real con una cuenta de prueba (baja y vuelta a activar).
+- `enlaceRevision` sin correo (así la ejecuta el botón «Ejecutar» del editor) saca el enlace de todas las cuentas. Ojo: desde el editor el enlace sale con `/dev` en vez de `/exec` y solo se abre con la sesión de la cuenta de la UTE abierta; la firma es la misma, así que se puede cambiar `…/dev?` por la URL `…/exec?` de la app.
+
 ## Servidor v14 · 2026-10-27 (la app no cambia)
 - **Bajas de usuarios**: el enlace firmado del correo de registro sirve también después. Con la cuenta activa enseña «Dar de baja» (pasa a «rechazado»: ya no puede entrar, recibir la lista ni enviar partes; lo enviado se queda) y, si está de baja, «Volver a activar». Cada decisión pide dos toques.
-- Si el correo del registro ya no está: ejecutar `enlaceRevision('correo@…')` en el editor de Apps Script y abrir el enlace que sale en el registro de ejecución.
+- Si el correo del registro ya no está: en el editor de Apps Script elegir la función `enlaceRevision` y pulsar «Ejecutar». En el registro de ejecución sale cada cuenta con su nombre, estado y enlace.
 - El correo de registro dice que se guarde, porque sirve para la baja.
 
 ## 0.19.2 · 2026-10-27

@@ -281,10 +281,17 @@ function urlRevision_(email) {
 
 /**
  * Para dar de baja a alguien cuyo correo de registro ya no está: ejecutarla a mano en el editor
- * (cambiando el correo) y abrir el enlace que sale en el registro de ejecución.
+ * («Ejecutar» no pasa argumentos: sin correo saca el enlace de todas las cuentas, con su nombre
+ * y estado) y abrir el enlace que sale en el registro de ejecución.
  */
 function enlaceRevision(email) {
   email = String(email || '').trim().toLowerCase();
+  if (!email) {
+    const lineas = tabla_('Usuarios').filas.map((u) =>
+      u.Nombre + ' <' + u.Email + '> · ' + u.Estado + '\n' + urlRevision_(String(u.Email).toLowerCase()));
+    Logger.log(lineas.join('\n\n'));
+    return lineas.join('\n\n');
+  }
   if (!buscarUsuario_(email)) throw new Error('No hay ninguna cuenta con ese correo: ' + email);
   const url = urlRevision_(email);
   Logger.log(url);
@@ -1071,10 +1078,12 @@ const PAGINA_REVISION_ = `<!doctype html>
 <button class="si" onclick="decidir(this, 'activo')">Volver a activar</button>
 <? } ?>
 <script>
-  // Dos toques para decidir: un toque sin querer no cambia nada.
+  // Dos toques para decidir: un toque sin querer no cambia nada. El segundo solo cuenta si llega
+  // medio segundo después: un solo toque puede llegar como dos clics seguidos (visto en la v14).
   function decidir(boton, d) {
-    if (!boton.dataset.seguro) {
-      boton.dataset.seguro = '1';
+    var primero = Number(boton.dataset.seguro || 0);
+    if (!primero || Date.now() - primero < 500) {
+      if (!primero) boton.dataset.seguro = String(Date.now());
       boton.textContent = 'Pulsa otra vez para confirmar';
       return;
     }

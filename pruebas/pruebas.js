@@ -1019,6 +1019,9 @@ prueba('servidor: dar de baja con el enlace firmado y volver a activar', async (
   igual(error, 'Enlace no válido.', 'firma falsa');
   try { E.s.enlaceRevision('nadie@ejemplo.test'); error = ''; } catch (e) { error = e.message; }
   cierto(/No hay ninguna cuenta/.test(error), 'correo que no existe');
+  const todas = E.s.enlaceRevision();   // así la ejecuta el botón «Ejecutar» del editor
+  cierto(todas.includes('Ana Prueba <ana@ejemplo.test> · activo') && todas.includes(firma), 'sin correo: todas las cuentas');
+  cierto(todas.includes('Rechazado Prueba'), 'también las de baja');
 
   igual(E.s.revisarRegistro('ana@ejemplo.test', firma, 'rechazado'), 'rechazado');
   const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
