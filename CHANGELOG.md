@@ -2,6 +2,14 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.20.0 · 2026-10-27
+- **Aspecto** (Menú → Aspecto): **Tema** (Automático, Claro u Oscuro) y **Letra** (Normal o Grande, un 20 % más grande en toda la app). Se aplica al tocar, se guarda en cada móvil (localStorage, `js/aspecto.js`) y se recuerda al reabrir; un script de `index.html` lo pone antes de pintar para que no parpadee en claro. «Automático» sigue al móvil como hasta ahora. El texto base de la hoja de estilos pasa de 17 px fijos a `1.0625rem` para que la letra grande llegue a todo.
+- **Jornada sin trabajos** (todos los partes): en «Jornada» hay una casilla nueva, «Jornada sin trabajos (no se ha podido trabajar: lluvia, avería…)». Al marcarla pide el motivo (lluvia / meteorología, avería de maquinaria o vehículos, sin corte de vía / sin autorización, falta de material, falta de personal, u «Otro» escrito) y esconde trabajos, maquinaria, vehículos, medidas antiincendios y formato 1. Siguen siendo obligatorios la fecha y el personal. No se preguntan horas extra.
+- El PDF lleva una sola sección, «JORNADA SIN TRABAJOS: No se ha podido trabajar: <motivo>» en rojo (más las observaciones). El asunto del correo acaba en «· SIN TRABAJOS» y el cuerpo dice «JORNADA SIN TRABAJOS: <motivo>»; sigue empezando por «PARTE LAV», así que el flujo de Power Automate lo recoge igual. Los datos llevan `sinTrabajos`, `motivoSinTrabajos` y `sinTrabajosOtro`. En Inicio sale «Jornada sin trabajos» en vez de «N trabajo(s)».
+- Si ya había trabajos apuntados y se marca la casilla, al cerrar pregunta y los quita (con sus fotos).
+- **También en maquinaria** (vía, locomotora y dresina), pensado para averías: piden solo fecha, máquina y motivo (más los nombres del personal que se haya puesto). No piden horario, EVB, viaje, tajos/trabajos, vagones, combustible, km ni nº de acta, ni puestos obligatorios. El PDF saca la máquina, el motivo en rojo y el personal.
+- Con la casilla marcada, los datos que viajan (`Datos_`) llevan vacíos trabajos, tajos, realizados, vagones y formato 1, aunque se hubieran apuntado antes.
+
 ## Servidor v15 · 2026-10-27 (la app no cambia)
 - Arreglo de la v14: un solo toque llegaba como dos clics y daba de baja sin confirmar. Ahora el segundo toque solo cuenta si llega medio segundo después del primero. Probado en la página real con una cuenta de prueba (baja y vuelta a activar).
 - `enlaceRevision` sin correo (así la ejecuta el botón «Ejecutar» del editor) saca el enlace de todas las cuentas. Ojo: desde el editor el enlace sale con `/dev` en vez de `/exec` y solo se abre con la sesión de la cuenta de la UTE abierta; la firma es la misma, así que se puede cambiar `…/dev?` por la URL `…/exec?` de la app.

@@ -10,6 +10,7 @@ import {
 import { estado, ir, render, guardarYa, maquinasViaCfg, capatazComoPersona, medidasCfg } from './estado.js';
 import { inputConfig } from './vista-acceso.js';
 import { APP_VERSION } from './app.js';
+import { leerAspecto } from './aspecto.js';
 
 // ---------- Inicio ----------
 
@@ -27,6 +28,7 @@ export function estadoTexto(p) {
 
 /** «3 trabajo(s)», «2 tajo(s)»… según el tipo de parte. */
 export function textoCuenta(p) {
+  if (p.sinTrabajos) return 'Jornada sin trabajos';
   if (p.tipo !== 'MAQUINARIA') return `${p.trabajos.length} trabajo(s)`;
   return subtipoDe(p) === 'via' ? `${(p.tajos || []).length} tajo(s)` : `${(p.realizados || []).length} trabajo(s)`;
 }
@@ -95,9 +97,16 @@ export function vInicio() {
   ${estado.repetir ? vRepetir() : ''}`;
 }
 
+/** Una fila de botones para elegir (Tema, Letra). Cambia al tocar: ver `data-aspecto` en eventos.js. */
+function filaAspecto(titulo, clave, opciones, actual) {
+  return `<div class="campo"><span>${titulo}</span><div class="segmentado compacto">${opciones.map(([v, txt]) =>
+    `<label><input type="radio" name="aspecto-${clave}" value="${v}" data-aspecto="${clave}" ${actual === v ? 'checked' : ''}><span>${txt}</span></label>`).join('')}</div></div>`;
+}
+
 export function vMenu() {
   const c = estado.config || {};
   const srv = Boolean(estado.perfil && estado.perfil.token);
+  const asp = leerAspecto();
   return `
   <div class="capa" data-action="cerrar-menu"><div class="hoja" data-stop>
     <h2>Menú</h2>
@@ -105,6 +114,11 @@ export function vMenu() {
     ? '<button class="btn secundario" data-action="actualizar-lista">Actualizar la lista de la oficina</button>'
     : `<button class="btn secundario" data-action="elegir-config">Cargar lista de la oficina</button>${inputConfig}
        <button class="btn secundario" data-action="cambiar-capataz">Cambiar de capataz</button>`}
+    <section class="aspecto">
+      <h3>Aspecto</h3>
+      ${filaAspecto('Tema', 'tema', [['auto', 'Automático'], ['claro', 'Claro'], ['oscuro', 'Oscuro']], asp.tema)}
+      ${filaAspecto('Letra', 'letra', [['normal', 'Normal'], ['grande', 'Grande']], asp.letra)}
+    </section>
     <a class="btn secundario" href="./guia/guia-capataces.pdf" target="_blank" rel="noopener">Guía rápida (PDF)</a>
     <button class="btn secundario" data-action="cambiar-pin">Cambiar PIN</button>
     <button class="btn secundario" data-action="bloquear">Bloquear la app</button>

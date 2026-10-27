@@ -9,6 +9,14 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<script>
+  // Aspecto elegido en el Menú (tema y letra): se pone antes de pintar para que no parpadee. Ver js/aspecto.js.
+  try {
+    var a = JSON.parse(localStorage.getItem('partes-lav-aspecto') || '{}');
+    if (a.tema === 'claro' || a.tema === 'oscuro') document.documentElement.dataset.tema = a.tema;
+    if (a.letra === 'grande') document.documentElement.dataset.letra = 'grande';
+  } catch (e) { /* sin almacenamiento: aspecto por defecto */ }
+</script>
 <link rel="stylesheet" href="css/app.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"
         integrity="sha384-qovJwSBbRDPP5cEjCp8S0UP66wrvnjaa60XMOGzTNanrThcrGfXfnZkvgY8N1KT3"

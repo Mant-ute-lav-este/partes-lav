@@ -182,12 +182,24 @@ export function faltasTrabajo(t) {
   return e;
 }
 
+/** Jornada sin trabajos (no se pudo trabajar): el aviso si falta el motivo; si no, null. */
+export function faltaMotivoSinTrabajos(p) {
+  if (String(p.motivoSinTrabajos == null ? '' : p.motivoSinTrabajos).trim()) return null;
+  return p.sinTrabajosOtro ? 'Has elegido «Otro» motivo: escribe por qué no se ha podido trabajar.'
+    : 'Indica por qué no se ha podido trabajar.';
+}
+
 export function validar(p) {
   const e = [];
   const add = (msg, trabajo = null) => e.push({ msg, trabajo });
   const vacio = (s) => !String(s == null ? '' : s).trim();
   if (!p.fecha) add('Falta la fecha de la jornada.');
   if (!p.personal.length) add('Añade al menos una persona en «Personal».');
+  // Jornada sin trabajos: solo hace falta el motivo; no se piden trabajos, maquinaria ni medidas.
+  if (p.sinTrabajos) {
+    if (faltaMotivoSinTrabajos(p)) add(faltaMotivoSinTrabajos(p));
+    return e;
+  }
   if (!p.trabajos.length) add('Añade al menos un trabajo.');
   p.trabajos.forEach((t, i) => {
     for (const f of faltasTrabajo(t)) add(`Trabajo ${i + 1}: ${f.largo}`, i);
@@ -260,6 +272,13 @@ export function validarMaq(p) {
   const add = (msg) => e.push({ msg, trabajo: null });
   const vacio = (s) => !String(s == null ? '' : s).trim();
   if (!p.fecha) add('Falta la fecha de la jornada.');
+  // Jornada sin trabajos (p. ej. avería): basta con la fecha, la máquina y el motivo.
+  if (p.sinTrabajos) {
+    if (!p.maquinasVia.some((m) => !vacio(m.descripcion))) add('Elige la máquina.');
+    if (faltaMotivoSinTrabajos(p)) add(faltaMotivoSinTrabajos(p));
+    p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(p, x.puesto)}: escribe el nombre o quítalo.`); });
+    return e;
+  }
   if (!horaValida(p.horaInicio) || !horaValida(p.horaFin)) add('Falta el horario de la jornada (inicio y fin).');
   faltasPuestos(p).forEach(add);
   const maquinas = p.maquinasVia.filter((m) => !vacio(m.descripcion));
@@ -291,6 +310,12 @@ export function validarLD(p) {
   const loco = subtipoDe(p) === 'locomotora';
   if (!p.fecha) add('Falta la fecha.');
   if (vacio(p.maquina.descripcion)) add(`Escribe qué ${loco ? 'locomotora' : 'dresina'} es.`);
+  // Jornada sin trabajos (p. ej. avería): basta con la fecha, la máquina y el motivo.
+  if (p.sinTrabajos) {
+    if (faltaMotivoSinTrabajos(p)) add(faltaMotivoSinTrabajos(p));
+    p.personal.forEach((x) => { if (vacio(x.nombre)) add(`${nombrePuesto(p, x.puesto)}: escribe el nombre o quítalo.`); });
+    return e;
+  }
   if (vacio(p.acta)) add('Falta el nº de acta.');
   faltasPuestos(p).forEach(add);
   if (!horaValida(p.salida.hora)) add('Falta la hora de salida.');

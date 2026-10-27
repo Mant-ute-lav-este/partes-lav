@@ -24,8 +24,10 @@
   color-scheme: light;
 }
 
+/* Tema oscuro: con el móvil en oscuro (salvo que se haya elegido «Claro» en el Menú) o si se ha
+   elegido «Oscuro». Son dos copias del mismo bloque: CSS no deja unir una media query con un atributo. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --fondo: #0b0f19;
     --superficie: #151b29;
     --superficie-2: #1b2234;
@@ -47,14 +49,37 @@
     color-scheme: dark;
   }
 }
+:root[data-tema="oscuro"] {
+  --fondo: #0b0f19;
+  --superficie: #151b29;
+  --superficie-2: #1b2234;
+  --texto: #e8ebf1;
+  --suave: #a1a9b8;
+  --borde: #2f3850;
+  --primario: #2a3f73;
+  --acento: #6b9cff;
+  --infra: #e0601c;
+  --super: #3b6fe8;
+  --maq: #65a30d;
+  --ok: #4ade80;
+  --ok-fondo: #12301d;
+  --pendiente-fondo: #3a2c06;
+  --peligro: #ff8a7a;
+  --aviso-fondo: #3a2c06;
+  --aviso-txt: #ffe08a;
+  --sombra: none;
+  color-scheme: dark;
+}
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* Letra grande (Menú → Aspecto): casi todo está en rem, así que basta con subir la base. */
+html[data-letra="grande"] { font-size: 120%; }
 body {
   margin: 0;
   background: var(--fondo);
   color: var(--texto);
-  font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 1.0625rem/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 body.sin-scroll { overflow: hidden; }
@@ -242,6 +267,8 @@ a.btn { display: flex; align-items: center; justify-content: center; text-decora
   width: 100%; max-width: 720px; max-height: 88vh; overflow: auto; background: var(--superficie);
   border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
 }
+.hoja .aspecto { margin: 6px 0 12px; }
+.hoja .aspecto h3 { margin-bottom: 4px; }
 .hoja.pequena { max-width: 320px; border-radius: 16px; text-align: center; padding: 24px; }
 .girando {
   width: 42px; height: 42px; margin: 0 auto 12px; border-radius: 50%;

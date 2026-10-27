@@ -6,7 +6,7 @@ import { procesarFoto } from './fotos.js';
 import { registrarFallo } from './fallos.js';
 import { esc, uuid, isoLocal, toast, FORMATO1, MAX_FORMATO1, LADO_FORMATO1 } from './util.js';
 import { faltasTrabajo, listaAparatos, unirAparatos, pkDeAparatos } from './validaciones.js';
-import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS } from './modelo.js';
+import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS, MOTIVOS_SIN_TRABAJOS } from './modelo.js';
 import { app, estado, urls, ir, render, guardarYa, guardarPronto, motivosCfg } from './estado.js';
 import { cabeceraParte, campo, campoHora, campoPk, radio, casillasVias } from './campos.js';
 
@@ -72,18 +72,28 @@ export function campoMotivo(p, t, b) {
  * Motivo de una lista fija (no realizado, sin fotos) más «Otro» para escribirlo. Guarda el texto en
  * t[campo] y si es «Otro» en t[campoOtro].
  */
-function campoMotivoLista(titulo, b, t, campo, campoOtro, lista) {
+export function campoMotivoLista(titulo, b, t, campo, campoOtro, lista) {
   const m = t[campo] || '';
   const otro = t[campoOtro] || (m && !lista.includes(m));
+  // Sin `b` el motivo es del parte (jornada sin trabajos), no de un trabajo.
+  const sel = b ? `data-motivo-lista="${b}"` : 'data-motivo-parte';
   return `
       <div class="campo"><span>${titulo} <span class="oblig">obligatorio</span></span>
-        <select data-motivo-lista="${b}" data-campo="${campo}" data-otro="${campoOtro}" aria-label="${titulo}">
+        <select ${sel} data-campo="${campo}" data-otro="${campoOtro}" aria-label="${titulo}">
           <option value="">Elige el motivo…</option>
           ${lista.map((x) => `<option value="${esc(x)}" ${!otro && x === m ? 'selected' : ''}>${esc(x)}</option>`).join('')}
           <option value="__otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option>
         </select>
-        ${otro ? `<input data-bind="${b}.${campo}" value="${esc(m)}" placeholder="Escribe el motivo" autocomplete="off">` : ''}
+        ${otro ? `<input data-bind="${b ? `${b}.` : ''}${campo}" value="${esc(m)}" placeholder="Escribe el motivo" autocomplete="off">` : ''}
       </div>`;
+}
+
+/** «Jornada sin trabajos» (no se pudo trabajar): casilla y, si está marcada, el motivo. Va en la tarjeta Jornada de todos los partes. */
+export function bloqueSinTrabajos(p) {
+  return `
+      <label class="check"><input type="checkbox" data-bind="sinTrabajos" data-rerender ${p.sinTrabajos ? 'checked' : ''}>
+        <span>Jornada sin trabajos <small>(no se ha podido trabajar: lluvia, avería…)</small></span></label>
+      ${p.sinTrabajos ? campoMotivoLista('¿Por qué no se ha podido trabajar?', '', p, 'motivoSinTrabajos', 'sinTrabajosOtro', MOTIVOS_SIN_TRABAJOS) : ''}`;
 }
 
 /** Mismo corte que el trabajo anterior: copia línea, vía, horas, telefonema y PIDAME (se pueden cambiar). */

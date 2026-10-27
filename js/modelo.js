@@ -79,6 +79,14 @@ export const MOTIVOS_NO_REALIZADO = [
   'Falta de material',
   'Falta de personal o maquinaria',
 ];
+// Jornada en la que no se pudo trabajar (INFRA y SUPER): se cierra el parte sin trabajos y con el motivo.
+export const MOTIVOS_SIN_TRABAJOS = [
+  'Lluvia / meteorología',
+  'Avería de maquinaria o vehículos',
+  'Sin corte de vía / sin autorización',
+  'Falta de material',
+  'Falta de personal',
+];
 export const MOTIVOS_SIN_FOTOS = [
   'Prohibido fotografiar en la zona',
   'Móvil sin batería / sin cámara',

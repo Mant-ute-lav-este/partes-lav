@@ -14,7 +14,7 @@ import {
 import { cabeceraParte, refParte, radio, vErrores } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 import { vParteMaq } from './vista-maquinaria.js';
-import { vFotoGrande } from './vista-trabajo.js';
+import { vFotoGrande, bloqueSinTrabajos } from './vista-trabajo.js';
 
 // ---------- Parte ----------
 
@@ -49,6 +49,7 @@ export function vParte() {
       ${p.tipo === 'INFRA' ? '' : `<label class="check"><input type="checkbox" data-bind="nocturna" ${p.nocturna ? 'checked' : ''}>
         <span>Jornada nocturna <small>(pon la fecha del día en que empezó)</small></span></label>`}
       <div class="campo"><span>Capataz</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
+      ${bloqueSinTrabajos(p)}
     </section>
 
     <section class="tarjeta">
@@ -66,6 +67,10 @@ export function vParte() {
       ${estado.otroAbierto ? vOtroForm() : '<button class="btn secundario" data-action="abrir-otro">+ Añadir a alguien que no está en la lista</button>'}
     </section>
 
+    ${p.sinTrabajos ? `
+    <section class="tarjeta">
+      <p class="nota">Con «Jornada sin trabajos» solo hace falta el personal y el motivo. No se piden trabajos, maquinaria, vehículos ni medidas antiincendios.</p>
+    </section>` : `
     ${estado.parte.usaExtras && !estado.preguntaExtras ? seccionExtras() : ''}
     ${seccionEquipos('maquinas')}
     ${seccionEquipos('vehiculos')}
@@ -85,7 +90,7 @@ export function vParte() {
       ${p.medidasOtrasSi ? `<textarea data-bind="medidasOtras" rows="2" placeholder="Escribe las otras medidas">${esc(p.medidasOtras)}</textarea>` : ''}
     </section>
 
-    ${p.tipo === 'SUPER' ? seccionFormato1(p) : ''}
+    ${p.tipo === 'SUPER' ? seccionFormato1(p) : ''}`}
 
     <section class="tarjeta">
       <h2>Observaciones</h2>
@@ -254,13 +259,21 @@ export async function cerrarParte() {
     render();
     return;
   }
-  // Sin nadie en el parte de maquinaria no hay a quién poner horas extra.
-  if (maq && !estado.parte.personal.length) estado.parte.usaExtras = false;
+  // Sin nadie en el parte de maquinaria no hay a quién poner horas extra; en una jornada sin trabajos tampoco.
+  if ((maq && !estado.parte.personal.length) || estado.parte.sinTrabajos) estado.parte.usaExtras = false;
   // Las horas extra se preguntan al cerrar: Sí abre la lista del personal; No sigue cerrando.
   if (estado.parte.usaExtras == null) {
     estado.preguntaExtras = true;
     render();
     return;
+  }
+  // Si ya había trabajos apuntados y luego se marcó «Jornada sin trabajos», se quitan al cerrar (con aviso).
+  const p = estado.parte;
+  if (p.sinTrabajos && ((p.trabajos || []).length || (p.formato1 || []).length)) {
+    if (!confirm('Has marcado «Jornada sin trabajos»: se quitarán de este parte los trabajos y fotos que ya habías apuntado. ¿Seguir?')) return;
+    p.trabajos = [];
+    p.formato1 = [];
+    for (const f of await db.fotosDeParte(p.id)) await db.borrarFoto(f.id);
   }
   const aviso = await avisoPeso(estado.parte);
   if (aviso && !confirm(aviso)) return;

@@ -17,6 +17,7 @@ import {
 } from './vista-acceso.js';
 import { nuevoParte, contestarRepetir } from './vista-inicio.js';
 import { textoEspacio } from './espacio.js';
+import { guardarAspecto } from './aspecto.js';
 import { aplicarExtra, extrasATodos } from './vista-extras.js';
 import { pintarResultados, copiarPersonal, anadirOtro, borrarParte, cerrarParte } from './vista-parte.js';
 import {
@@ -78,6 +79,11 @@ export async function onChange(e) {
     if (files.length && estado.fotoPendiente) await anadirFotos(files, estado.fotoPendiente);
     return;
   }
+  // Menú → Aspecto (tema y letra): se aplica y se guarda en este móvil al instante, sin repintar el Menú.
+  if (el.dataset.aspecto) {
+    guardarAspecto({ [el.dataset.aspecto]: el.value });
+    return;
+  }
   if (el.dataset.aparato) {
     const t = trabajoActual();
     if (!t || estado.parte.estado !== 'borrador') return;
@@ -98,6 +104,17 @@ export async function onChange(e) {
     t.noRealizado = el.value === 'noreal';
     guardarPronto();
     render();
+    return;
+  }
+  // Motivo de «jornada sin trabajos»: es del parte, no de un trabajo.
+  if (el.matches('[data-motivo-parte]')) {
+    const p = estado.parte;
+    if (!p || p.estado !== 'borrador') return;
+    p[el.dataset.otro] = el.value === '__otro';
+    p[el.dataset.campo] = p[el.dataset.otro] ? '' : el.value;
+    guardarPronto();
+    render();
+    if (p[el.dataset.otro]) { const inp = app.querySelector(`[data-bind="${el.dataset.campo}"]`); if (inp) inp.focus(); }
     return;
   }
   if (el.dataset.motivoLista) {

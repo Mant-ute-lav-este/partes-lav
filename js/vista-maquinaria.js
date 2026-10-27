@@ -7,6 +7,12 @@ import { MAX_TOLVA, MODOS_NIVELADO, MODOS_ALINEADO, CUANDO_REGISTRO, normalizarP
 import { estado, maquinasDeVia, personalMaqCfg } from './estado.js';
 import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores, casillasVias } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
+import { bloqueSinTrabajos } from './vista-trabajo.js';
+
+const NOTA_SIN_TRABAJOS = `
+    <section class="tarjeta">
+      <p class="nota">Con «Jornada sin trabajos» solo hace falta la fecha, la máquina y el motivo. No se piden horarios, viaje ni trabajos.</p>
+    </section>`;
 
 // ---------- Parte de maquinaria de vía ----------
 // Sigue el orden del papel: jornada (fecha y horario), máquinas con sus horas, viaje, tajos,
@@ -92,8 +98,8 @@ export function campoEvb(p) {
 
 export function seccionPersonalMaq(p) {
   const lista = personalMaqCfg();
-  const oblig = puestosObligatorios(p);
-  const sinEvb = llevaEvb(p) && p.evb !== true && p.evb !== false;
+  const oblig = p.sinTrabajos ? [] : puestosObligatorios(p);   // sin trabajos no hay puestos obligatorios
+  const sinEvb = !p.sinTrabajos && llevaEvb(p) && p.evb !== true && p.evb !== false;
   const bloques = puestosDe(p).map(([clave, titulo, varios]) => {
     const gente = p.personal.map((x, i) => ({ x, i })).filter(({ x }) => x.puesto === clave);
     const filas = gente.map(({ x, i }) => `
@@ -131,13 +137,15 @@ export function vParteMaq() {
     <section class="tarjeta">
       <h2>Jornada</h2>
       <label class="campo"><span>Fecha <small>(si es de noche, el día en que empieza)</small></span><input type="date" data-bind="fecha" value="${esc(p.fecha)}"></label>
-      <div class="dos">${campoHora('Horario: inicio', 'horaInicio', p.horaInicio)}${campoHora('Horario: fin', 'horaFin', p.horaFin)}</div>
-      ${campoEvb(p)}
+      ${p.sinTrabajos ? '' : `<div class="dos">${campoHora('Horario: inicio', 'horaInicio', p.horaInicio)}${campoHora('Horario: fin', 'horaFin', p.horaFin)}</div>
+      ${campoEvb(p)}`}
       <div class="campo"><span>Lo rellena</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
+      ${bloqueSinTrabajos(p)}
     </section>
 
     ${seccionMaquinasVia(p)}
 
+    ${p.sinTrabajos ? NOTA_SIN_TRABAJOS : `
     <section class="tarjeta">
       <h2>Viaje</h2>
       <div class="dos">${campoHora('Hora de salida', 'viaje.horaSalida', v.horaSalida)}
@@ -150,7 +158,7 @@ export function vParteMaq() {
       <h2>Tajos <span class="contador">${p.tajos.length}</span></h2>
       ${p.tajos.map((t, i) => seccionTajo(t, i, p.tajos.length)).join('')}
       <button class="btn anadir" data-action="nuevo-tajo">+ Añadir tajo</button>
-    </section>
+    </section>`}
 
     <section class="tarjeta">
       <h2>Observaciones</h2>
@@ -158,7 +166,7 @@ export function vParteMaq() {
     </section>
 
     ${seccionPersonalMaq(p)}
-    ${p.usaExtras && !estado.preguntaExtras ? seccionExtras() : ''}
+    ${p.usaExtras && !p.sinTrabajos && !estado.preguntaExtras ? seccionExtras() : ''}
 
     <button class="btn peligro-texto" data-action="borrar-parte">Borrar este borrador</button>
   </main>
@@ -231,12 +239,14 @@ export function vParteLD() {
     <section class="tarjeta">
       <h2>Jornada</h2>
       <label class="campo"><span>Fecha</span><input type="date" data-bind="fecha" data-rerender value="${esc(p.fecha)}"></label>
-      <div class="dos"><div class="campo"><span>Semana</span><div class="valor-fijo">${semanaIso(p.fecha)}</div></div>
+      ${p.sinTrabajos ? '' : `<div class="dos"><div class="campo"><span>Semana</span><div class="valor-fijo">${semanaIso(p.fecha)}</div></div>
         ${campo('Nº de acta', 'acta', p.acta, 'autocomplete="off"')}</div>
-      ${loco ? '' : campoEvb(p)}
+      ${loco ? '' : campoEvb(p)}`}
       <div class="campo"><span>Lo rellena</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
+      ${bloqueSinTrabajos(p)}
     </section>
 
+    ${p.sinTrabajos ? NOTA_SIN_TRABAJOS : `
     ${loco ? '' : `
     <section class="tarjeta">
       <h2>Telefonemas</h2>
@@ -268,7 +278,7 @@ export function vParteLD() {
         ${campo('Combustible llegada (l)', 'combustible.llegada', p.combustible.llegada, 'inputmode="decimal" autocomplete="off"')}</div>
       <div class="dos">${campo('Kilómetros salida', 'km.salida', p.km.salida, 'inputmode="decimal" autocomplete="off"')}
         ${campo('Kilómetros llegada', 'km.llegada', p.km.llegada, 'inputmode="decimal" autocomplete="off"')}</div>
-    </section>
+    </section>`}
 
     <section class="tarjeta">
       <h2>Observaciones</h2>
@@ -276,7 +286,7 @@ export function vParteLD() {
     </section>
 
     ${seccionPersonalMaq(p)}
-    ${p.usaExtras && !estado.preguntaExtras ? seccionExtras() : ''}
+    ${p.usaExtras && !p.sinTrabajos && !estado.preguntaExtras ? seccionExtras() : ''}
 
     <button class="btn peligro-texto" data-action="borrar-parte">Borrar este borrador</button>
   </main>

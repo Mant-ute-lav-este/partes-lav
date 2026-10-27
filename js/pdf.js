@@ -274,6 +274,13 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     c.y += 4;
   }
 
+  // Jornada en la que no se pudo trabajar: sin trabajos, maquinaria ni medidas, solo el motivo.
+  if (parte.sinTrabajos) {
+    seccionSinTrabajos(c, parte);
+    pdfPie(c, parte, versionApp);
+    return doc.output('blob');
+  }
+
   pdfHorasExtra(c, parte);
 
   // Trabajos
@@ -345,6 +352,16 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
 
   pdfPie(c, parte, versionApp);
   return doc.output('blob');
+}
+
+/** Jornada en la que no se pudo trabajar: una sección con el motivo, en rojo, y las observaciones. */
+function seccionSinTrabajos(c, parte) {
+  seccion(c, 'JORNADA SIN TRABAJOS');
+  fila(c, [{ w: AN, t: `No se ha podido trabajar: ${parte.motivoSinTrabajos || ''}`, b: true, s: 10, color: [170, 0, 0] }], { minH: 12 });
+  if ((parte.observaciones || '').trim()) {
+    seccion(c, 'OBSERVACIONES');
+    fila(c, [{ w: AN, t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
+  }
 }
 
 /** Horas extra del parte (desde v0.8.0): tabla y total por tipo. */
@@ -473,6 +490,13 @@ function cuerpoLocoDresina(c, parte, cab) {
     }], { minH: 7 });
   }
 
+  // Jornada sin trabajos (p. ej. avería de la máquina): solo el motivo y quién estaba.
+  if (parte.sinTrabajos) {
+    seccionSinTrabajos(c, parte);
+    tablaPersonalPuestos(c, parte, puestosDe(parte));
+    return;
+  }
+
   if (!loco) {
     const t = parte.telefonemas || { entrada: {}, salida: {} };
     seccion(c, 'TELEFONEMAS');
@@ -539,7 +563,7 @@ function cuerpoMaquinaria(c, parte, cab) {
   fila(c, [
     { w: 52, t: `Ref. ${parte.ref}${parte.rev > 1 ? `   ·   Rev. ${parte.rev}` : ''}`, b: true, s: 9 },
     { w: AN - 104, t: 'PARTE DE MAQUINARIA', b: true, s: 14, a: 'center' },
-    { w: 52, t: `Fecha ${fmtFecha(parte.fecha)}\nHorario ${parte.horaInicio || '--:--'} - ${parte.horaFin || '--:--'}`, b: true, s: 9, a: 'center' },
+    { w: 52, t: `Fecha ${fmtFecha(parte.fecha)}${parte.sinTrabajos ? '' : `\nHorario ${parte.horaInicio || '--:--'} - ${parte.horaFin || '--:--'}`}`, b: true, s: 9, a: 'center' },
   ], { minH: 13 });
   fila(c, [
     { ...L, w: 22, t: 'EMPRESA' }, { w: 70, t: cab.empresa || '', b: true },
@@ -564,6 +588,13 @@ function cuerpoMaquinaria(c, parte, cab) {
     { t: 'TRABAJO', w: 66 }, { t: 'HORAS', w: AN - 246, a: 'center' },
   ], maquinas.map((m, i) => [String(i + 1), m.descripcion, m.uic || '', m.trabajo || '', String(m.horas || '').replace('.', ',')]),
   { vacio: 'Sin máquinas' });
+
+  if (parte.sinTrabajos) {
+    // Jornada sin trabajos (p. ej. avería): máquina, motivo y personal; sin viaje ni tajos.
+    seccionSinTrabajos(c, parte);
+    tablaPersonalPuestos(c, parte, puestosDe(parte));
+    return;
+  }
 
   const v = parte.viaje || {};
   seccion(c, 'VIAJE');

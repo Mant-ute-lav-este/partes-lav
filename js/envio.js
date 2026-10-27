@@ -25,6 +25,8 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   const pdf = await generarPDF(parte, config, versionApp, leerFoto);
 
   const datos = structuredClone(parte);
+  // Jornada sin trabajos: no viajan trabajos, tajos ni fotos que se hubieran apuntado antes de marcarla.
+  if (datos.sinTrabajos) for (const k of ['trabajos', 'formato1', 'tajos', 'realizados', 'vagones']) if (Array.isArray(datos[k])) datos[k] = [];
   const fotos = [];
   for (const [i, t] of datos.trabajos.entries()) {
     const cuenta = {};
@@ -59,7 +61,7 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
       `Fotos_${base}.txt`, { type: 'text/plain' }),
   ];
   const asunto = `PARTE LAV · ${parte.tipo} · ${fmtFecha(parte.fecha)} · ${parte.ref}` +
-    `${parte.rev > 1 ? ` rev. ${parte.rev}` : ''} · ${parte.capataz}`;
+    `${parte.rev > 1 ? ` rev. ${parte.rev}` : ''} · ${parte.capataz}${parte.sinTrabajos ? ' · SIN TRABAJOS' : ''}`;
   // Aviso para la oficina (no para el operario): fotos de galería sin fecha original.
   const sinFecha = [
     ...parte.trabajos.map((t, i) => ({ nombre: `trabajo ${i + 1}`, n: t.fotos.filter(sinFechaOriginal).length, de: t.fotos.length })),
@@ -69,7 +71,10 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   const sinFotos = (parte.trabajos || []).map((t, i) => ({ t, i })).filter(({ t }) => t.sinFotos && !t.noRealizado);
   const cuerpo = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
-    parte.tipo === 'MAQUINARIA' && parte.subtipo && parte.subtipo !== 'via'
+    parte.sinTrabajos
+      ? `${parte.tipo === 'MAQUINARIA' ? 'Lo rellena' : 'Capataz'}: ${parte.capataz}. JORNADA SIN TRABAJOS: ${parte.motivoSinTrabajos || ''}.` +
+        `${parte.tipo === 'MAQUINARIA' ? ` Máquina: ${(parte.maquinasVia || []).map((m) => m.descripcion).filter(Boolean).join('; ') || (parte.maquina && parte.maquina.descripcion) || ''}.` : ''}`
+      : parte.tipo === 'MAQUINARIA' && parte.subtipo && parte.subtipo !== 'via'
       ? `Lo rellena: ${parte.capataz}. ${parte.subtipo === 'locomotora' ? 'Locomotora' : 'Dresina'}: ${parte.maquina.descripcion}` +
         `${parte.maquina.uic ? ` (UIC ${parte.maquina.uic})` : ''}. Nº acta: ${parte.acta}. ` +
         `Trabajos: ${(parte.realizados || []).map((r) => `vía ${r.via} PK ${r.pkInicio}-${r.pkFin} ${r.trabajo}`).join('; ')}.`

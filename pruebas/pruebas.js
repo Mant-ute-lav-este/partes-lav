@@ -10,6 +10,7 @@ import { esHeic, procesarFoto } from '../js/fotos.js';
 import { procesarSalida } from '../js/salida.js';
 import { limpiarFotosAntiguas, textoEspacio } from '../js/espacio.js';
 import { iniciarFallos, registrarFallo } from '../js/fallos.js';
+import { leerAspecto, guardarAspecto, aplicarAspecto } from '../js/aspecto.js';
 import { SERVIDOR_URL } from '../js/servidor.js';
 import * as val from '../js/validaciones.js';
 import * as modelo from '../js/modelo.js';
@@ -565,6 +566,56 @@ prueba('PDF y envío: trabajo no realizado y trabajo sin fotos', async () => {
   const datos = JSON.parse(await r.archivos[1].text());
   igual(JSON.parse(await r.archivos[2].text()).fotos.length, 0, 'sin fotos en el adjunto');
   cierto(JSON.stringify(datos).includes('"noRealizado":true'), 'los datos llevan el campo nuevo');
+});
+
+prueba('jornada sin trabajos: solo pide el motivo y sale clara en el PDF y el correo', async () => {
+  const vacia = (extra = {}) => ({ ...ej.parteInfra(), trabajos: [], formato1: [], medidas: [], antiincendios: '', usaMaquinaria: null, usaVehiculos: null, ...extra });
+  // Sin marcarla, un parte sin trabajos sigue sin poder cerrarse.
+  cierto(val.validar(vacia()).some((x) => x.msg === 'Añade al menos un trabajo.'), 'sin casilla pide trabajos');
+  // Con la casilla, solo falta el motivo (no trabajos, maquinaria, vehículos ni medidas).
+  igual(val.validar(vacia({ sinTrabajos: true })).map((x) => x.msg), ['Indica por qué no se ha podido trabajar.']);
+  igual(val.validar(vacia({ sinTrabajos: true, sinTrabajosOtro: true })).map((x) => x.msg),
+    ['Has elegido «Otro» motivo: escribe por qué no se ha podido trabajar.']);
+  igual(val.validar(vacia({ sinTrabajos: true, motivoSinTrabajos: 'Lluvia / meteorología' })), [], 'con motivo, se puede cerrar');
+  igual(val.validar(vacia({ sinTrabajos: true, motivoSinTrabajos: 'x', personal: [] })).map((x) => x.msg),
+    ['Añade al menos una persona en «Personal».'], 'el personal sigue siendo obligatorio');
+  igual(val.validar(vacia({ sinTrabajos: true, motivoSinTrabajos: 'x', fecha: '' })).length, 1, 'la fecha también');
+  for (const tipo of ['INFRA', 'SUPER']) {
+    const p = vacia({ tipo, sinTrabajos: true, motivoSinTrabajos: 'Avería de maquinaria o vehículos', observaciones: 'Bateadora averiada' });
+    const leerFoto = async () => jpeg();
+    igual(await (await generarPDF(p, ej.config, 'prueba', leerFoto)).slice(0, 5).text(), '%PDF-', `PDF ${tipo}`);
+    const r = await prepararEnvio(p, ej.config, leerFoto, 'prueba');
+    cierto(r.asunto.endsWith('· SIN TRABAJOS'), r.asunto);
+    cierto(r.asunto.startsWith('PARTE LAV'), 'Power Automate lo sigue filtrando por el asunto');
+    cierto(r.cuerpo.includes('JORNADA SIN TRABAJOS: Avería de maquinaria o vehículos.'), r.cuerpo);
+    igual(JSON.parse(await r.archivos[2].text()).fotos.length, 0, 'sin fotos');
+    cierto((await r.archivos[1].text()).includes('"sinTrabajos": true'), 'los datos llevan la marca');
+  }
+});
+
+prueba('jornada sin trabajos en maquinaria (avería): vía, locomotora y dresina', async () => {
+  const motivo = 'Avería de maquinaria o vehículos';
+  const casos = [['vía', ej.parteMaqVia(), val.validarMaq], ['locomotora', ej.parteLoco(), val.validarLD], ['dresina', ej.parteLoco('dresina'), val.validarLD]];
+  for (const [nombre, base, validarX] of casos) {
+    const sin = (extra = {}) => ({ ...base, sinTrabajos: true, tajos: [], realizados: [], vagones: [], horaInicio: '', horaFin: '', acta: '', evb: null, ...extra });
+    cierto(validarX({ ...sin(), sinTrabajos: false }).length > 0, `${nombre}: sin la casilla, un parte vacío no se puede cerrar`);
+    igual(validarX(sin()).map((x) => x.msg), ['Indica por qué no se ha podido trabajar.'], `${nombre}: solo falta el motivo`);
+    igual(validarX(sin({ motivoSinTrabajos: motivo })), [], `${nombre}: con motivo se puede cerrar`);
+    igual(validarX(sin({ motivoSinTrabajos: motivo, fecha: '' })).length, 1, `${nombre}: la fecha sigue siendo obligatoria`);
+    const p = sin({ motivoSinTrabajos: motivo, observaciones: 'Se rompió la bomba de gasoil' });
+    const leerFoto = async () => jpeg();
+    igual(await (await generarPDF(p, ej.config, 'prueba', leerFoto)).slice(0, 5).text(), '%PDF-', `${nombre}: PDF`);
+    const r = await prepararEnvio(p, ej.config, leerFoto, 'prueba');
+    cierto(r.asunto.endsWith('· SIN TRABAJOS') && r.asunto.startsWith('PARTE LAV'), `${nombre}: ${r.asunto}`);
+    cierto(r.cuerpo.includes(`JORNADA SIN TRABAJOS: ${motivo}.`) && r.cuerpo.includes('Máquina:'), `${nombre}: ${r.cuerpo}`);
+    const datos = JSON.parse(await r.archivos[1].text());
+    cierto(datos.sinTrabajos === true && !(datos.tajos || []).length && !(datos.realizados || []).length, `${nombre}: los datos no llevan trabajos`);
+  }
+  // Un parte con trabajos apuntados antes de marcar la casilla no los manda.
+  const viejo = { ...ej.parteInfra(), sinTrabajos: true, motivoSinTrabajos: 'Lluvia / meteorología' };
+  const r = await prepararEnvio(viejo, ej.config, async () => jpeg(), 'prueba');
+  igual(JSON.parse(await r.archivos[2].text()).fotos.length, 0, 'sin fotos de trabajos que ya no cuentan');
+  igual(JSON.parse(await r.archivos[1].text()).trabajos, [], 'sin trabajos');
 });
 
 prueba('envío: avisa si falta una foto', async () => {
@@ -1252,7 +1303,7 @@ prueba('pantallas: registro, acceso y PIN', async () => {
 prueba('pantallas: inicio, menú y elegir máquina', async () => {
   const lista = [borrador(ej.parteInfra()), ej.parteSuper(), { ...ej.parteMaqVia(), estado: 'en-cola' }, { ...ej.parteLoco(), estado: 'enviado' }];
   await pantalla((e) => { e.lista = lista; }, 'Partes LAV', 'INF-9001', 'SUP-9001', '🗑');
-  await pantalla((e) => { e.lista = lista; e.menu = true; }, 'Guía rápida');
+  await pantalla((e) => { e.lista = lista; e.menu = true; }, 'Guía rápida', 'Aspecto', 'Automático', 'Oscuro', 'Grande');
   await pantalla((e) => { e.lista = lista; e.menu = true; e.espacio = { poco: true, texto: 'Espacio usado: 900 MB. Queda poco sitio' }; }, 'Queda poco sitio');
   await pantalla((e) => { e.eligeMaquina = true; }, '¿Con qué máquina?', 'Bateadora 08-475-4S', 'Dresina');
   await pantalla((e) => { e.perfil.cuenta = 'pendiente'; }, 'pendiente de que lo apruebe');
@@ -1269,6 +1320,49 @@ prueba('pantallas: parte INFRA y SUPER', async () => {
     e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); e.parte.fecha = '';
     e.errores = [{ msg: 'Falta la fecha de la jornada.', trabajo: null }, { msg: 'Trabajo 1: falta la línea.', trabajo: 0 }];
   }, 'Falta por completar', 'Falta la fecha de la jornada.');
+});
+
+prueba('aspecto: tema y letra se guardan, se aplican y los valores raros se ignoran', () => {
+  const antes = localStorage.getItem('partes-lav-aspecto');
+  const raiz = document.createElement('div');   // una raíz de mentira: la prueba no cambia la página de pruebas
+  try {
+    localStorage.removeItem('partes-lav-aspecto');
+    igual(leerAspecto(), { tema: 'auto', letra: 'normal' }, 'por defecto');
+    guardarAspecto({ tema: 'oscuro' }, raiz);
+    igual(raiz.dataset.tema, 'oscuro');
+    igual(raiz.dataset.letra, undefined, 'la letra no se toca al cambiar el tema');
+    guardarAspecto({ letra: 'grande' }, raiz);
+    igual(leerAspecto(), { tema: 'oscuro', letra: 'grande' }, 'se recuerda cada ajuste');
+    igual([raiz.dataset.tema, raiz.dataset.letra], ['oscuro', 'grande']);
+    guardarAspecto({ tema: 'auto', letra: 'normal' }, raiz);
+    igual([raiz.dataset.tema, raiz.dataset.letra], [undefined, undefined], 'auto y normal quitan los atributos');
+    localStorage.setItem('partes-lav-aspecto', JSON.stringify({ tema: 'rosa', letra: 'enorme' }));
+    igual(leerAspecto(), { tema: 'auto', letra: 'normal' }, 'valores raros: por defecto');
+    localStorage.setItem('partes-lav-aspecto', '{no es json');
+    igual(leerAspecto(), { tema: 'auto', letra: 'normal' }, 'dato roto: por defecto');
+    aplicarAspecto({ tema: 'claro', letra: 'grande' }, raiz);
+    igual([raiz.dataset.tema, raiz.dataset.letra], ['claro', 'grande']);
+  } finally {
+    if (antes == null) localStorage.removeItem('partes-lav-aspecto'); else localStorage.setItem('partes-lav-aspecto', antes);
+  }
+});
+
+prueba('pantallas: jornada sin trabajos', async () => {
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); }, 'Jornada sin trabajos', 'Trabajos');
+  await pantalla((e) => {
+    e.vista = 'parte'; e.parte = borrador(ej.parteSuper()); e.parte.sinTrabajos = true;
+  }, '¿Por qué no se ha podido trabajar?', 'Con «Jornada sin trabajos» solo hace falta');
+  await pantalla((e) => {
+    e.vista = 'parte'; e.parte = borrador(ej.parteInfra()); e.parte.sinTrabajos = true; e.parte.sinTrabajosOtro = true;
+    e.parte.motivoSinTrabajos = 'Se cayó la catenaria';
+  }, '¿Por qué no se ha podido trabajar?', 'Otro (escribirlo)');
+  await pantalla((e) => { e.lista = [{ ...borrador(ej.parteInfra()), sinTrabajos: true }]; }, 'Jornada sin trabajos');
+  // Maquinaria: vía, locomotora y dresina lo llevan; con la casilla marcada no piden horario, viaje ni trabajos.
+  for (const [parte, tipoRef] of [[ej.parteMaqVia(), 'MAQ-9001'], [ej.parteLoco(), 'LOC-9001'], [ej.parteLoco('dresina'), 'DRE-9001']]) {
+    await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(parte); }, tipoRef, 'Jornada sin trabajos');
+    await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(parte); e.parte.sinTrabajos = true; },
+      '¿Por qué no se ha podido trabajar?', 'Con «Jornada sin trabajos» solo hace falta la fecha, la máquina y el motivo');
+  }
 });
 
 prueba('pantallas: trabajo de INFRA', async () => {
