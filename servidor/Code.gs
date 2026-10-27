@@ -17,6 +17,10 @@
  * (Ejecutar como: yo · Quién tiene acceso: cualquier usuario).
  */
 
+// Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
+// Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
+// (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
+const VERSION_SERVIDOR = 17;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 
@@ -103,7 +107,7 @@ function doGet(e) {
     t.firma = p.firma;
     return t.evaluate().setTitle('Partes LAV · Registro').addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
-  return HtmlService.createHtmlOutput('<p>Partes LAV · servidor de envío.</p>');
+  return HtmlService.createHtmlOutput('<p>Partes LAV · servidor de envío · v' + VERSION_SERVIDOR + '</p>');
 }
 
 // ---------- Instalación ----------
@@ -410,6 +414,7 @@ function config_(d) {
     config: {
       formato: 'config-partes-lav',
       version: 1,
+      versionServidor: VERSION_SERVIDOR,
       nombre: aj.nombre || 'Lista de la oficina',
       fecha: aj.fecha || '',
       destinatario: aj.destinatario || '',   // para el envío alternativo por Gmail

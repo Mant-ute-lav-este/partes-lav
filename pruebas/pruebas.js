@@ -1421,6 +1421,19 @@ prueba('servidor: archivo anual de Envios (sin perder números ni duplicar parte
   igual(E.correos.length, 1, 'solo el envío de hoy');
 });
 
+prueba('servidor: dice su versión en la lista, en la página de la URL y coincide con el CHANGELOG', async () => {
+  const E = await servidorListo();
+  const v = E.s.VERSION_SERVIDOR;
+  cierto(Number.isInteger(v) && v > 0, 'VERSION_SERVIDOR debe ser un número entero');
+  const r = E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() });
+  igual(r.config.versionServidor, v, 'config');
+  cierto(E.s.doGet({ parameter: {} }).html.includes('v' + v), 'página de la URL');
+  // Quien despliega una versión nueva tiene que subir el número y contarlo en el CHANGELOG.
+  const log = await fetch('../CHANGELOG.md', { cache: 'no-store' }).then((x) => x.text());
+  const ultima = Math.max(...[...log.matchAll(/^## Servidor v(\d+)/gm)].map((x) => Number(x[1])));
+  igual(ultima, v, 'última «## Servidor vN» del CHANGELOG');
+});
+
 prueba('servidor: cada petición abre la hoja una sola vez', async () => {
   // Un entorno simulado es una sola ejecución de Google: el libro se abre una vez (al preparar la
   // prueba) y ninguna petición más lo vuelve a abrir. Antes, config lo abría una vez por cada hoja.
@@ -1502,6 +1515,7 @@ prueba('pantallas: inicio, menú y elegir máquina', async () => {
   const lista = [borrador(ej.parteInfra()), ej.parteSuper(), { ...ej.parteMaqVia(), estado: 'en-cola' }, { ...ej.parteLoco(), estado: 'enviado' }];
   await pantalla((e) => { e.lista = lista; }, 'Partes LAV', 'INF-9001', 'SUP-9001', '🗑');
   await pantalla((e) => { e.lista = lista; e.menu = true; }, 'Guía rápida', 'Aspecto', 'Automático', 'Oscuro', 'Grande');
+  await pantalla((e) => { e.lista = lista; e.menu = true; e.config = { ...ej.config, versionServidor: 17 }; }, 'Servidor: v17');
   await pantalla((e) => { e.lista = lista; e.menu = true; e.espacio = { poco: true, texto: 'Espacio usado: 900 MB. Queda poco sitio' }; }, 'Queda poco sitio');
   await pantalla((e) => { e.eligeMaquina = true; }, '¿Con qué máquina?', 'Bateadora 08-475-4S', 'Dresina');
   await pantalla((e) => { e.perfil.cuenta = 'pendiente'; }, 'pendiente de que lo apruebe');

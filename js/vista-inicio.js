@@ -125,7 +125,7 @@ export function vMenu() {
     ${srv ? '<button class="btn secundario" data-action="cerrar-sesion">Cerrar sesión en este móvil</button>' : ''}
     <p class="nota">${srv ? `Cuenta: ${esc(estado.perfil.email)}${estado.perfil.cuenta === 'pendiente' ? ' (pendiente de aprobar)' : ''}<br>` : ''}
       Lista de la oficina: ${esc(c.nombre || 'sin nombre')}${c.fecha ? ` (${esc(c.fecha)})` : ''} ·
-      ${(c.trabajadores || []).length} trabajadores<br>Versión de la app: ${APP_VERSION}</p>
+      ${(c.trabajadores || []).length} trabajadores<br>Versión de la app: ${APP_VERSION}${c.versionServidor ? ` · Servidor: v${esc(c.versionServidor)}` : ''}</p>
     ${estado.espacio ? `<p class="${estado.espacio.poco ? 'error' : 'nota'}">${esc(estado.espacio.texto)}</p>` : ''}
     <button class="btn" data-action="cerrar-menu">Cerrar</button>
   </div></div>`;

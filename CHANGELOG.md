@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v17 · sin desplegar (la app tampoco cambia hasta la próxima publicación)
+- **El servidor dice qué versión es**: constante `VERSION_SERVIDOR` en `Code.gs`. Va en la lista que pide la app (`config.versionServidor`) y en la página de la URL del servidor («… · v17»). Tras desplegar se comprueba con curl a la URL, sin token. Una prueba exige que coincida con la última «Servidor vN» de este archivo.
+- La app (a partir de la próxima versión) la enseña en el Menú: «Versión de la app: … · Servidor: v17».
+- Comentarios en `login`, `estado` y `nuevoPin`: los usa también la app del almacén. No cambia lo que hacen.
+
 ## Sin versión nueva (2026-10-27): contrato del Datos_ y pruebas de recorrido
 - Nuevo `docs/DATOS-PARTE.md`: qué lleva el Datos_ y qué significa cada campo; cuándo se sube `version`. El Datos_ ya llevaba `formato: "parte-lav"` y `version: 1`; no cambia.
 - Pruebas nuevas (la app no cambia): forma del Datos_ de los 5 tipos fijada en `pruebas/contrato-datos.json`, y recorridos con toques reales (cerrar y enviar los 5 tipos, parte incompleto, Corregir, Descartar).
