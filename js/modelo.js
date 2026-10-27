@@ -261,5 +261,11 @@ export function quitarFotosQueFaltan(p, existe) {
   }
   const antes = (p.formato1 || []).length;
   p.formato1 = (p.formato1 || []).filter((f) => existe.has(f.id));
-  return quitadas + antes - p.formato1.length;
+  quitadas += antes - p.formato1.length;
+  if (p.drp) {   // solo si lo tiene: un parte sin DRP no gana el campo al rectificarlo
+    const antesDrp = p.drp.length;
+    p.drp = p.drp.filter((f) => existe.has(f.id));
+    quitadas += antesDrp - p.drp.length;
+  }
+  return quitadas;
 }

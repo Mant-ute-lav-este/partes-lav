@@ -12,6 +12,10 @@ export const FORMATO1 = 'Formato 1';
 export const MAX_FORMATO1 = 6;        // fotos como máximo
 export const LADO_FORMATO1 = 2400;    // píxeles del lado largo (más que las fotos normales: se lee letra a mano)
 
+// Registros DRP de la bateadora (opcionales, solo en el parte de bateadora).
+export const MAX_DRP = 6;                    // archivos como máximo
+export const MAX_DRP_BYTES = 10 * 1024 * 1024;   // peso total
+
 const p2 = (n) => String(n).padStart(2, '0');
 
 /** Fecha local "AAAA-MM-DD". */

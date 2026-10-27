@@ -62,7 +62,8 @@ Los añade el envío: `carpeta` (ruta en SharePoint), `archivos{pdf, datos, foto
 
 ## Campos opcionales (solo aparecen en casos concretos; no vigilados por la prueba)
 
-- Jornada sin trabajos: `sinTrabajos` (true), `motivoSinTrabajos`, `sinTrabajosOtro`. En ese caso `trabajos`, `formato1`, `tajos`, `realizados` y `vagones` viajan vacíos.
+- Jornada sin trabajos: `sinTrabajos` (true), `motivoSinTrabajos`, `sinTrabajosOtro`. En ese caso `trabajos`, `formato1`, `tajos`, `realizados`, `vagones` y `drp` viajan vacíos.
+- Registros DRP (maquinaria de vía con bateadora; desde la versión de la app que los adjunta, con el servidor v18): `drp[]` (`id`, `nombre` original, `tam` en bytes, `anadido`, `archivo` con el que va adjunto, ya limpio como lo deja el servidor: `495_940_al_495_840_via2_reg1.drp`) y `archivos.drp[]` con esos nombres. Solo aparecen si se ha añadido alguno; los archivos van como adjuntos `.drp` aparte, tal cual salen de la máquina.
 - Trabajo no realizado: `noRealizado`, `motivoNoRealizado`, `noRealizadoOtro` dentro del trabajo. Trabajo sin fotos: `sinFotos`, `motivoSinFotos`, `sinFotosOtro`.
 - Revisión: `rectificaA` con datos; `rev` mayor que 1.
 - Envío por Gmail de emergencia: `porGmail`, `enCola` (los apunta la app en el móvil; pueden aparecer si se envía así).

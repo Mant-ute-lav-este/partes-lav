@@ -20,9 +20,10 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 17;
+const VERSION_SERVIDOR = 18;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
+const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
 
 const ACCIONES = {
   codigo: pedirCodigo_,
@@ -652,7 +653,7 @@ function mandarParte_(d, u, aj) {
   let asunto = String(d.asunto || '').replace(/[\r\n]+/g, ' ').trim();
   if (asunto.indexOf('PARTE LAV') !== 0) asunto = 'PARTE LAV · ' + asunto;
   const archivos = Array.isArray(d.archivos) ? d.archivos : [];
-  if (!archivos.length || archivos.length > 6) throw new Error('El parte no trae los archivos esperados.');
+  if (!archivos.length || archivos.length > MAX_ARCHIVOS) throw new Error('El parte no trae los archivos esperados.');
   let bytes = 0;
   const adjuntos = archivos.map((a) => {
     const nombre = String(a.nombre || 'archivo').replace(/[^\w.\-]/g, '_');
@@ -718,13 +719,15 @@ function mandarCopia_(archivos, adjuntos, para, asunto, cuerpo, u) {
     return Utilities.newBlob(Utilities.base64Decode(String(f.base64 || '')), 'image/jpeg', base + '_' + nombreArchivo_(nombre) + '.jpg');
   });
   const pdf = adjuntos.filter((b) => /\.pdf$/i.test(String(b.getName())));
+  const drp = adjuntos.filter((b) => /\.drp$/i.test(String(b.getName())));   // registros de la bateadora, tal cual
   enviarCorreo_({
     to: para,
     name: 'Partes LAV',
     replyTo: String(u.Email),
     subject: asunto,
-    body: cuerpo + '\n\nCopia: PDF del parte' + (jpgs.length ? ' y ' + jpgs.length + ' foto(s) sueltas en .jpg.' : ' (sin fotos).'),
-    attachments: pdf.concat(jpgs),
+    body: cuerpo + '\n\nCopia: PDF del parte' + (jpgs.length ? ' y ' + jpgs.length + ' foto(s) sueltas en .jpg.' : ' (sin fotos).') +
+      (drp.length ? ' Y ' + drp.length + ' registro(s) DRP.' : ''),
+    attachments: pdf.concat(jpgs, drp),
   });
 }
 

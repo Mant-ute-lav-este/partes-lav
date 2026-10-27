@@ -269,10 +269,11 @@ export async function cerrarParte() {
   }
   // Si ya había trabajos apuntados y luego se marcó «Jornada sin trabajos», se quitan al cerrar (con aviso).
   const p = estado.parte;
-  if (p.sinTrabajos && ((p.trabajos || []).length || (p.formato1 || []).length)) {
+  if (p.sinTrabajos && ((p.trabajos || []).length || (p.formato1 || []).length || (p.drp || []).length)) {
     if (!confirm('Has marcado «Jornada sin trabajos»: se quitarán de este parte los trabajos y fotos que ya habías apuntado. ¿Seguir?')) return;
     p.trabajos = [];
     p.formato1 = [];
+    p.drp = [];
     for (const f of await db.fotosDeParte(p.id)) await db.borrarFoto(f.id);
   }
   const aviso = await avisoPeso(estado.parte);

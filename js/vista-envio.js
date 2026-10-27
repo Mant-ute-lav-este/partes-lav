@@ -2,11 +2,11 @@
 // cobertura) o, como alternativa, por Gmail; y la corrección con una revisión nueva.
 
 import * as db from './db.js';
-import { prepararEnvio, compartir } from './envio.js';
+import { prepararEnvio, compartir, archivosParaServidor } from './envio.js';
 import { generarPDF } from './pdf.js';
 import { quitarFotosQueFaltan, colaAtascada, HORAS_EMERGENCIA } from './modelo.js';
 import { procesarSalida, descartarDelMovil } from './salida.js';
-import { esc, uuid, isoLocal, fmtFecha, fmtFechaHora, toast, blobABase64, FORMATO1 } from './util.js';
+import { esc, uuid, isoLocal, fmtFecha, fmtFechaHora, toast, FORMATO1 } from './util.js';
 import { estado, ir, render, guardarYa, registrarSync } from './estado.js';
 import { cabeceraParte, refParte } from './campos.js';
 import { ultimoEnvio, textoCuenta } from './vista-inicio.js';
@@ -108,11 +108,7 @@ export async function enviarServidor() {
   const p = estado.parte;
   const e = estado.envio;
   if (!e || !e.listo) return;
-  const archivos = [];
-  for (const f of e.archivos) {
-    if (f.type === 'application/pdf') archivos.push({ nombre: f.name, tipo: f.type, base64: await blobABase64(f) });
-    else archivos.push({ nombre: f.name, tipo: 'text/plain', texto: await f.text() });
-  }
+  const archivos = await archivosParaServidor(e);
   await db.putSalida({ id: uuid(), parteId: p.id, creado: isoLocal(), datos: { ref: p.ref, asunto: e.asunto, cuerpo: e.cuerpo, archivos } });
   p.estado = 'en-cola';
   p.enCola = isoLocal();
@@ -208,14 +204,16 @@ export async function enviar() {
   const dest = estado.config && estado.config.destinatario;
   if (dest && navigator.clipboard) { try { await navigator.clipboard.writeText(dest); } catch { /* sin portapapeles */ } }
   try {
-    const modo = await compartir(e);
+    const modo = await compartir({ ...e, cuerpo: e.cuerpoGmail || e.cuerpo });
     if (modo === 'compartido') {
       p.envios = (p.envios || []).concat([isoLocal()]);
       p.estado = 'enviado';
       p.porGmail = true;
       await guardarYa();
       render();
-      toast('Listo. Comprueba que Gmail lo ha enviado.', 4000);
+      // Por Gmail solo van los 3 adjuntos de siempre (Android falla al compartir muchos de golpe).
+      toast((e.drp || []).length ? 'Listo. Los registros DRP no van por Gmail: mándalos aparte a la oficina.'
+        : 'Listo. Comprueba que Gmail lo ha enviado.', (e.drp || []).length ? 7000 : 4000);
     } else {
       toast('Este dispositivo no puede compartir: se han descargado los archivos.', 4000);
     }
@@ -240,7 +238,7 @@ export async function corregir() {
   // Las fotos que sigan en el móvil se copian; las borradas por antiguas se quitan del parte nuevo
   // y la app pedirá fotos nuevas al cerrarlo.
   const existe = new Set();
-  for (const f of [...nuevo.trabajos.flatMap((t) => t.fotos), ...(nuevo.formato1 || [])]) {
+  for (const f of [...nuevo.trabajos.flatMap((t) => t.fotos), ...(nuevo.formato1 || []), ...(nuevo.drp || [])]) {
     const reg = await db.getFoto(f.id);
     if (!reg) continue;
     const id = uuid();
@@ -248,10 +246,16 @@ export async function corregir() {
     f.id = id;
     existe.add(id);
   }
+  const drpAntes = (nuevo.drp || []).length;
   const quitadas = quitarFotosQueFaltan(nuevo, existe);
+  const drpQuitados = drpAntes - (nuevo.drp || []).length;
   delete nuevo.fotosBorradas;
   estado.parte = nuevo;
   await guardarYa();
   ir('parte');
-  if (quitadas) toast(`Las fotos de este parte ya no estaban en el móvil (${quitadas}). Haz o elige fotos nuevas.`, 6000);
+  const avisos = [
+    ...(quitadas > drpQuitados ? [`Las fotos de este parte ya no estaban en el móvil (${quitadas - drpQuitados}). Haz o elige fotos nuevas.`] : []),
+    ...(drpQuitados ? [`Los registros DRP ya no estaban en el móvil (${drpQuitados}). Vuelve a añadirlos si hacen falta.`] : []),
+  ];
+  if (avisos.length) toast(avisos.join(' '), 6000);
 }

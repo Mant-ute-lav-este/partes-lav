@@ -2,6 +2,18 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.21.0 · 2026-10-27 (necesita el servidor v18)
+- **Registros DRP en el parte de bateadora.** Apartado opcional «Registros DRP» entre Observaciones y Personal: «📎 Añadir archivos DRP» deja elegir los `.drp` bajados de la máquina (hasta 6 y 10 MB en total). Cada uno sale con su tamaño y, si el nombre es del tipo `495+940 al 495+840 via2 reg1.drp`, con vía y PK. Se quitan con la ✕. Rechaza lo que no es `.drp`, vacíos y repetidos, y dice por qué.
+- Sale si alguna máquina del parte es bateadora (por el nombre o por el trabajo «Bateo»). Si se cambia la máquina con DRP ya añadidos, siguen a la vista con un aviso para poder quitarlos.
+- Se guardan en el móvil con el parte (sin cobertura también), se copian al Corregir y se quitan con «Jornada sin trabajos».
+- Van en el correo de la oficina como adjuntos `.drp` aparte, tal cual salen de la máquina, con el nombre limpio (`495_940_al_495_840_via2_reg1.drp`; `_v2` en una corrección). `Datos_` los apunta en `drp[]` y `archivos.drp[]` solo si hay alguno. El cuerpo del correo dice cuántos van.
+- Por «Gmail (emergencia)» no van: solo los 3 adjuntos de siempre, y el correo y la app avisan de mandarlos aparte.
+
+## Servidor v18 · 2026-10-27 (sin desplegar; va con la app que adjunta registros DRP)
+- **Registros DRP de la bateadora**: admite hasta 12 archivos por parte (antes 6): los 3 de siempre y hasta 6 `.drp`. Van en el correo de la oficina detrás del PDF, Datos y Fotos, sin tocar sus bytes (llegan en base64). Su nombre se limpia como el del resto (`495+940 al 495+840 via2 reg1.drp` → `495_940_al_495_840_via2_reg1.drp`).
+- La copia (fila `copia` de Ajustes) también lleva los DRP.
+- Un servidor v17 rechaza un parte con DRP («no trae los archivos esperados»): desplegar este antes de publicar la app.
+
 ## 0.20.4 · 2026-10-27
 - **Menú: versión del servidor.** Junto a la versión de la app sale «· Servidor: v17» (la que dice el servidor al descargar la lista). Sirve para comprobar de un vistazo qué servidor está en marcha. Sale en cuanto la app vuelva a descargar la lista (al abrirla con cobertura).
 

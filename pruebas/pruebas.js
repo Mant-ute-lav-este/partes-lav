@@ -5,7 +5,7 @@
 import * as util from '../js/util.js';
 import * as db from '../js/db.js';
 import { textoReferencia, generarPDF } from '../js/pdf.js';
-import { carpetaDestino, nombreBase, prepararEnvio } from '../js/envio.js';
+import { carpetaDestino, nombreBase, prepararEnvio, archivosParaServidor } from '../js/envio.js';
 import { esHeic, procesarFoto } from '../js/fotos.js';
 import { procesarSalida, descartarDelMovil } from '../js/salida.js';
 import { limpiarFotosAntiguas, textoEspacio } from '../js/espacio.js';
@@ -14,6 +14,7 @@ import { leerAspecto, guardarAspecto, aplicarAspecto } from '../js/aspecto.js';
 import { SERVIDOR_URL } from '../js/servidor.js';
 import * as val from '../js/validaciones.js';
 import * as modelo from '../js/modelo.js';
+import * as drp from '../js/drp.js';
 import * as ej from './ejemplos.js';
 import { cargarServidor } from './google-simulado.js';
 
@@ -553,6 +554,44 @@ for (const [nombre, hacer] of tipos) {
   });
 }
 
+prueba('envío: registros DRP de la bateadora, aparte y sin tocar sus bytes', async () => {
+  const bytes = new Uint8Array([0xEF, 0xBB, 0xBF, ...new TextEncoder().encode('<?xml version="1.0"?><DPRMessData/>')]);   // con BOM, como los reales
+  const blob = new Blob([bytes]);
+  const nombre = '495+940 al 495+840 via2 reg1.drp';
+  const p = ej.parteMaqVia();
+  // El tercero solo se distingue por los símbolos: limpio, se llamaría igual que los otros dos.
+  p.drp = [{ id: 'd1', nombre, tam: blob.size }, { id: 'd2', nombre, tam: 9 }, { id: 'd3', nombre: '495+940_al_495+840 via2 reg1.drp', tam: 8 }];
+  const leer = async () => blob;
+  const r = await prepararEnvio(p, ej.config, leer, 'prueba');
+  igual(r.archivos.length, 3, 'los 3 de siempre (Gmail de emergencia comparte solo estos)');
+  igual(r.drp.map((f) => f.name), ['495_940_al_495_840_via2_reg1.drp', '495_940_al_495_840_via2_reg1_2.drp', '495_940_al_495_840_via2_reg1_3.drp'],
+    'nombre limpio como en el servidor (el mismo que llega a Teams); si se repite, _2, _3');
+  igual(r.drp.map((f) => f.name), r.drp.map((f) => f.name.replace(/[^\w.\-]/g, '_')), 'el servidor no les cambia el nombre');
+  igual([...new Uint8Array(await r.drp[0].arrayBuffer())], [...bytes], 'el DRP va tal cual, con su BOM');
+  const datos = JSON.parse(await r.archivos[1].text());
+  igual(datos.archivos.drp, r.drp.map((f) => f.name), 'Datos_ dice qué DRP van');
+  igual(datos.drp.map((d) => d.archivo), r.drp.map((f) => f.name));
+  cierto(r.cuerpo.includes('Registros DRP adjuntos: 3'), 'el correo dice cuántos DRP van');
+  cierto(!r.cuerpoGmail.includes('adjuntos: 3') && r.cuerpoGmail.includes('NO van en este correo'), 'por Gmail de emergencia dice que no van');
+  // Lo que se manda al servidor: los 3 de siempre y los DRP en base64, sin perder ni un byte.
+  const env = await archivosParaServidor(r);
+  igual(env.map((a) => a.nombre), [...r.archivos.map((f) => f.name), ...r.drp.map((f) => f.name)]);
+  igual([env[1].tipo, env[2].tipo, typeof env[1].texto], ['text/plain', 'text/plain', 'string'], 'Datos y Fotos van como texto, igual que antes');
+  igual(env[3].tipo, 'application/octet-stream');
+  igual(Array.from(atob(env[3].base64), (c) => c.charCodeAt(0)), [...bytes], 'base64 del DRP');
+  // Revisión 2: _v2, como las fotos, para no pisar en Teams los de la revisión 1.
+  const r2 = await prepararEnvio({ ...p, rev: 2, drp: [p.drp[0]] }, ej.config, leer, 'prueba');
+  igual(r2.drp.map((f) => f.name), ['495_940_al_495_840_via2_reg1_v2.drp']);
+  // Sin DRP, o jornada sin trabajos: nada cambia.
+  for (const q of [ej.parteMaqVia(), { ...p, sinTrabajos: true, motivoSinTrabajos: 'Avería' }]) {
+    const r3 = await prepararEnvio(q, ej.config, leer, 'prueba');
+    igual(r3.drp, [], 'sin DRP');
+    cierto(!('drp' in JSON.parse(await r3.archivos[1].text()).archivos), 'Datos_ sin archivos.drp');
+    cierto(!r3.cuerpo.includes('DRP') && r3.cuerpoGmail === r3.cuerpo, 'el correo no habla de DRP');
+  }
+  await falla(() => prepararEnvio(p, ej.config, async () => null, 'prueba'), 'un DRP que ya no está en el móvil');
+});
+
 prueba('PDF y envío: trabajo no realizado y trabajo sin fotos', async () => {
   const p = ej.parteInfra();
   Object.assign(p.trabajos[0], { finalizado: false, noRealizado: true, motivoNoRealizado: 'Lluvia / meteorología', fotos: [] });
@@ -671,6 +710,60 @@ async function conPerfil(fn) {
     if (perfil) await db.kvSet('perfil', perfil); else await db.kvSet('perfil', undefined);
   }
 }
+
+prueba('DRP: solo la bateadora los pide', () => {
+  cierto(drp.llevaDrp(ej.parteMaqVia()), 'bateadora de vía');
+  const otra = ej.parteMaqVia();
+  Object.assign(otra.maquinasVia[0], { descripcion: 'Perfiladora PDB-110', trabajo: 'Perfilado' });
+  cierto(!drp.llevaDrp(otra), 'perfiladora');
+  otra.maquinasVia.push({ descripcion: 'Bateadora 08-475-4S', horas: '2', otro: false });
+  cierto(drp.llevaDrp(otra), 'varias máquinas, una bateadora');
+  otra.maquinasVia = [{ descripcion: 'Unimat 08-4x4/4s', trabajo: 'Bateo', horas: '6', otro: false }];
+  cierto(drp.llevaDrp(otra), 'sin la palabra «bateadora», pero con trabajo de bateo');
+  cierto(!drp.llevaDrp(ej.parteLoco()) && !drp.llevaDrp(ej.parteInfra()) && !drp.llevaDrp(null), 'otros partes');
+});
+
+prueba('DRP: qué archivos se admiten y por qué se rechazan', () => {
+  const f = (name, size = 200000) => ({ name, size });
+  const a = drp.admitirDrp([], [f('495+940 al 495+840 via2 reg1.drp'), f('foto.jpg'), f('vacio.drp', 0), f('MAYUS.DRP')]);
+  igual(a.ok.map((x) => x.name), ['495+940 al 495+840 via2 reg1.drp', 'MAYUS.DRP']);
+  igual(a.rechazados, [{ nombre: 'foto.jpg', motivo: 'extension' }, { nombre: 'vacio.drp', motivo: 'vacio' }]);
+  // Repetido: mismo nombre y tamaño, tanto contra lo que ya hay como dentro de la misma tanda.
+  const r = drp.admitirDrp([{ nombre: 'a.drp', tam: 10 }], [f('a.drp', 10), f('a.drp', 11), f('b.drp', 5), f('b.drp', 5)]);
+  igual(r.ok.map((x) => `${x.name}:${x.size}`), ['a.drp:11', 'b.drp:5']);
+  igual(r.rechazados.map((x) => x.motivo), ['repetido', 'repetido']);
+  // Cantidad: 6 como máximo.
+  const siete = Array.from({ length: 7 }, (_, i) => f(`r${i}.drp`, 1000));
+  const c = drp.admitirDrp([], siete);
+  igual(c.ok.length, util.MAX_DRP);
+  igual(c.rechazados, [{ nombre: 'r6.drp', motivo: 'cantidad' }]);
+  // Peso: 10 MB en total; un archivo grande no impide que quepan los pequeños que vengan después.
+  const p = drp.admitirDrp([{ nombre: 'x.drp', tam: 6 * 1048576 }], [f('grande.drp', 5 * 1048576), f('chico.drp', 100000)]);
+  igual(p.ok.map((x) => x.name), ['chico.drp']);
+  igual(p.rechazados, [{ nombre: 'grande.drp', motivo: 'peso' }]);
+  cierto(Object.values({ e: 'extension', v: 'vacio', r: 'repetido', c: 'cantidad', p: 'peso' }).every((m) => drp.textoMotivoDrp(m).length > 5), 'texto de cada motivo');
+});
+
+prueba('DRP: el nombre dice tramo, vía y registro; tamaños en texto', () => {
+  igual(drp.leerNombreDrp('495+940 al 495+840 via2 reg1.drp'), { pkInicio: '495+940', pkFin: '495+840', via: '2', registro: '1' });
+  igual(drp.leerNombreDrp('497+230 al 496+875 via1 reg1.drp').via, '1');
+  igual(drp.leerNombreDrp('medicion final.drp'), null);
+  igual(drp.leerNombreDrp(undefined), null);
+  igual([drp.tamTexto(205851), drp.tamTexto(598311), drp.tamTexto(2500000), drp.tamTexto(10), drp.tamTexto(0)], ['201 KB', '584 KB', '2,4 MB', '1 KB', '1 KB']);
+});
+
+prueba('DRP: un borrador antiguo no cambia y rectificar quita los que faltan', () => {
+  const viejo = { ...ej.parteMaqVia(), estado: 'borrador' };
+  delete viejo.drp;
+  cierto(!('drp' in modelo.normalizarParte(viejo)), 'un borrador antiguo no cambia');
+  const p = ej.parteMaqVia();
+  p.drp = [{ id: 'd1', nombre: 'a.drp', tam: 5 }, { id: 'd2', nombre: 'b.drp', tam: 6 }];
+  igual(modelo.quitarFotosQueFaltan(p, new Set(['d2'])), 1);
+  igual(p.drp.map((x) => x.id), ['d2']);
+  const sup = ej.parteSuper();
+  modelo.quitarFotosQueFaltan(sup, new Set());
+  cierto(!('drp' in sup), 'rectificar un parte sin DRP no le añade el campo');
+});
 
 prueba('fotos antiguas: qué partes caducan y qué se quita al rectificar', () => {
   const ahora = new Date('2026-11-30T12:00:00+01:00');
@@ -1061,6 +1154,25 @@ prueba('servidor: copia aparte con PDF y fotos .jpg con nombre completo', async 
   ]);
   cierto(copia.attachments.slice(1).every((b) => b.getContentType() === 'image/jpeg'), 'las fotos deben ir como image/jpeg');
   igual(JSON.parse(E.props.CORREOS).n, 3, 'cuenta 1 (oficina) + 2 (copia)');
+});
+
+prueba('servidor: registros DRP en el correo de la oficina y en la copia, sin tocar sus bytes', async () => {
+  const E = await servidorListo();
+  E.hojas.Ajustes.appendRow(['copia', 'otro@ejemplo.test']);
+  const crudo = '\xEF\xBB\xBF<?xml?>';
+  const drp = (n) => ({ nombre: `495+940 al 495+840 via${n} reg1.drp`, tipo: 'application/octet-stream', base64: btoa(crudo) });
+  const r = E.post(E.parte({ archivos: [...adjuntosConFotos(), drp(1), drp(2)] }));
+  igual(r.ok, true, r.error);
+  const [oficina, copia] = E.correos;
+  igual(oficina.attachments.map((b) => b.getName()),
+    ['Parte_x.pdf', 'Datos_x.txt', 'Fotos_x.txt', '495_940_al_495_840_via1_reg1.drp', '495_940_al_495_840_via2_reg1.drp'], 'oficina: los 3 de siempre y los DRP detrás');
+  igual(oficina.attachments[3].getBytes(), Array.from(crudo, (c) => c.charCodeAt(0)), 'bytes del DRP (con BOM)');
+  igual(copia.attachments.filter((b) => /\.drp$/.test(b.getName())).length, 2, 'la copia también lleva los DRP');
+  cierto(/2 registro\(s\) DRP/.test(copia.body), 'la copia dice que lleva DRP');
+  // 3 de siempre + 6 DRP caben; 13 archivos no.
+  const E2 = await servidorListo();
+  igual(E2.post(E2.parte({ archivos: [...adjuntosConFotos(), ...[1, 2, 3, 4, 5, 6].map(drp)] })).ok, true, '9 archivos');
+  igual(E2.post(E2.parte({ archivos: [...adjuntosConFotos(), ...Array.from({ length: 10 }, (_, i) => drp(i))] })).ok, false, '13 archivos');
 });
 
 prueba('servidor: si falla la copia, el parte sale igual y se apunta el error', async () => {
@@ -1633,7 +1745,14 @@ prueba('pantallas: varios aparatos en un trabajo', async () => {
 });
 
 prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {
-  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo', 'entrega de vía bloqueada (EVB)');
+  await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo', 'entrega de vía bloqueada (EVB)', 'Registros DRP', 'Añadir archivos DRP');
+  // Si se cambia la bateadora por otra máquina, los DRP ya añadidos siguen a la vista para poder quitarlos.
+  await pantalla((e) => {
+    e.vista = 'parte';
+    e.parte = borrador(ej.parteMaqVia());
+    Object.assign(e.parte.maquinasVia[0], { descripcion: 'Perfiladora PDB-110', trabajo: 'Perfilado' });
+    e.parte.drp = [{ id: 'd1', nombre: 'a.drp', tam: 2048 }];
+  }, 'Registros DRP', 'a.drp', 'no es una bateadora');
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco()); }, 'LOC-9001', 'Vagones', 'Trabajo realizado', 'Responsable de trabajos');
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteLoco('dresina')); }, 'DRE-9001', 'Telefonemas', 'ET / al amparo de', 'entrega de vía bloqueada (EVB)', 'OMI', 'Piloto');
 });

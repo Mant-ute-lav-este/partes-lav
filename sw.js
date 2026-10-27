@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.20.4';
+const VERSION = 'v0.21.0';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -17,6 +17,7 @@ const ARCHIVOS = [
   './js/aspecto.js',
   './js/campos.js',
   './js/db.js',
+  './js/drp.js',
   './js/envio.js',
   './js/espacio.js',
   './js/estado.js',
@@ -30,6 +31,7 @@ const ARCHIVOS = [
   './js/util.js',
   './js/validaciones.js',
   './js/vista-acceso.js',
+  './js/vista-drp.js',
   './js/vista-envio.js',
   './js/vista-extras.js',
   './js/vista-inicio.js',

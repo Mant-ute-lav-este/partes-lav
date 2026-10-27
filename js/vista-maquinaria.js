@@ -8,6 +8,8 @@ import { estado, maquinasDeVia, personalMaqCfg } from './estado.js';
 import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores, casillasVias } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 import { bloqueSinTrabajos } from './vista-trabajo.js';
+import { llevaDrp } from './drp.js';
+import { seccionDrp } from './vista-drp.js';
 
 const NOTA_SIN_TRABAJOS = `
     <section class="tarjeta">
@@ -164,6 +166,8 @@ export function vParteMaq() {
       <h2>Observaciones</h2>
       <textarea data-bind="observaciones" rows="3" placeholder="Opcional">${esc(p.observaciones)}</textarea>
     </section>
+
+    ${(llevaDrp(p) || (p.drp || []).length) && !p.sinTrabajos ? seccionDrp(p, llevaDrp(p)) : ''}
 
     ${seccionPersonalMaq(p)}
     ${p.usaExtras && !p.sinTrabajos && !estado.preguntaExtras ? seccionExtras() : ''}

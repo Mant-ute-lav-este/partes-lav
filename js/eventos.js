@@ -24,6 +24,7 @@ import {
   trabajoActual, nuevoTrabajo, copiarTrabajoAnterior, anadirFotos, borrarFoto, borrarTrabajo,
   filasAparato, aplicarAparatos,
 } from './vista-trabajo.js';
+import { anadirDrp, quitarDrp } from './vista-drp.js';
 import {
   enviarServidor, procesarYMostrar, enviarPorGmail, enviar, corregir, prepararEnvioActual, descartarParte,
 } from './vista-envio.js';
@@ -77,6 +78,12 @@ export async function onChange(e) {
     const files = [...el.files];
     el.value = '';
     if (files.length && estado.fotoPendiente) await anadirFotos(files, estado.fotoPendiente);
+    return;
+  }
+  if (el.id === 'in-drp') {
+    const files = [...el.files];
+    el.value = '';
+    if (files.length) await anadirDrp(files);
     return;
   }
   // Menú → Aspecto (tema y letra): se aplica y se guarda en este móvil al instante, sin repintar el Menú.
@@ -499,6 +506,8 @@ export async function onClick(e) {
       estado.fotoPendiente = { formato: true, origen: el.dataset.origen };
       document.getElementById(el.dataset.origen === 'camara' ? 'in-camara' : 'in-galeria').click();
       break;
+    case 'anadir-drp': document.getElementById('in-drp').click(); break;
+    case 'quitar-drp': quitarDrp(el.dataset.id); break;
     case 'ver-foto': estado.fotoVista = el.dataset.id; render(); break;
     case 'cerrar-foto': estado.fotoVista = null; render(); break;
     case 'borrar-foto': borrarFoto(el.dataset.id); break;

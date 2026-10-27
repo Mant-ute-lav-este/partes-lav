@@ -26,7 +26,7 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
 
   const datos = structuredClone(parte);
   // Jornada sin trabajos: no viajan trabajos, tajos ni fotos que se hubieran apuntado antes de marcarla.
-  if (datos.sinTrabajos) for (const k of ['trabajos', 'formato1', 'tajos', 'realizados', 'vagones']) if (Array.isArray(datos[k])) datos[k] = [];
+  if (datos.sinTrabajos) for (const k of ['trabajos', 'formato1', 'tajos', 'realizados', 'vagones', 'drp']) if (Array.isArray(datos[k])) datos[k] = [];
   const fotos = [];
   for (const [i, t] of datos.trabajos.entries()) {
     const cuenta = {};
@@ -45,11 +45,27 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
     if (!blob) throw new Error(`Falta una foto del ${FORMATO1.toLowerCase()}. Ábrelo y revisa sus fotos.`);
     fotos.push({ archivo: f.archivo, trabajo: 0, fase: 'formato', base64: await blobABase64(blob) });
   }
+  // Registros DRP (solo bateadora): cada uno es un adjunto más, tal cual sale de la máquina.
+  // Van aparte de los 3 de siempre: el Gmail de emergencia sigue compartiendo solo esos 3.
+  const drp = [];
+  const usados = new Set();
+  for (const d of datos.drp || []) {
+    const blob = await leerFoto(d.id);
+    if (!blob) throw new Error(`Falta el registro DRP «${d.nombre}». Quítalo del parte y vuelve a añadirlo.`);
+    // Se limpia con la misma regla que el servidor (mandarParte_), para que el nombre de Datos_ sea el que llega a Teams.
+    const raiz = `${String(d.nombre).replace(/\.drp$/i, '')}${sufijo}`.replace(/[^\w.\-]/g, '_');
+    let nombre = raiz;
+    for (let k = 2; usados.has(nombre.toLowerCase()); k++) nombre = `${raiz}_${k}`;
+    usados.add(nombre.toLowerCase());
+    d.archivo = `${nombre}.drp`;
+    drp.push(new File([blob], d.archivo, { type: 'application/octet-stream' }));
+  }
   datos.carpeta = carpetaDestino(parte);
   datos.archivos = {
     pdf: `Parte_${base}.pdf`,
     datos: `datos${sufijo}.json`,
     fotos: fotos.map((f) => f.archivo),
+    ...(drp.length ? { drp: drp.map((f) => f.name) } : {}),
   };
   datos.preparado = isoLocal();
   delete datos.envios;
@@ -69,7 +85,7 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   ].filter((x) => x.n);
   // Aviso para la oficina: trabajos hechos sin fotos (el capataz ha dicho por qué).
   const sinFotos = (parte.trabajos || []).map((t, i) => ({ t, i })).filter(({ t }) => t.sinFotos && !t.noRealizado);
-  const cuerpo = [
+  const lineas = [
     `Parte ${parte.tipo} de la jornada ${fmtFecha(parte.fecha)}${parte.nocturna ? ' (nocturna)' : ''}.`,
     parte.sinTrabajos
       ? `${parte.tipo === 'MAQUINARIA' ? 'Lo rellena' : 'Capataz'}: ${parte.capataz}. JORNADA SIN TRABAJOS: ${parte.motivoSinTrabajos || ''}.` +
@@ -87,9 +103,23 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
     ...(sinFecha.length ? [`AVISO: fotos de galería sin fecha original (se ha usado la fecha del archivo): ${
       sinFecha.map((x) => `${x.nombre} (${x.n} de ${x.de})`).join(', ')}.`] : []),
     ...((parte.formato1 || []).length ? [`${FORMATO1} adjunto: ${parte.formato1.length} foto(s).`] : []),
-    'Enviado desde la app Partes LAV. No cambies los adjuntos.',
-  ].join('\n');
-  return { pdf, archivos, asunto, cuerpo };
+  ];
+  const fin = 'Enviado desde la app Partes LAV. No cambies los adjuntos.';
+  const nombresDrp = drp.map((f) => f.name).join(', ');
+  const cuerpo = [...lineas, ...(drp.length ? [`Registros DRP adjuntos: ${drp.length} (${nombresDrp}).`] : []), fin].join('\n');
+  // Por Gmail de emergencia solo se comparten los 3 de siempre: el correo no debe decir que van los DRP.
+  const cuerpoGmail = [...lineas, ...(drp.length ? [`AVISO: ${drp.length} registro(s) DRP NO van en este correo (${nombresDrp}): se mandan aparte.`] : []), fin].join('\n');
+  return { pdf, archivos, drp, asunto, cuerpo, cuerpoGmail };
+}
+
+/** Lo que se manda al servidor: PDF y DRP en base64 (sin tocar sus bytes); Datos y Fotos como texto. */
+export async function archivosParaServidor({ archivos, drp = [] }) {
+  const lista = [];
+  for (const f of [...archivos, ...drp]) {
+    if (f.type === 'text/plain') lista.push({ nombre: f.name, tipo: 'text/plain', texto: await f.text() });
+    else lista.push({ nombre: f.name, tipo: f.type, base64: await blobABase64(f) });
+  }
+  return lista;
 }
 
 /** Abre el menú Compartir del móvil. Si no se puede (p. ej. en el PC), descarga los archivos. */
