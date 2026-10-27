@@ -28,7 +28,7 @@ const datos = await r.json();   // { ok: true, ... }  o  { ok: false, error: '..
 
 ### Reintentos (importante)
 
-Google a veces pierde la respuesta aunque haya hecho la acción (llega una página HTML en lugar de JSON). **Si la respuesta no es JSON, repite la misma petición con el mismo `peticion`**: el servidor la reconoce durante 30 minutos y devuelve la respuesta guardada, sin volver a mandar el correo ni registrar dos veces. Partes LAV reintenta hasta 5 veces con 45 s de espera cada una.
+Google a veces pierde la respuesta aunque haya hecho la acción (llega una página HTML en lugar de JSON). **Si la respuesta no es JSON, repite la misma petición con el mismo `peticion`**: el servidor la reconoce durante 30 minutos y devuelve la respuesta guardada, sin volver a mandar el correo ni registrar dos veces. Partes LAV hace hasta 5 intentos, con esperas de 2, 4, 5 y 5 s entre ellos, y cada intento espera la respuesta hasta 45 s (240 s al enviar un parte, que lleva fotos).
 
 ## Acciones para el registro y la entrada
 
@@ -48,7 +48,9 @@ El `token` es un secreto de sesión: guárdalo solo en el dispositivo y mándalo
 
 ## Acciones propias de Partes LAV
 
-`config`, `enviar`, `pin` y `cargarLista` pertenecen a Partes LAV (lista de la oficina, envío de partes, cambio de PIN y carga de listas). **Otra app no debe usarlas.** `cargarLista` además exige una clave de administración que no se comparte.
+`config`, `enviar`, `pin`, `fallo` y `cargarLista` pertenecen a Partes LAV (lista de la oficina, envío de partes, cambio de PIN, registro de fallos de los móviles y carga de listas). **Otra app no debe usarlas.** `cargarLista` además exige una clave de administración que no se comparte.
+
+`enviar` lleva `token`, `envioId` (UUID del envío, para no mandar un parte dos veces), `asunto`, `ref`, `cuerpo` y `archivos` (de 1 a 6; PDF en `base64`, el resto en `texto`). Los adjuntos no pueden pasar de 24 MB en total (Gmail admite 25). Responde `recibido` (fecha) y, si el parte ya había llegado, `repetido: true`.
 
 ## Pendiente (aún no existe)
 

@@ -2,6 +2,17 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.19.2 · 2026-10-27
+- **Envío en segundo plano igual que el de la app**: el service worker (`sw.js`) hacía 3 intentos sin tiempo máximo y no apuntaba los fallos; ahora hace los mismos 5 intentos, con las mismas esperas (2, 4, 5 y 5 s) y 240 s máximo por intento, y apunta los rechazos del servidor para la hoja «Errores». Una prueba nueva carga el `sw.js` real y avisa si se separa de `js/salida.js`.
+- Pruebas del servidor nuevas: PIN erróneo (bloqueo a los 5 fallos) y parte de más de 24 MB.
+
+## 0.19.1 · 2026-10-27
+- Guía rápida de capataces al día: botón «Enviar por Gmail (emergencia)», registro por nombre y apellidos (ya no se elige de una lista) y fotos borradas a los 30 días. «No realizado» y «No se han podido hacer fotos» ya estaban.
+
+## 0.19.0 · 2026-10-27
+- **«Enviar por Gmail (emergencia)»**: si un parte lleva más de 12 horas en la cola sin llegar a la oficina, la pantalla del parte lo avisa y ofrece ese botón. Al usarlo, el parte sale de la cola (para que no llegue dos veces cuando vuelva el servidor) y queda como «Enviado por Gmail» (`porGmail`). Antes de quitarlo de la cola, la app mira si ya ha llegado mientras tanto.
+- Campo nuevo en el parte: `enCola` (fecha en que entró en la cola). Los partes que ya estaban en la cola antes de esta versión no la tienen y no muestran el botón (siguen con el enlace pequeño de Gmail).
+
 ## 0.18.2 · 2026-10-27
 - **Fotos de partes antiguos fuera del móvil**: al abrir la app se borran las fotos de los partes enviados hace más de 30 días (la oficina ya las tiene). El parte se queda con todos sus datos, para repetirlo o rectificarlo, y se marca con `fotosBorradas` (fecha). Nunca se tocan borradores, partes cerrados ni nada que esté en la cola de envío; si la fecha del envío no se entiende, tampoco.
 - En un parte así, la pantalla dice cuándo se borraron las fotos y «Ver el PDF» lo saca sin el anexo de fotos. Sin servidor (envío por Gmail) ya no se ofrece volver a mandarlo.

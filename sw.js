@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.19.1';
+const VERSION = 'v0.19.2';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -161,6 +161,7 @@ async function procesarSalida() {
       await op('salida', 'readwrite', (s) => s.delete(it.id));
       enviados++;
     } else {
+      await registrarFallo('envio', j.error);
       it.error = j.error;
       it.intentos = (it.intentos || 0) + 1;
       await op('salida', 'readwrite', (s) => s.put(it));
@@ -176,14 +177,40 @@ async function procesarSalida() {
 
 // Google a veces pierde la respuesta aunque el parte haya llegado: se repite con el mismo
 // identificador de petición y el servidor contesta lo mismo sin mandarlo otra vez.
+// Mismos 5 intentos, esperas y tiempo máximo que `api` en js/servidor.js (la prueba «cola: el
+// service worker…» avisa si se separan).
 async function llamar(url, cuerpo) {
-  for (let i = 0; i < 3; i++) {
-    if (i) await new Promise((r) => setTimeout(r, 2000 * i));
+  for (let i = 0; i < 5; i++) {
+    if (i) await new Promise((r) => setTimeout(r, Math.min(2000 * i, 5000)));
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 240000);
     try {
-      const r = await fetch(url, { method: 'POST', redirect: 'follow', body: cuerpo });
+      const r = await fetch(url, { method: 'POST', redirect: 'follow', body: cuerpo, signal: ctrl.signal });
       const j = await r.json();
       if (!j.reintentar) return j;
-    } catch { /* sin cobertura o respuesta perdida */ }
+    } catch {
+      if (!navigator.onLine) break;   // sin cobertura: se reintenta más tarde
+    } finally {
+      clearTimeout(t);
+    }
   }
   throw new Error('Sin respuesta del servidor');
+}
+
+// Apunta el fallo en el móvil como js/fallos.js (mismo texto limpio, sin repetidos, máximo 20);
+// la app lo manda a la hoja «Errores» la próxima vez que se abra.
+async function registrarFallo(tipo, mensaje) {
+  try {
+    const m = String(mensaje == null ? '' : mensaje)
+      .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[correo]')
+      .replace(/\d{6,}/g, '[nº]')
+      .replace(/https?:\/\/\S+/g, '[url]')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+    const pendientes = (await op('kv', 'readonly', (s) => s.get('fallos'))) || [];
+    if (!m || pendientes.some((f) => f.tipo === tipo && f.mensaje === m)) return;
+    pendientes.push({ tipo: String(tipo).slice(0, 20), mensaje: m, fecha: new Date().toISOString(), version: VERSION.slice(1) });
+    await op('kv', 'readwrite', (s) => s.put(pendientes.slice(-20), 'fallos'));
+  } catch { /* sin almacenamiento: nada que hacer */ }
 }

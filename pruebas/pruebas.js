@@ -738,6 +738,60 @@ prueba('salida: sin conexión no pierde nada', () => conPerfil(async () => {
   await db.borrarParte(p.id);
 }));
 
+// sw.js no puede importar js/salida.js (script clásico): repite su lógica. Esta prueba carga el
+// sw.js real y le hace lo mismo que a la app; si alguien cambia una cola y no la otra, falla.
+prueba('cola: el service worker (sw.js) hace lo mismo que js/salida.js', () => conPerfil(async () => {
+  const codigo = await fetch('../sw.js', { cache: 'no-store' }).then((r) => r.text());
+  const sw = new Function('self', `${codigo}\nreturn { procesarSalida };`)({ addEventListener() {}, clients: {}, skipWaiting() {} });
+  const urlAntes = await db.kvGet('servidorUrl');
+  const fallosAntes = await db.kvGet('fallos');
+  const setTimeoutReal = window.setTimeout;
+  // Las esperas entre reintentos (2 a 5 s) pasan a 0 para no tardar; el tiempo máximo (240 s) no se toca.
+  window.setTimeout = (f, ms, ...a) => setTimeoutReal(f, ms >= 2000 && ms <= 5000 ? 0 : ms, ...a);
+  await db.kvSet('servidorUrl', SERVIDOR_URL);
+  const caso = async (falso, procesar) => {
+    const p = ej.parteInfra();
+    await db.putParte(p);
+    await db.putSalida({ id: crypto.randomUUID(), parteId: p.id, creado: '2026-10-14T10:00:00+02:00', datos: { asunto: 'x', archivos: [] } });
+    await db.kvSet('fallos', []);
+    let llamadas = 0;
+    const cuenta = async (url, op) => { if (JSON.parse(op.body).accion === 'enviar') llamadas++; return falso(); };
+    const r = await conFetch(cuenta, async () => {
+      const salida = await procesar();
+      await new Promise((ok) => setTimeoutReal(ok, 100));   // deja acabar el envío de fallos que lanza la app
+      return salida;
+    });
+    const g = await db.getParte(p.id);
+    const cola = await db.listarSalida();
+    const visto = {
+      r, llamadas, estado: g.estado, errorEnvio: g.errorEnvio, recibido: g.recibido,
+      cola: cola.map((x) => [x.intentos, x.error]),
+      fallos: (await db.kvGet('fallos')).map((f) => [f.tipo, f.mensaje]),
+    };
+    for (const x of cola) await db.borrarSalida(x.id);
+    await db.borrarParte(p.id);
+    return visto;
+  };
+  const casos = {
+    'llega': () => respuesta({ ok: true, recibido: '2026-10-14T10:01:00+02:00' }),
+    'rechazado': () => respuesta({ ok: false, error: 'Tu registro aún no está aprobado por la oficina.' }),
+    'ocupado': () => respuesta({ ok: false, reintentar: true, error: 'El servidor está ocupado.' }),
+    'sin conexión': () => { throw new TypeError('Failed to fetch'); },
+  };
+  try {
+    for (const [nombre, falso] of Object.entries(casos)) {
+      const app = await caso(falso, () => procesarSalida());
+      const enSW = await caso(falso, () => sw.procesarSalida());
+      igual(enSW, app, nombre);
+    }
+    igual((await caso(casos['sin conexión'], () => sw.procesarSalida())).llamadas, 5, '5 intentos');
+  } finally {
+    window.setTimeout = setTimeoutReal;
+    await db.kvSet('servidorUrl', urlAntes);
+    await db.kvSet('fallos', fallosAntes || []);
+  }
+}));
+
 // ---------- registro de fallos ----------
 
 prueba('fallos: se guardan sin datos personales y sin repetir', async () => {
@@ -928,6 +982,30 @@ prueba('servidor: rechaza sesión no válida, parte sin archivos y cuenta no act
   const tp = E.s.crearSesion_('pen@ejemplo.test');
   cierto(/no está aprobado/.test(E.post(E.parte({ token: tp })).error), 'pendiente');
   igual(E.correos.length, 0);
+});
+
+prueba('servidor: PIN mal: a los 5 fallos se bloquea, y ya ni el PIN bueno entra', async () => {
+  const E = await servidorListo();
+  igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
+  const entrar = (pin) => E.post({ accion: 'login', email: 'ana@ejemplo.test', pin, peticion: crypto.randomUUID() });
+  for (let i = 0; i < 5; i++) igual(entrar('0000').error, 'PIN incorrecto.', `fallo ${i + 1}`);
+  cierto(/Demasiados intentos/.test(entrar('1234').error), 'bloqueado aunque el PIN sea el bueno');
+  E.hojas.Usuarios._d[1][6] = '0';   // pasa el tiempo de bloqueo (la fila 1 es Ana)
+  const r = entrar('1234');
+  igual(r.ok, true, r.error);
+  cierto(Boolean(r.token), 'entra con el PIN bueno');
+});
+
+prueba('servidor: un parte que pesa más de 24 MB no sale y se puede reintentar sin él', async () => {
+  const E = await servidorListo();
+  const grande = { nombre: 'Fotos_x.txt', tipo: 'application/octet-stream', base64: btoa('x'.repeat(25 * 1024 * 1024)) };
+  const p = E.parte({ archivos: [grande] });
+  cierto(/pesa demasiado/.test(E.post(p).error), 'aviso de peso');
+  igual(E.correos.length, 0, 'no sale ningún correo');
+  igual(E.hojas.Envios._d.length, 1, 'no se apunta en Envios');
+  const r = E.post(E.parte({ envioId: p.envioId }));   // mismo envío, ya sin las fotos de más
+  igual(r.ok, true, r.error);
+  igual(E.correos.length, 1, 'el reintento sale');
 });
 
 prueba('servidor: registro de fallos sin nombre ni correo', async () => {

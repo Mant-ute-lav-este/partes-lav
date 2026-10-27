@@ -41,7 +41,9 @@ Carpeta sincronizada en el OneDrive de quien la tenga sincronizada
 | `js/modelo.js` | Listas fijas, apartados nuevos y arreglo de borradores antiguos |
 | `js/db.js` | IndexedDB `partes-lav`: kv, partes, fotos, salida |
 | `js/servidor.js` | Llamadas al servidor, con reintentos e identificador de petición |
-| `js/envio.js`, `js/salida.js` | Cola de envío |
+| `js/envio.js`, `js/salida.js` | Preparar el correo y cola de envío. `sw.js` repite la lógica de `salida.js` para enviar en segundo plano (no puede importar); la prueba «cola: el service worker…» avisa si se separan |
+| `js/fallos.js` | Fallos de campo: se guardan en el móvil sin datos personales y se mandan a la hoja «Errores» |
+| `js/espacio.js` | Borra las fotos de partes enviados hace más de 30 días y calcula el espacio usado del Menú |
 | `js/pdf.js` | PDF A4 del parte |
 | `js/fotos.js` | Reducir fotos y ponerles el sello |
 | `js/util.js` | Utilidades |
@@ -68,4 +70,14 @@ Para volver atrás: en «Gestionar implementaciones», elegir la versión anteri
 
 ## Cuotas
 
-Apps Script en una cuenta Gmail gratuita permite unos 100 correos al día (cada parte, código y aviso cuenta uno) y tiene tiempo máximo de ejecución. Para el uso actual sobra; hay que vigilarlo si se suman más apps o usuarios.
+Apps Script en una cuenta Gmail gratuita permite unos 100 correos al día (cada parte, código y aviso cuenta uno) y tiene tiempo máximo de ejecución. Para el uso actual sobra; hay que vigilarlo si se suman más apps o usuarios. Cada parte gasta 1 correo: la copia a otra dirección la manda el flujo de Power Automate desde Outlook, no el servidor. El servidor avisa al llegar a 70 correos en el día.
+
+## Si el servidor no responde
+
+- Los partes cerrados esperan en la cola del móvil y se envían solos cuando vuelve.
+- Pasadas 12 horas en la cola, la pantalla del parte ofrece «Enviar por Gmail (emergencia)»: el capataz lo manda desde su Gmail a la oficina, con el mismo asunto «PARTE LAV…» que lee Power Automate (el flujo filtra por asunto y adjuntos, no por remitente). El parte sale de la cola y queda marcado como enviado por Gmail.
+- Para una caída larga o una cuenta bloqueada hay una hoja de contingencia en la carpeta privada del proyecto (montar un servidor nuevo y cambiar `SERVIDOR_URL`).
+
+## Pruebas
+
+`privado/herramientas/pruebas.ps1` pasa todas las pruebas en Edge sin ventana (app, pantallas, cola de envío y servidor con Google simulado en `pruebas/google-simulado.js`). `publicar.ps1` no publica si falla alguna.
