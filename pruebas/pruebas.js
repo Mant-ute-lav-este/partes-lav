@@ -130,6 +130,16 @@ prueba('varias vías: lista, validaciones, PDF y correo', async () => {
   igual(val.listaVias(ej.parteInfra().trabajos[0].via), ['1']);
 });
 
+prueba('peso del correo: aviso y cuántas fotos quitar', () => {
+  const MB = 1048576;
+  igual(val.pesoCorreoMB([]), 0);
+  igual(Math.round(val.pesoCorreoMB([MB, MB, 3 * MB]) * 10) / 10, 12, 'x2,4 sobre 5 MB');
+  igual(val.fotosAQuitar(Array(8).fill(MB)), 0, '8 fotos de 1 MB = 19,2 MB: cabe');
+  igual(val.fotosAQuitar(Array(10).fill(MB)), 2, '10 fotos de 1 MB = 24 MB: sobran 4 MB = 2 fotos');
+  igual(val.fotosAQuitar(Array(35).fill(MB)), 27, '35 fotos de 1 MB = 84 MB');
+  igual(val.fotosAQuitar([]), 0);
+});
+
 // Aparatos de prueba (inventados), con PK en los dos sentidos como en la lista real.
 const APARATOS = [
   { nombre: 'S2 PRU 2', pkInicio: '100+250', pkFin: '100+430' },

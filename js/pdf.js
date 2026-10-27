@@ -129,7 +129,7 @@ function descripcionTrabajo(t) {
 const FASE_TXT ={ antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS' };
 
 /** Reduce la foto para el anexo del PDF (las originales van aparte, a tamaño completo). */
-async function reducir(blob, lado = 1100, calidad = 0.72) {
+async function reducir(blob, lado = 900, calidad = 0.65) {
   const bmp = await createImageBitmap(blob);
   const k = Math.min(1, lado / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * k);
@@ -164,7 +164,7 @@ async function anexoFormato(c, parte, leerFoto) {
 }
 
 /** Dos fotos por página, con el título del anexo y un pie por foto. */
-async function paginasFotos(c, parte, leerFoto, lista, nombreAnexo, textoPie, lado = 1100, calidad = 0.72) {
+async function paginasFotos(c, parte, leerFoto, lista, nombreAnexo, textoPie, lado = 900, calidad = 0.65) {
   if (!lista.length) return;
   const { doc } = c;
   const hueco = 6;

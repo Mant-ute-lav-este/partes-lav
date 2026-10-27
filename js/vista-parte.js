@@ -4,7 +4,9 @@
 import * as db from './db.js';
 import { textoReferencia } from './pdf.js';
 import { esc, normaliza, toast, isoLocal, fmtFecha, FORMATO1, MAX_FORMATO1 } from './util.js';
-import { faltasTrabajo, validar, validarMaq, validarLD, subtipoDe } from './validaciones.js';
+import {
+  faltasTrabajo, validar, validarMaq, validarLD, subtipoDe, fotosAQuitar, pesoCorreoMB, LIMITE_CORREO_MB,
+} from './validaciones.js';
 import { EQUIPOS, textoEquipo, persona, normalizarParte } from './modelo.js';
 import {
   estado, ir, render, guardarYa, guardarPronto, catalogo, equiposCfg, indiceEquipo, medidasCfg,
@@ -223,6 +225,25 @@ export async function anadirOtro() {
 
 // ---------- Cierre y borrado del parte ----------
 
+/** Si el correo del parte pesaría demasiado, el texto del aviso; si cabe (o no se puede medir), null. */
+async function avisoPeso(p) {
+  try {
+    const ids = [...(p.trabajos || []).flatMap((t) => t.fotos || []), ...(p.formato1 || [])].map((f) => f.id);
+    const bytes = [];
+    for (const id of ids) {
+      const f = await db.getFoto(id);
+      if (f && f.blob) bytes.push(f.blob.size);
+    }
+    const quitar = fotosAQuitar(bytes);
+    if (!quitar) return null;
+    return `Este parte pesa unos ${Math.round(pesoCorreoMB(bytes))} MB y el correo admite unos ${LIMITE_CORREO_MB}. ` +
+      `Quita unas ${quitar} foto${quitar === 1 ? '' : 's'} o puede que no llegue a la oficina.\n\n` +
+      'Cancelar: volver al parte para quitar fotos.\nAceptar: seguir y cerrarlo igualmente.';
+  } catch (e) {
+    return null;   // el aviso es una ayuda: si falla la medida, el parte se cierra como siempre
+  }
+}
+
 export async function cerrarParte() {
   await guardarYa();
   const maq = estado.parte.tipo === 'MAQUINARIA';
@@ -241,6 +262,8 @@ export async function cerrarParte() {
     render();
     return;
   }
+  const aviso = await avisoPeso(estado.parte);
+  if (aviso && !confirm(aviso)) return;
   if (!confirm('¿Cerrar el parte? Después ya no se puede cambiar: solo corregir con una revisión nueva.')) return;
   estado.parte.cierre = isoLocal();
   estado.parte.estado = 'cerrado';

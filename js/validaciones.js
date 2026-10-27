@@ -38,6 +38,23 @@ export function pkDeAparatos(nombres, lista) {
   return { pkInicio: metrosAPk(Math.min(...ms)), pkFin: metrosAPk(Math.max(...ms)) };
 }
 
+/**
+ * Peso del correo de un parte. Las fotos viajan en base64 dentro del Fotos_.txt, que a su vez se
+ * adjunta en base64, y el PDF lleva una copia reducida: en total, unas 2,4 veces lo que pesan.
+ * Gmail admite 25 MB; se avisa a partir de 20 para dejar margen.
+ */
+export const LIMITE_CORREO_MB = 20;
+const FACTOR_CORREO = 2.4;
+export const pesoCorreoMB = (bytesFotos) => bytesFotos.reduce((a, b) => a + b, 0) * FACTOR_CORREO / 1048576;
+
+/** Cuántas fotos (de tamaño medio) hay que quitar para bajar del límite; 0 si ya cabe. */
+export function fotosAQuitar(bytesFotos) {
+  const peso = pesoCorreoMB(bytesFotos);
+  if (!bytesFotos.length || peso <= LIMITE_CORREO_MB) return 0;
+  const mediaMB = peso / bytesFotos.length;
+  return Math.min(bytesFotos.length, Math.ceil((peso - LIMITE_CORREO_MB) / mediaMB));
+}
+
 export const textoBool =(v) => (v === true ? 'si' : v === false ? 'no' : '');
 export const numeroOk = (s) => Number(String(s == null ? '' : s).replace(',', '.')) > 0;
 

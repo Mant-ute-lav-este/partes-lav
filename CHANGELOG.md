@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.18.1 · 2026-10-27
+- **Aviso de peso al cerrar el parte**: se calcula lo que pesará el correo (las fotos viajan dos veces en base64 más el PDF, unas 2,4 veces su peso). Por encima de 20 MB (Gmail admite 25) sale un aviso con «quita unas N fotos»: Cancelar vuelve al parte; Aceptar lo cierra igualmente. Si no se puede medir, el parte se cierra como siempre.
+- **Anexo del PDF más ligero**: las fotos del anexo pasan de 1100 px y calidad 0,72 a 900 px y 0,65. Las fotos originales del Fotos_ y las del formato de protección de la vía (SUPER) no cambian.
+
 ## 0.18.0 · 2026-10-26 (con el servidor versión 13)
 - **Registro sin la lista de trabajadores**: en el paso «¿Quién eres?» ya no sale la lista para elegir. Se escribe el nombre y al menos un apellido («Tu nombre y apellidos» → «Buscarme») y el servidor busca a esa persona (da igual el orden, las tildes y las mayúsculas). En el paso del PIN sale el nombre encontrado con «Si no eres tú, pulsa «Atrás»». Antes, cualquiera con un Gmail podía ver los nombres de todos.
 - Servidor v13 (sin cambios para el capataz): abre la hoja de Google una sola vez por petición; los últimos números de cada capataz se guardan aparte en vez de leer la hoja Envios entera; un parte ya enviado no se puede mandar dos veces aunque falle su apunte en Envios; los envíos de más de 12 meses pasan solos cada lunes a la hoja «EnviosArchivo». La copia a ivandesvios la manda ahora Power Automate desde Outlook (el servidor gasta 1 correo por parte en vez de 2).
