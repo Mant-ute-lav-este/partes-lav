@@ -317,11 +317,15 @@ function revisarRegistro(email, firma, decision) {
   return decision;
 }
 
+// ATENCIÓN: la usa también la app del almacén. No cambiar lo que recibe ni lo que devuelve sin avisar
+// al compañero (hay una prueba «contrato almacén» en pruebas/pruebas.js que lo vigila).
 function estado_(d) {
   const u = usuarioDeSesion_(d.token, false);
   return { estado: String(u.Estado), nombre: String(u.Nombre) };
 }
 
+// ATENCIÓN: la usa también la app del almacén. No cambiar lo que recibe ni lo que devuelve sin avisar
+// al compañero (hay una prueba «contrato almacén» en pruebas/pruebas.js que lo vigila).
 function entrar_(d) {
   const email = email_(d.email);
   const t = tabla_('Usuarios');
@@ -347,6 +351,8 @@ function cambiarPin_(d) {
   return {};
 }
 
+// ATENCIÓN: la usa también la app del almacén. No cambiar lo que recibe ni lo que devuelve sin avisar
+// al compañero (hay una prueba «contrato almacén» en pruebas/pruebas.js que lo vigila).
 /** «He olvidado el PIN»: con el código que llega al correo se crea un PIN nuevo y se entra. */
 function nuevoPin_(d) {
   const email = email_(d.email);

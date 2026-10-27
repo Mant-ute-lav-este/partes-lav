@@ -867,6 +867,24 @@ prueba('cola: el service worker (sw.js) hace lo mismo que js/salida.js', () => c
   }
 }));
 
+// sw.js abre la base de datos por su cuenta (no puede importar js/db.js). Si se sube la versión o se
+// añade una tabla en db.js y no en sw.js, el envío en segundo plano falla en silencio en los móviles.
+prueba('base de datos: sw.js y js/db.js abren la misma base (nombre, versión y tablas)', async () => {
+  const leer = (url) => fetch(url, { cache: 'no-store' }).then((r) => r.text());
+  const [sw, dbJs] = await Promise.all([leer('../sw.js'), leer('../js/db.js')]);
+  const tablas = (c) => [...c.matchAll(/createObjectStore\('(\w+)'(?:,\s*\{\s*keyPath:\s*'(\w+)'\s*\})?\)(?:\.createIndex\('(\w+)',\s*'(\w+)'\))?/g)]
+    .map((m) => m.slice(1).map((x) => x || '').join('|'));
+  const abre = sw.match(/indexedDB\.open\('([^']+)',\s*(\d+)\)/);
+  const nombre = dbJs.match(/const NOMBRE = '([^']+)'/);
+  const version = dbJs.match(/const VERSION = (\d+)/);
+  cierto(abre && nombre && version, 'no encuentro el nombre o la versión en sw.js o db.js (¿cambió la forma de escribirlos?)');
+  igual(abre[1], nombre[1], 'nombre de la base');
+  igual(Number(abre[2]), Number(version[1]), 'versión de la base');
+  const enSW = tablas(sw);
+  cierto(enSW.length >= 4, 'sw.js debería crear al menos 4 tablas');
+  igual(enSW, tablas(dbJs), 'tablas, claves e índices');
+});
+
 // ---------- registro de fallos ----------
 
 prueba('fallos: se guardan sin datos personales y sin repetir', async () => {
@@ -1117,6 +1135,45 @@ prueba('servidor: PIN mal: a los 5 fallos se bloquea, y ya ni el PIN bueno entra
   const r = entrar('1234');
   igual(r.ok, true, r.error);
   cierto(Boolean(r.token), 'entra con el PIN bueno');
+});
+
+// La app del almacén usa login, estado y nuevoPin del mismo servidor. Esta prueba fija lo que
+// devuelven: si un cambio lo altera, falla y hay que avisar al compañero antes de seguir.
+prueba('servidor: contrato con la app del almacén (login, estado y nuevoPin)', async () => {
+  const E = await servidorListo();
+  const id = () => crypto.randomUUID();
+  const claves = (o) => Object.keys(o).sort();
+  igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: id() }).ok, true, 'PIN de Ana');
+
+  const l = E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234', peticion: id() });
+  igual(claves(l), ['estado', 'nombre', 'ok', 'token'], 'login');
+  igual([l.ok, l.estado, l.nombre], [true, 'activo', 'Ana Prueba']);
+  cierto(typeof l.token === 'string' && l.token.length > 20, 'token de sesión');
+  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '0000', peticion: id() }), { ok: false, error: 'PIN incorrecto.' });
+  igual(E.post({ accion: 'login', email: 'nadie@ejemplo.test', pin: '1234', peticion: id() }),
+    { ok: false, error: 'No hay ninguna cuenta con ese correo. Regístrate primero.' });
+  igual(E.post({ accion: 'login', email: 'rec@ejemplo.test', pin: '1234', peticion: id() }),
+    { ok: false, error: 'Esta cuenta no está activa. Habla con la oficina.' });
+
+  const e = E.post({ accion: 'estado', token: l.token, peticion: id() });
+  igual(claves(e), ['estado', 'nombre', 'ok'], 'estado');
+  igual([e.ok, e.estado, e.nombre], [true, 'activo', 'Ana Prueba']);
+  E.hojas.Usuarios.appendRow(['pen@ejemplo.test', 'Pendiente Prueba', 'pendiente', 's', 'h', '0', '0', '2026-01-01', '']);
+  const ep = E.post({ accion: 'estado', token: E.s.crearSesion_('pen@ejemplo.test'), peticion: id() });
+  igual([ep.ok, ep.estado, ep.nombre], [true, 'pendiente', 'Pendiente Prueba'], 'estado no exige cuenta activa');
+  const mal = E.post({ accion: 'estado', token: 'nada', peticion: id() });
+  igual(mal.ok, false);
+  cierto(/Sesión no válida/.test(mal.error), 'sesión no válida');
+
+  E.cache['c:ana@ejemplo.test'] = JSON.stringify({ codigo: '123456', fallos: 0 });
+  const n = E.post({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '4321', peticion: id() });
+  igual(claves(n), ['estado', 'nombre', 'ok', 'token'], 'nuevoPin');
+  igual([n.ok, n.estado, n.nombre], [true, 'activo', 'Ana Prueba']);
+  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234', peticion: id() }).error, 'PIN incorrecto.', 'el PIN viejo ya no vale');
+  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '4321', peticion: id() }).ok, true, 'el PIN nuevo entra');
+  const otra = E.post({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '9999', peticion: id() });
+  igual(otra.ok, false, 'el código solo vale una vez');
+  cierto(/caducado/.test(otra.error), 'código gastado: ' + otra.error);
 });
 
 prueba('servidor: un parte que pesa más de 24 MB no sale y se puede reintentar sin él', async () => {
@@ -1556,6 +1613,58 @@ prueba('pantallas: parte nuevo igual que el anterior', async () => {
     const db = await import('../js/db.js');
     for (const p of await db.listarPartes()) if (p.fecha === '2099-01-01' || p.estado === 'borrador') await db.borrarParte(p.id);
   }
+});
+
+// Los datos salen de la hoja de la oficina y de lo que escribe el capataz, y las pantallas se pintan
+// con texto HTML (esc() a mano en cada dato). Esta prueba mete en los campos de texto libre un
+// «trozo de HTML» y comprueba que no se convierte en elementos ni en atributos de la pantalla.
+prueba('pantallas: textos con trampa (< > " \' &) no crean elementos ni atributos', async () => {
+  const T = '<b id="trampa">x</b><img src=x onerror="window.__trampa=1">" onfocus="window.__trampa=1" x=\'&amp;';
+  const libres = new Set(['nombre', 'capataz', 'empresa', 'categoria', 'habilitacion', 'matricula', 'descripcion', 'observaciones',
+    'motivo', 'motivoNoRealizado', 'motivoSinFotos', 'aparato', 'lugar', 'procedencia', 'acta', 'trabajo', 'medidasOtras', 'texto', 'etiqueta']);
+  const ensucia = (o) => {
+    if (Array.isArray(o)) o.forEach(ensucia);
+    else if (o && typeof o === 'object') {
+      for (const [k, v] of Object.entries(o)) {
+        if (typeof v === 'string' && libres.has(k)) o[k] = T + v; else ensucia(v);
+      }
+    }
+    return o;
+  };
+  const sucio = (p) => ensucia(borrador(p));
+  let vistoLiteral = 0;
+  const revisar = async (que, preparar) => {
+    await pantalla((e) => {
+      e.config = ensucia(structuredClone(ej.config));
+      e.perfil.capataz = T;
+      preparar(e);
+    });
+    const { f, m } = marco;
+    cierto(!m.app.querySelector('#trampa'), `«${que}»: la trampa se ha convertido en un elemento`);
+    cierto(f.contentWindow.__trampa === undefined, `«${que}»: se ha ejecutado código de la trampa`);
+    for (const el of m.app.querySelectorAll('*')) {
+      for (const a of el.attributes) cierto(!/^on/i.test(a.name), `«${que}»: atributo ${a.name} en <${el.localName}>`);
+    }
+    if (m.app.textContent.includes('<b id="trampa">')) vistoLiteral++;
+  };
+  await revisar('inicio', (e) => { e.lista = [sucio(ej.parteInfra()), { ...sucio(ej.parteSuper()), estado: 'enviado' }]; });
+  await revisar('menú', (e) => { e.lista = [sucio(ej.parteInfra())]; e.menu = true; });
+  await revisar('parte INFRA', (e) => { e.vista = 'parte'; e.parte = sucio(ej.parteInfra()); });
+  await revisar('buscador de personal', (e) => { e.vista = 'parte'; e.parte = sucio(ej.parteInfra()); e.otroAbierto = true; e.busqueda = 'a'; });
+  await revisar('trabajo INFRA', (e) => { e.vista = 'trabajo'; e.parte = sucio(ej.parteInfra()); e.trabajoIdx = 0; });
+  await revisar('parte SUPER', (e) => { e.vista = 'parte'; e.parte = sucio(ej.parteSuper()); });
+  await revisar('maquinaria de vía', (e) => { e.vista = 'parte'; e.parte = sucio(ej.parteMaqVia()); });
+  await revisar('locomotora', (e) => { e.vista = 'parte'; e.parte = sucio(ej.parteLoco()); });
+  await revisar('dresina', (e) => { e.vista = 'parte'; e.parte = sucio(ej.parteLoco('dresina')); });
+  await revisar('errores del parte', (e) => {
+    e.vista = 'parte'; e.parte = sucio(ej.parteInfra());
+    e.errores = [{ msg: T, trabajo: null }, { msg: 'Trabajo 1: ' + T, trabajo: 0 }];
+  });
+  await revisar('envío', (e) => { e.vista = 'envio'; e.parte = { ...sucio(ej.parteInfra()), estado: 'en-cola', errorEnvio: T }; });
+  await revisar('PIN', (e) => { e.vista = 'pin'; });
+  await revisar('registro: nombre', (e) => { e.vista = 'reg-nombre'; e.perfil = null; e.reg = { email: T, texto: T, nombre: T, codigo: T }; });
+  await revisar('registro: PIN', (e) => { e.vista = 'reg-pin'; e.perfil = null; e.reg = { email: T, texto: T, nombre: T, codigo: T }; });
+  cierto(vistoLiteral > 0, 'ninguna pantalla enseñó la trampa como texto: la prueba no está comprobando nada');
 });
 
 prueba('pantallas: envío', async () => {

@@ -4,6 +4,8 @@ config*.json
 !ejemplo/config-ejemplo.json
 # Herramientas, claves y pruebas locales
 privado/
+# Instrucciones para Claude (describen puntos delicados)
+CLAUDE.md
 # Hojas de cálculo, PDF y fotos (pueden llevar datos de personas)
 *.xlsx
 *.pdf
