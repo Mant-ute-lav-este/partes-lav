@@ -2,7 +2,7 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
-## 0.20.3 (sin publicar)
+## 0.20.3 · 2026-10-27
 - **Arreglo: bloqueo del PIN y avisos de errores.** Los intentos de PIN mal puestos y los errores pendientes de mandar a la oficina se guardaban en el móvil con el mismo nombre y se pisaban: con errores guardados el bloqueo a los 5 intentos no funcionaba, al acertar el PIN se perdían los errores sin mandar, y con un intento fallido apuntado no se guardaban errores nuevos. Ahora los intentos van en `intentosPin`. Si un móvil trae el valor antiguo, se ignora y se sobrescribe con el primer error nuevo (el contador de PIN empieza de cero una vez).
 - Pruebas nuevas: la base de datos de `sw.js` igual que la de `db.js`, textos con trampa en las pantallas, contrato con la app del almacén, PIN mal 5 veces con errores pendientes.
 
