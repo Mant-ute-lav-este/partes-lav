@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.20.1 · 2026-10-27
+- Guía rápida de capataces al día: «Jornada sin trabajos» (también en maquinaria) y Menú → Aspecto (tema y letra). La letra de la guía baja a 10 pt para que siga cabiendo en una página.
+
 ## 0.20.0 · 2026-10-27
 - **Aspecto** (Menú → Aspecto): **Tema** (Automático, Claro u Oscuro) y **Letra** (Normal o Grande, un 20 % más grande en toda la app). Se aplica al tocar, se guarda en cada móvil (localStorage, `js/aspecto.js`) y se recuerda al reabrir; un script de `index.html` lo pone antes de pintar para que no parpadee en claro. «Automático» sigue al móvil como hasta ahora. El texto base de la hoja de estilos pasa de 17 px fijos a `1.0625rem` para que la letra grande llegue a todo.
 - **Jornada sin trabajos** (todos los partes): en «Jornada» hay una casilla nueva, «Jornada sin trabajos (no se ha podido trabajar: lluvia, avería…)». Al marcarla pide el motivo (lluvia / meteorología, avería de maquinaria o vehículos, sin corte de vía / sin autorización, falta de material, falta de personal, u «Otro» escrito) y esconde trabajos, maquinaria, vehículos, medidas antiincendios y formato 1. Siguen siendo obligatorios la fecha y el personal. No se preguntan horas extra.

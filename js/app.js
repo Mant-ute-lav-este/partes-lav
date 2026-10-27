@@ -16,7 +16,7 @@ import { esc } from './util.js';
 import { app, estado, sincronizar, refrescarVista, ir, guardarYa } from './estado.js';
 import { onInput, onChange, onSubmit, onClick } from './eventos.js';
 
-export const APP_VERSION = '0.20.0';
+export const APP_VERSION = '0.20.1';
 
 // ---------- Arranque ----------
 
