@@ -112,6 +112,7 @@ export function vMenu() {
     <p class="nota">${srv ? `Cuenta: ${esc(estado.perfil.email)}${estado.perfil.cuenta === 'pendiente' ? ' (pendiente de aprobar)' : ''}<br>` : ''}
       Lista de la oficina: ${esc(c.nombre || 'sin nombre')}${c.fecha ? ` (${esc(c.fecha)})` : ''} ·
       ${(c.trabajadores || []).length} trabajadores<br>Versión de la app: ${APP_VERSION}</p>
+    ${estado.espacio ? `<p class="${estado.espacio.poco ? 'error' : 'nota'}">${esc(estado.espacio.texto)}</p>` : ''}
     <button class="btn" data-action="cerrar-menu">Cerrar</button>
   </div></div>`;
 }

@@ -3,6 +3,8 @@
 
 import * as db from './db.js';
 import { prepararEnvio, compartir } from './envio.js';
+import { generarPDF } from './pdf.js';
+import { quitarFotosQueFaltan } from './modelo.js';
 import { procesarSalida } from './salida.js';
 import { esc, uuid, isoLocal, fmtFecha, fmtFechaHora, toast, blobABase64, FORMATO1 } from './util.js';
 import { estado, ir, render, guardarYa, registrarSync } from './estado.js';
@@ -21,7 +23,8 @@ export function resumenEnvio(p) {
   const envios = (p.envios || []).map((x) => (typeof x === 'string' ? fmtFechaHora(x) : fmtFechaHora(x.recibido || x.fecha)));
   return `
       <p>Jornada del ${fmtFecha(p.fecha)}${p.nocturna ? ' (nocturna)' : ''} · ${textoCuenta(p)} · ${p.personal.length} persona(s)${(p.formato1 || []).length ? ` · ${esc(FORMATO1.toLowerCase())}: ${p.formato1.length} foto(s)` : ''}</p>
-      <p><small>Cerrado en el móvil: ${fmtFechaHora(p.cierre)}${envios.length ? `<br>Envíos: ${envios.join(', ')}` : ''}</small></p>`;
+      <p><small>Cerrado en el móvil: ${fmtFechaHora(p.cierre)}${envios.length ? `<br>Envíos: ${envios.join(', ')}` : ''}</small></p>
+      ${p.fotosBorradas ? `<p class="nota">Las fotos se borraron de este móvil el ${fmtFechaHora(p.fotosBorradas)} para dejar sitio (la oficina las tiene). El PDF sale sin el anexo de fotos.</p>` : ''}`;
 }
 
 export function seccionCorregir() {
@@ -127,7 +130,9 @@ export function vEnvioGmail() {
       ${resumenEnvio(p)}
     </section>
 
-    <section class="tarjeta">
+    ${p.fotosBorradas ? `<section class="tarjeta">
+      <button class="btn secundario" data-action="ver-pdf" ${e.listo ? '' : 'disabled'}>Ver el PDF</button>
+    </section>` : `<section class="tarjeta">
       <h2>${enviado ? 'Volver a enviarlo' : 'Cómo enviarlo'}</h2>
       <ol class="pasos">
         <li>Pulsa <strong>Enviar por correo</strong>.</li>
@@ -138,7 +143,7 @@ export function vEnvioGmail() {
       ${e.error ? `<p class="error">${esc(e.error)}</p><button class="btn secundario" data-action="reintentar-envio">Reintentar</button>` : ''}
       <button class="btn primario grande" data-action="enviar" ${e.listo ? '' : 'disabled'}>${e.listo ? 'Enviar por correo' : (e.error ? 'No se ha podido preparar' : 'Preparando…')}</button>
       <button class="btn secundario" data-action="ver-pdf" ${e.listo ? '' : 'disabled'}>Ver el PDF</button>
-    </section>
+    </section>`}
     ${seccionCorregir()}
   </main>`;
 }
@@ -148,7 +153,8 @@ export async function prepararEnvioActual() {
   estado.envio = { listo: false };
   render();
   try {
-    const r = await prepararEnvio(p, estado.config, async (id) => {
+    // Sin fotos en el móvil ya no se puede volver a mandar: solo se puede ver el PDF, sin anexo.
+    const r = p.fotosBorradas ? { pdf: await generarPDF(p, estado.config, APP_VERSION) } : await prepararEnvio(p, estado.config, async (id) => {
       const f = await db.getFoto(id);
       return f && f.blob;
     }, APP_VERSION);
@@ -195,13 +201,21 @@ export async function corregir() {
   });
   delete nuevo.recibido;
   delete nuevo.errorEnvio;
+  // Las fotos que sigan en el móvil se copian; las borradas por antiguas se quitan del parte nuevo
+  // y la app pedirá fotos nuevas al cerrarlo.
+  const existe = new Set();
   for (const f of [...nuevo.trabajos.flatMap((t) => t.fotos), ...(nuevo.formato1 || [])]) {
     const reg = await db.getFoto(f.id);
+    if (!reg) continue;
     const id = uuid();
-    if (reg) await db.putFoto({ id, parteId: nuevo.id, blob: reg.blob });
+    await db.putFoto({ id, parteId: nuevo.id, blob: reg.blob });
     f.id = id;
+    existe.add(id);
   }
+  const quitadas = quitarFotosQueFaltan(nuevo, existe);
+  delete nuevo.fotosBorradas;
   estado.parte = nuevo;
   await guardarYa();
   ir('parte');
+  if (quitadas) toast(`Las fotos de este parte ya no estaban en el móvil (${quitadas}). Haz o elige fotos nuevas.`, 6000);
 }

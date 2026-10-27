@@ -210,3 +210,38 @@ export function repetirParte(nuevo, previo, claves, medidasLista) {
   }
   return p;
 }
+
+// ---------- Fotos de partes ya enviados ----------
+// Las fotos ocupan casi todo el espacio del móvil. Cuando un parte lleva tiempo en la oficina, se
+// borran del móvil (allí están las originales) y se quedan los datos, para repetir o rectificar.
+
+export const DIAS_FOTOS = 30;
+
+/** Fecha (ISO, la del móvil) del último envío del parte; '' si no tiene. */
+export function fechaEnvio(p) {
+  const x = (p.envios || [])[(p.envios || []).length - 1];
+  return typeof x === 'string' ? x : (x && x.fecha) || '';
+}
+
+/**
+ * ¿Hay que borrar ya las fotos de este parte? Solo de partes enviados hace más de «dias» días.
+ * Borradores, cerrados y en cola nunca; tampoco si la fecha del envío no se entiende.
+ */
+export function fotosCaducadas(p, ahora = new Date(), dias = DIAS_FOTOS) {
+  if (!p || p.estado !== 'enviado' || p.fotosBorradas) return false;
+  const t = Date.parse(fechaEnvio(p));
+  return Number.isFinite(t) && ahora.getTime() - t > dias * 86400000;
+}
+
+/** Al rectificar: quita las fotos que ya no están en el móvil, para que la app pida fotos nuevas. */
+export function quitarFotosQueFaltan(p, existe) {
+  let quitadas = 0;
+  for (const t of p.trabajos || []) {
+    const antes = (t.fotos || []).length;
+    t.fotos = (t.fotos || []).filter((f) => existe.has(f.id));
+    quitadas += antes - t.fotos.length;
+  }
+  const antes = (p.formato1 || []).length;
+  p.formato1 = (p.formato1 || []).filter((f) => existe.has(f.id));
+  return quitadas + antes - p.formato1.length;
+}

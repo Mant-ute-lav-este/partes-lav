@@ -8,6 +8,7 @@ import { textoReferencia, generarPDF } from '../js/pdf.js';
 import { carpetaDestino, nombreBase, prepararEnvio } from '../js/envio.js';
 import { esHeic, procesarFoto } from '../js/fotos.js';
 import { procesarSalida } from '../js/salida.js';
+import { limpiarFotosAntiguas, textoEspacio } from '../js/espacio.js';
 import { iniciarFallos, registrarFallo } from '../js/fallos.js';
 import { SERVIDOR_URL } from '../js/servidor.js';
 import * as val from '../js/validaciones.js';
@@ -620,6 +621,74 @@ async function conPerfil(fn) {
   }
 }
 
+prueba('fotos antiguas: qué partes caducan y qué se quita al rectificar', () => {
+  const ahora = new Date('2026-11-30T12:00:00+01:00');
+  const enviado = (fecha, extra = {}) => ({ ...ej.parteInfra(), estado: 'enviado', envios: [{ fecha, recibido: fecha }], ...extra });
+  cierto(modelo.fotosCaducadas(enviado('2026-10-30T10:00:00+01:00'), ahora), 'enviado hace 31 días');
+  cierto(!modelo.fotosCaducadas(enviado('2026-11-01T10:00:00+01:00'), ahora), 'enviado hace 29 días');
+  cierto(modelo.fotosCaducadas({ ...enviado(''), envios: ['2026-10-01T10:00:00+02:00'] }, ahora), 'envío por Gmail (fecha en texto)');
+  for (const estadoP of ['borrador', 'cerrado', 'en-cola']) {
+    cierto(!modelo.fotosCaducadas(enviado('2026-01-01T10:00:00+01:00', { estado: estadoP }), ahora), `${estadoP}: nunca`);
+  }
+  cierto(!modelo.fotosCaducadas(enviado('2026-01-01T10:00:00+01:00', { fotosBorradas: '2026-02-01T10:00:00+01:00' }), ahora), 'ya borradas');
+  cierto(!modelo.fotosCaducadas(enviado('fecha rara'), ahora), 'fecha que no se entiende: no se borra');
+  cierto(!modelo.fotosCaducadas({ ...enviado(''), envios: [] }, ahora), 'sin envíos: no se borra');
+  // Rectificar: se quitan las fotos que ya no están; las que siguen, se quedan.
+  const p = ej.parteSuper();
+  p.formato1 = [{ id: 'fm1' }, { id: 'fm2' }];
+  const todas = [...p.trabajos.flatMap((t) => t.fotos), ...p.formato1].length;
+  igual(modelo.quitarFotosQueFaltan(p, new Set(['fm2'])), todas - 1);
+  igual(p.trabajos.flatMap((t) => t.fotos).length, 0);
+  igual(p.formato1, [{ id: 'fm2' }]);
+  cierto(val.validar(p).length > 0, 'el parte rectificado sin fotos pide fotos nuevas');
+});
+
+prueba('fotos antiguas: solo se borran las de partes enviados hace más de 30 días', async () => {
+  const ahora = new Date('2026-11-30T12:00:00+01:00');
+  const viejo = '2026-10-01T10:00:00+02:00';
+  const casos = {
+    enviadoViejo: { estado: 'enviado', envios: [{ fecha: viejo, recibido: viejo }] },
+    enviadoReciente: { estado: 'enviado', envios: [{ fecha: '2026-11-20T10:00:00+01:00' }] },
+    borrador: { estado: 'borrador', envios: [], creado: viejo },
+    cerrado: { estado: 'cerrado', envios: [], cierre: viejo },
+    enCola: { estado: 'en-cola', envios: [] },
+    reenvioEnCola: { estado: 'enviado', envios: [{ fecha: viejo }] },   // enviado, pero vuelve a estar en la cola
+  };
+  const ids = {};
+  for (const [k, extra] of Object.entries(casos)) {
+    const p = { ...ej.parteInfra(), ...extra };
+    ids[k] = p.id;
+    await db.putParte(p);
+    for (let n = 0; n < 3; n++) await db.putFoto({ id: crypto.randomUUID(), parteId: p.id, blob: await jpeg() });
+  }
+  const cola = [ids.enCola, ids.reenvioEnCola].map((parteId) => ({ id: crypto.randomUUID(), parteId, creado: viejo, datos: {} }));
+  for (const x of cola) await db.putSalida(x);
+  try {
+    igual(await limpiarFotosAntiguas(ahora), { partes: 1, fotos: 3 });
+    for (const [k, id] of Object.entries(ids)) {
+      igual((await db.fotosDeParte(id)).length, k === 'enviadoViejo' ? 0 : 3, `fotos de ${k}`);
+    }
+    const g = await db.getParte(ids.enviadoViejo);
+    cierto(g.fotosBorradas && g.trabajos.length === 2 && g.personal.length === 2, 'el parte se queda, con sus datos, y marcado');
+    igual(await limpiarFotosAntiguas(ahora), { partes: 0, fotos: 0 }, 'la segunda vez no hace nada');
+    // Sin fotos, el PDF sale igual (sin anexo).
+    igual(await (await generarPDF(g, ej.config, 'prueba')).slice(0, 5).text(), '%PDF-');
+  } finally {
+    for (const x of cola) await db.borrarSalida(x.id);
+    for (const id of Object.values(ids)) {
+      for (const f of await db.fotosDeParte(id)) await db.borrarFoto(f.id);
+      await db.borrarParte(id);
+    }
+  }
+});
+
+prueba('espacio usado en el Menú', () => {
+  const MB = 1048576;
+  igual(textoEspacio({ usage: 85 * MB, quota: 5000 * MB }), { poco: false, texto: 'Espacio usado: 85 MB' });
+  const r = textoEspacio({ usage: 900 * MB, quota: 1100 * MB });
+  cierto(r.poco && r.texto.includes('Queda poco sitio (200 MB)'), r.texto);
+});
+
 prueba('salida: un parte en cola se envía y queda «enviado»', () => conPerfil(async () => {
   const p = ej.parteInfra();
   await db.putParte(p);
@@ -1068,6 +1137,7 @@ prueba('pantallas: inicio, menú y elegir máquina', async () => {
   const lista = [borrador(ej.parteInfra()), ej.parteSuper(), { ...ej.parteMaqVia(), estado: 'en-cola' }, { ...ej.parteLoco(), estado: 'enviado' }];
   await pantalla((e) => { e.lista = lista; }, 'Partes LAV', 'INF-9001', 'SUP-9001', '🗑');
   await pantalla((e) => { e.lista = lista; e.menu = true; }, 'Guía rápida');
+  await pantalla((e) => { e.lista = lista; e.menu = true; e.espacio = { poco: true, texto: 'Espacio usado: 900 MB. Queda poco sitio' }; }, 'Queda poco sitio');
   await pantalla((e) => { e.eligeMaquina = true; }, '¿Con qué máquina?', 'Bateadora 08-475-4S', 'Dresina');
   await pantalla((e) => { e.perfil.cuenta = 'pendiente'; }, 'pendiente de que lo apruebe');
 });
@@ -1211,6 +1281,11 @@ prueba('pantallas: envío', async () => {
   await pantalla((e) => { e.vista = 'envio'; e.parte = { ...ej.parteSuper(), estado: 'en-cola', errorEnvio: 'Sin cobertura' }; }, 'No se ha podido enviar');
   await pantalla((e) => { e.vista = 'envio'; e.parte = { ...ej.parteMaqVia(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00' }; }, 'Recibido en la oficina');
   await pantalla((e) => { e.vista = 'envio'; e.perfil.token = ''; e.parte = ej.parteLoco('dresina'); }, 'Cómo enviarlo');
+  const borradas = { ...ej.parteInfra(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00', fotosBorradas: '2026-11-14T08:00:00+01:00' };
+  await pantalla((e) => { e.vista = 'envio'; e.parte = borradas; }, 'Recibido en la oficina', 'Las fotos se borraron de este móvil', 'Corregir el parte');
+  await pantalla((e) => { e.vista = 'envio'; e.perfil.token = ''; e.parte = borradas; e.envio = { listo: true }; }, 'Las fotos se borraron de este móvil');
+  cierto(!marco.m.app.querySelector('[data-action="enviar"]') && marco.m.app.querySelector('[data-action="ver-pdf"]'),
+    'sin fotos no se ofrece volver a mandarlo por Gmail, pero sí ver el PDF');
   marco.f.remove();
   marco = null;
 });

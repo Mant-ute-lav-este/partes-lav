@@ -11,11 +11,12 @@
 import * as db from './db.js';
 import { hayServidor, SERVIDOR_URL } from './servidor.js';
 import { iniciarFallos, registrarFallo, enviarFallos } from './fallos.js';
+import { limpiarFotosAntiguas } from './espacio.js';
 import { esc } from './util.js';
 import { app, estado, sincronizar, refrescarVista, ir, guardarYa } from './estado.js';
 import { onInput, onChange, onSubmit, onClick } from './eventos.js';
 
-export const APP_VERSION = '0.18.1';
+export const APP_VERSION = '0.18.2';
 
 // ---------- Arranque ----------
 
@@ -57,6 +58,8 @@ async function iniciar() {
     app.innerHTML = `<p class="error">No se puede usar el almacenamiento del móvil: ${esc(e.message)}</p>`;
     return;
   }
+  // Antes de abrir ningún parte: fotos de partes enviados hace más de 30 días fuera del móvil.
+  try { await limpiarFotosAntiguas(); } catch (e) { registrarFallo('limpieza', e.message); }
   // Con servidor hay que estar registrado: un perfil antiguo, sin registro, vuelve a la bienvenida.
   if (estado.perfil && (estado.perfil.token || !hayServidor())) return ir('pin');
   if (hayServidor()) return ir('bienvenida');

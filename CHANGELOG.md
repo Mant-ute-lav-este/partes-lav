@@ -2,6 +2,12 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.18.2 · 2026-10-27
+- **Fotos de partes antiguos fuera del móvil**: al abrir la app se borran las fotos de los partes enviados hace más de 30 días (la oficina ya las tiene). El parte se queda con todos sus datos, para repetirlo o rectificarlo, y se marca con `fotosBorradas` (fecha). Nunca se tocan borradores, partes cerrados ni nada que esté en la cola de envío; si la fecha del envío no se entiende, tampoco.
+- En un parte así, la pantalla dice cuándo se borraron las fotos y «Ver el PDF» lo saca sin el anexo de fotos. Sin servidor (envío por Gmail) ya no se ofrece volver a mandarlo.
+- «Corregir el parte» copia las fotos que sigan en el móvil y quita las borradas: la app pide fotos nuevas al cerrarlo, con un aviso al abrir la corrección.
+- **Espacio usado en el Menú**: «Espacio usado: X MB». Si quedan menos de 300 MB, sale en rojo con «Queda poco sitio».
+
 ## 0.18.1 · 2026-10-27
 - **Aviso de peso al cerrar el parte**: se calcula lo que pesará el correo (las fotos viajan dos veces en base64 más el PDF, unas 2,4 veces su peso). Por encima de 20 MB (Gmail admite 25) sale un aviso con «quita unas N fotos»: Cancelar vuelve al parte; Aceptar lo cierra igualmente. Si no se puede medir, el parte se cierra como siempre.
 - **Anexo del PDF más ligero**: las fotos del anexo pasan de 1100 px y calidad 0,72 a 900 px y 0,65. Las fotos originales del Fotos_ y las del formato de protección de la vía (SUPER) no cambian.

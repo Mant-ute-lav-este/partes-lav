@@ -16,6 +16,7 @@ import {
   ITER_PIN, terminarAcceso, cerrarSesion, hashPin, cargarConfigArchivo, guardarConfig,
 } from './vista-acceso.js';
 import { nuevoParte, contestarRepetir } from './vista-inicio.js';
+import { textoEspacio } from './espacio.js';
 import { aplicarExtra, extrasATodos } from './vista-extras.js';
 import { pintarResultados, copiarPersonal, anadirOtro, borrarParte, cerrarParte } from './vista-parte.js';
 import {
@@ -372,7 +373,11 @@ export async function onClick(e) {
     }
     case 'reintentar-salida': registrarSync(); await procesarYMostrar(p.id); break;
     case 'enviar-gmail': enviarPorGmail(); break;
-    case 'menu': estado.menu = true; render(); break;
+    case 'menu':
+      estado.menu = true;
+      render();
+      try { estado.espacio = textoEspacio(await navigator.storage.estimate()); render(); } catch { /* navegador sin estimate: no sale la línea */ }
+      break;
     case 'cerrar-menu': estado.menu = false; render(); break;
     case 'cambiar-pin': estado.cambiandoPin = true; ir('setup-pin'); break;
     case 'cambiar-capataz':
