@@ -885,6 +885,53 @@ prueba('base de datos: sw.js y js/db.js abren la misma base (nombre, versión y 
   igual(enSW, tablas(dbJs), 'tablas, claves e índices');
 });
 
+// El Datos_.txt lo leen el flujo de Power Automate, el portal de la UTE y (pronto) el Excel histórico.
+// Esta prueba guarda la «forma» del Datos_ de los 5 partes de ejemplo (qué campos hay y de qué tipo,
+// no sus valores) en pruebas/contrato-datos.json. Si un cambio añade, quita o renombra un campo,
+// falla. Entonces hay que decidir: o era un error, o es un cambio a propósito, y en ese caso
+// se avisa a quien lee el Datos_, se apunta en docs/DATOS-PARTE.md y en el CHANGELOG, se sube
+// `version` si se quita o renombra algo, y se actualiza el archivo con el que deja la prueba
+// en privado/herramientas/salida/contrato-datos-actual.json.
+function formaDe(valor, ruta, salida) {
+  const tipo = valor === null ? 'null' : Array.isArray(valor) ? 'lista' : typeof valor;
+  if (tipo === 'lista') {
+    salida[ruta] = (salida[ruta] || new Set()).add('lista');
+    for (const x of valor) formaDe(x, `${ruta}[]`, salida);
+  } else if (tipo === 'object') {
+    salida[ruta] = (salida[ruta] || new Set()).add('objeto');
+    for (const [k, v] of Object.entries(valor)) formaDe(v, ruta ? `${ruta}.${k}` : k, salida);
+  } else {
+    (salida[ruta] = salida[ruta] || new Set()).add(tipo);
+  }
+  return salida;
+}
+prueba('contrato: la forma del Datos_ de los 5 tipos de parte no cambia sin avisar', async () => {
+  const casos = {
+    INFRA: infra(), SUPER: conExtras(ej.parteSuper()), 'MAQUINARIA-via': maqVia(),
+    'MAQUINARIA-locomotora': loco(), 'MAQUINARIA-dresina': loco('dresina'),
+  };
+  const actual = {};
+  for (const [nombre, p] of Object.entries(casos)) {
+    const e = await prepararEnvio(p, ej.config, async () => jpeg(), 'prueba');
+    const datos = JSON.parse(await e.archivos.find((a) => a.name.startsWith('Datos_')).text());
+    igual([datos.formato, Number.isInteger(datos.version)], ['parte-lav', true], `${nombre}: formato y versión del Datos_`);
+    const forma = formaDe(datos, '', {});
+    actual[nombre] = Object.fromEntries(Object.keys(forma).sort().map((k) => [k || '(raíz)', [...forma[k]].sort().join('|')]));
+  }
+  const guardado = await fetch('contrato-datos.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (JSON.stringify(guardado) !== JSON.stringify(actual)) {
+    await fetch('/__guardar?nombre=contrato-datos-actual.json', { method: 'POST', body: JSON.stringify(actual, null, 1) }).catch(() => {});
+    const dif = [];
+    for (const nombre of Object.keys(actual)) {
+      const a = actual[nombre];
+      const g = (guardado && guardado[nombre]) || {};
+      for (const k of Object.keys(a)) if (!(k in g)) dif.push(`${nombre}: campo nuevo ${k} (${a[k]})`); else if (a[k] !== g[k]) dif.push(`${nombre}: ${k} era ${g[k]} y ahora es ${a[k]}`);
+      for (const k of Object.keys(g)) if (!(k in a)) dif.push(`${nombre}: campo quitado ${k}`);
+    }
+    throw new Error(`el Datos_ ha cambiado (${dif.length}): ${dif.slice(0, 8).join(' · ')}${dif.length > 8 ? ' …' : ''}. Mira docs/DATOS-PARTE.md.`);
+  }
+});
+
 // ---------- registro de fallos ----------
 
 prueba('fallos: se guardan sin datos personales y sin repetir', async () => {
