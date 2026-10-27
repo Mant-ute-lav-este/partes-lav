@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.20.4 · 2026-10-27
+- **Menú: versión del servidor.** Junto a la versión de la app sale «· Servidor: v17» (la que dice el servidor al descargar la lista). Sirve para comprobar de un vistazo qué servidor está en marcha. Sale en cuanto la app vuelva a descargar la lista (al abrirla con cobertura).
+
 ## Servidor v17 · 2026-10-27 (desplegado; la app lo enseña desde su próxima versión)
 - **El servidor dice qué versión es**: constante `VERSION_SERVIDOR` en `Code.gs`. Va en la lista que pide la app (`config.versionServidor`) y en la página de la URL del servidor («… · v17»). Tras desplegar se comprueba con curl a la URL, sin token. Una prueba exige que coincida con la última «Servidor vN» de este archivo.
 - La app (a partir de la próxima versión) la enseña en el Menú: «Versión de la app: … · Servidor: v17».
