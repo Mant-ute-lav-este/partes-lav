@@ -1744,6 +1744,61 @@ prueba('pantallas: varios aparatos en un trabajo', async () => {
   igual(t.aparato, 'S2 PRU 2, aguja 3', 'escrito a mano');
 });
 
+prueba('pantallas: desvío / AD del tajo de maquinaria, con la misma lista que los aparatos de SUPER', async () => {
+  const conLista = (e, desvio, lista = APARATOS) => {
+    e.vista = 'parte'; e.config = { ...ej.config, aparatos: lista }; e.parte = borrador(ej.parteMaqVia());
+    Object.assign(e.parte.tajos[0], { desvio, pkInicio: '', pkFin: '' });
+  };
+  // Sin lista de la oficina: la caja de texto de siempre.
+  await pantalla((e) => conLista(e, 'Desvío viejo', []), 'Nombre del desvío / AD');
+  {
+    const { m } = await appEnMarco();
+    igual(m.app.querySelector('input[data-bind="tajos.0.desvio"]').value, 'Desvío viejo');
+  }
+  // Con lista: desplegable agrupado, y un tajo antiguo con texto libre sale como «Otro».
+  await pantalla((e) => conLista(e, ''), 'Desvío / AD', 'Sin desvío', '+ Añadir otro desvío');
+  await pantalla((e) => conLista(e, 'S2 PRU 2, desvío 3'), 'PK del más bajo al más alto');
+  const { m } = await appEnMarco();
+  const { app } = m;
+  const grupo = app.querySelector('select[data-desvio="0.0"] optgroup[label="Aparatos de dilatación"]');
+  igual([...grupo.querySelectorAll('option')].map((o) => o.value), ['AD V2 200+050', 'Sobre el Barranco de Prueba E1 · 210+050']);
+  const t = m.estado.parte.tajos[0];
+  igual(t.filasDesvio.map((f) => f.otro), [false, true], 'el escrito a mano sale como «Otro»');
+  const elegir = (i, valor) => {
+    const s = app.querySelector(`select[data-desvio="0.${i}"]`);
+    s.value = valor;
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const pulsar = (sel) => app.querySelector(sel).click();
+  pulsar('[data-action="quitar-desvio"][data-t="0"][data-i="1"]');
+  igual([t.desvio, t.pkInicio, t.pkFin], ['S2 PRU 2', '100+250', '100+430'], 'queda uno: sus PK en el tajo');
+  pulsar('[data-action="anadir-desvio"][data-t="0"]');
+  igual(t.desvio, 'S2 PRU 2', 'la fila vacía no cuenta');
+  elegir(1, 'S1 PRU 1');
+  igual([t.desvio, t.pkInicio, t.pkFin], ['S2 PRU 2, S1 PRU 1', '100+250', '100+820'], 'dos: del más bajo al más alto');
+  elegir(1, '__otro');
+  igual([t.pkInicio, t.pkFin], ['100+250', '100+430'], '«Otro» no tiene PK: quedan los del de la lista (igual que en SUPER)');
+  t.pkFin = '100+500';   // el capataz lo corrige a mano
+  const inp = app.querySelector('input[data-desvio-txt="0.1"]');
+  inp.value = 'desvío 3';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  igual(t.desvio, 'S2 PRU 2, desvío 3', 'escrito a mano');
+  igual(t.pkFin, '100+500', 'escribir a mano no toca los PK');
+  // Cada tajo con su desvío: tocar el segundo no cambia el primero.
+  m.estado.parte.tajos.push({ ...structuredClone(t), id: 't2', desvio: '', pkInicio: '', pkFin: '' });
+  delete m.estado.parte.tajos[1].filasDesvio;
+  m.render();
+  const s2 = app.querySelector('select[data-desvio="1.0"]');
+  s2.value = 'AD V2 200+050';
+  s2.dispatchEvent(new Event('change', { bubbles: true }));
+  igual([m.estado.parte.tajos[1].desvio, m.estado.parte.tajos[1].pkInicio], ['AD V2 200+050', '200+010']);
+  igual(t.desvio, 'S2 PRU 2, desvío 3', 'el primer tajo sigue igual');
+  // El Datos_ no lleva las filas de pantalla (solo el texto `desvio`, como siempre).
+  const datos = JSON.parse(await (await prepararEnvio(m.estado.parte, ej.config, async () => null, 'prueba')).archivos[1].text());
+  cierto(datos.tajos.every((x) => !('filasDesvio' in x)), 'filasDesvio fuera del Datos_');
+  igual(datos.tajos[0].desvio, 'S2 PRU 2, desvío 3');
+});
+
 prueba('pantallas: maquinaria de vía, locomotora y dresina', async () => {
   await pantalla((e) => { e.vista = 'parte'; e.parte = borrador(ej.parteMaqVia()); }, 'MAQ-9001', 'Tajo 1', 'Viaje', 'Encargado de trabajo', 'entrega de vía bloqueada (EVB)', 'Registros DRP', 'Añadir archivos DRP');
   // Si se cambia la bateadora por otra máquina, los DRP ya añadidos siguen a la vista para poder quitarlos.

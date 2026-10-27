@@ -27,6 +27,8 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   const datos = structuredClone(parte);
   // Jornada sin trabajos: no viajan trabajos, tajos ni fotos que se hubieran apuntado antes de marcarla.
   if (datos.sinTrabajos) for (const k of ['trabajos', 'formato1', 'tajos', 'realizados', 'vagones', 'drp']) if (Array.isArray(datos[k])) datos[k] = [];
+  // Las filas del desplegable de desvíos son de la pantalla: lo que vale es el texto `desvio`.
+  for (const t of datos.tajos || []) delete t.filasDesvio;
   const fotos = [];
   for (const [i, t] of datos.trabajos.entries()) {
     const cuenta = {};

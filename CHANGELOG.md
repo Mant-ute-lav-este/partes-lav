@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.21.1 · 2026-10-27
+- **Desvío / AD en el tajo de maquinaria con desplegable**, el mismo de los aparatos de SUPER: lista de la oficina agrupada por estación y «Aparatos de dilatación», «Otro (escribirlo)», varios por tajo con «+ Añadir otro desvío». Al elegirlos se rellenan los PK del tajo (con varios, del más bajo al más alto; se pueden cambiar). Sin lista de la oficina sigue la caja de texto.
+- El dato sigue en `desvio` (texto, varios separados por comas): Datos_, PDF y partes antiguos no cambian. Las filas de la pantalla (`filasDesvio`) no viajan en el Datos_.
+
 ## 0.21.0 · 2026-10-27 (necesita el servidor v18)
 - **Registros DRP en el parte de bateadora.** Apartado opcional «Registros DRP» entre Observaciones y Personal: «📎 Añadir archivos DRP» deja elegir los `.drp` bajados de la máquina (hasta 6 y 10 MB en total). Cada uno sale con su tamaño y, si el nombre es del tipo `495+940 al 495+840 via2 reg1.drp`, con vía y PK. Se quitan con la ✕. Rechaza lo que no es `.drp`, vacíos y repetidos, y dice por qué.
 - Sale si alguna máquina del parte es bateadora (por el nombre o por el trabajo «Bateo»). Si se cambia la máquina con DRP ya añadidos, siguen a la vista con un aviso para poder quitarlos.

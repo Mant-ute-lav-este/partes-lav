@@ -22,7 +22,7 @@ import { aplicarExtra, extrasATodos } from './vista-extras.js';
 import { pintarResultados, copiarPersonal, anadirOtro, borrarParte, cerrarParte } from './vista-parte.js';
 import {
   trabajoActual, nuevoTrabajo, copiarTrabajoAnterior, anadirFotos, borrarFoto, borrarTrabajo,
-  filasAparato, aplicarAparatos,
+  filasAparato, aplicarAparatos, destinoAparato,
 } from './vista-trabajo.js';
 import { anadirDrp, quitarDrp } from './vista-drp.js';
 import {
@@ -55,11 +55,11 @@ export function onInput(e) {
   if (el.dataset.pk) { aplicarPk(el, false); return; }
   if (el.dataset.hora) { aplicarHora(el, false); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
-  if (el.dataset.aparatoTxt) {
-    const t = trabajoActual();
+  if (el.dataset.aparatoTxt || el.dataset.desvioTxt) {
+    const { t, prop, i } = destinoAparato(el, 'Txt');
     if (!t || estado.parte.estado !== 'borrador') return;
-    filasAparato(t)[Number(el.dataset.aparatoTxt)].nombre = el.value;
-    aplicarAparatos(t, false);
+    filasAparato(t, prop)[i].nombre = el.value;
+    aplicarAparatos(t, false, prop);
     guardarPronto();
     return;
   }
@@ -91,16 +91,18 @@ export async function onChange(e) {
     guardarAspecto({ [el.dataset.aspecto]: el.value });
     return;
   }
-  if (el.dataset.aparato) {
-    const t = trabajoActual();
+  if (el.dataset.aparato || el.dataset.desvio) {
+    const { t, prop, i } = destinoAparato(el);
     if (!t || estado.parte.estado !== 'borrador') return;
-    const i = Number(el.dataset.aparato);
     const otro = el.value === '__otro';
-    filasAparato(t)[i] = { nombre: otro ? '' : el.value, otro };
-    aplicarAparatos(t, true);
+    filasAparato(t, prop)[i] = { nombre: otro ? '' : el.value, otro };
+    aplicarAparatos(t, true, prop);
     guardarPronto();
     render();
-    if (otro) { const inp = app.querySelector(`[data-aparato-txt="${i}"]`); if (inp) inp.focus(); }
+    if (otro) {
+      const inp = app.querySelector(el.dataset.desvio ? `[data-desvio-txt="${el.dataset.desvio}"]` : `[data-aparato-txt="${i}"]`);
+      if (inp) inp.focus();
+    }
     return;
   }
   // ¿Trabajo finalizado? Sí / No, sin terminar / No realizado (un no realizado tampoco está finalizado).
@@ -471,6 +473,15 @@ export async function onClick(e) {
       const t = trabajoActual();
       filasAparato(t).splice(i, 1);
       aplicarAparatos(t, true);
+      guardarPronto();
+      render();
+      break;
+    }
+    case 'anadir-desvio': filasAparato(p.tajos[Number(el.dataset.t)], 'desvio').push({ nombre: '', otro: false }); guardarPronto(); render(); break;
+    case 'quitar-desvio': {
+      const t = p.tajos[Number(el.dataset.t)];
+      filasAparato(t, 'desvio').splice(i, 1);
+      aplicarAparatos(t, true, 'desvio');
       guardarPronto();
       render();
       break;

@@ -7,7 +7,7 @@ import { MAX_TOLVA, MODOS_NIVELADO, MODOS_ALINEADO, CUANDO_REGISTRO, normalizarP
 import { estado, maquinasDeVia, personalMaqCfg } from './estado.js';
 import { cabeceraParte, refParte, campo, campoHora, campoPk, radio, siNo, opciones, vErrores, casillasVias } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
-import { bloqueSinTrabajos } from './vista-trabajo.js';
+import { bloqueSinTrabajos, campoAparato } from './vista-trabajo.js';
 import { llevaDrp } from './drp.js';
 import { seccionDrp } from './vista-drp.js';
 
@@ -50,7 +50,7 @@ export function seccionTajo(t, i, total) {
       <div class="campo"><span>Vía <small>(marca todas las que uses)</small></span>
         ${casillasVias(`${b}.via`, t.via, ['1', '2', '3', '4', '5'], { etiqueta: (v) => `Vía ${v}`, compacto: true })}</div>
       <div class="dos">${campoPk('PK inicio', `${b}.pkInicio`, t.pkInicio)}${campoPk('PK final', `${b}.pkFin`, t.pkFin)}</div>
-      ${campo('Nombre del desvío / AD <small>(opcional)</small>', `${b}.desvio`, t.desvio, 'autocomplete="off"')}
+      ${campoAparato(t, b, i)}
       ${operacion('Nivelado', `${b}.nivelado`, t.nivelado, detalleGeometria(`${b}.nivelado`, t.nivelado, MODOS_NIVELADO, 'Lev. máx.'))}
       ${operacion('Alineado', `${b}.alineado`, t.alineado, detalleGeometria(`${b}.alineado`, t.alineado, MODOS_ALINEADO, 'Rip. máx.'))}
       ${operacion('Estabilizado', `${b}.estabilizado`, t.estabilizado,

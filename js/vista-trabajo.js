@@ -122,38 +122,61 @@ export function etiquetaFoto(t) {
 
 const aparatosCfg = () => (estado.config && estado.config.aparatos) || [];
 
+// El mismo campo sirve para el aparato de un trabajo (INFRA/SUPER) y para el desvío / AD de un
+// tajo de maquinaria: cambia en qué propiedad va el texto y dónde se guardan las filas.
+const FILAS = { aparato: 'filasAparato', desvio: 'filasDesvio' };
+
 /**
- * Filas del campo Aparato mientras se edita ({ nombre, otro }). Lo que vale es `t.aparato`, el texto
- * con los nombres separados por comas; las filas guardan además las vacías y las escritas a mano.
- * Los trabajos de antes no las tienen y se sacan del texto.
+ * Filas del campo Aparato (o Desvío) mientras se edita ({ nombre, otro }). Lo que vale es `t[campo]`,
+ * el texto con los nombres separados por comas; las filas guardan además las vacías y las escritas a
+ * mano. Los trabajos y tajos de antes no las tienen y se sacan del texto.
  */
-export function filasAparato(t) {
-  if (!Array.isArray(t.filasAparato)) {
+export function filasAparato(t, campo = 'aparato') {
+  const k = FILAS[campo];
+  if (!Array.isArray(t[k])) {
     const lista = aparatosCfg();
-    const ns = listaAparatos(t.aparato);
-    t.filasAparato = ns.length ? ns.map((n) => ({ nombre: n, otro: !lista.some((x) => x.nombre === n) }))
+    const ns = listaAparatos(t[campo]);
+    t[k] = ns.length ? ns.map((n) => ({ nombre: n, otro: !lista.some((x) => x.nombre === n) }))
       : [{ nombre: '', otro: !!t.aparatoOtro }];
   }
-  return t.filasAparato;
+  return t[k];
 }
 
-/** Pasa las filas al texto `t.aparato` y, si `conPk`, rellena los PK con los de los aparatos de la lista. */
-export function aplicarAparatos(t, conPk) {
-  const filas = filasAparato(t);
-  t.aparato = unirAparatos(filas.map((f) => f.nombre));
+/** Pasa las filas al texto `t[campo]` y, si `conPk`, rellena los PK con los de los aparatos de la lista. */
+export function aplicarAparatos(t, conPk, campo = 'aparato') {
+  const filas = filasAparato(t, campo);
+  t[campo] = unirAparatos(filas.map((f) => f.nombre));
   delete t.aparatoOtro;   // de antes de 0.17.0: ahora va en cada fila
   const pk = conPk && pkDeAparatos(filas.filter((f) => !f.otro).map((f) => f.nombre), aparatosCfg());
   if (pk) Object.assign(t, pk);
 }
 
 /**
+ * De un control del campo: a qué trabajo o tajo pertenece, qué campo es y qué fila.
+ * Trabajo: data-aparato="fila"; tajo: data-desvio="tajo.fila". `sufijo` 'Txt' para la caja «Otro».
+ */
+export function destinoAparato(el, sufijo = '') {
+  const d = el.dataset[`desvio${sufijo}`];
+  if (d) {
+    const [ti, i] = d.split('.').map(Number);
+    return { t: estado.parte.tajos[ti], prop: 'desvio', i };
+  }
+  return { t: trabajoActual(), prop: 'aparato', i: Number(el.dataset[`aparato${sufijo}`]) };
+}
+
+/**
  * Aparatos (opcional, uno o varios): con la lista de la oficina sale un desplegable agrupado por
  * estación por cada aparato y, al elegirlos, se rellenan solos los PK de inicio y fin (con varios,
  * del más bajo al más alto; se pueden cambiar). Sin lista, o con «Otro», se escribe a mano.
+ * Con `ti` (número de tajo) es el «Desvío / AD» del tajo de maquinaria, con la misma lista.
  */
-export function campoAparato(t, b) {
+export function campoAparato(t, b, ti = null) {
   const lista = aparatosCfg();
-  if (!lista.length) return campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"');
+  const tajo = ti !== null;
+  if (!lista.length) {
+    return tajo ? campo('Nombre del desvío / AD <small>(opcional)</small>', `${b}.desvio`, t.desvio, 'autocomplete="off"')
+      : campo('Aparato <small>(opcional)</small>', `${b}.aparato`, t.aparato, 'placeholder="Ej.: aguja 3" autocomplete="off"');
+  }
   const grupos = new Map();
   lista.forEach((x) => {
     // Los de dilatación llevan el nombre del viaducto, el estribo y el PK («Sobre Río Magro E1 · 322+013»).
@@ -162,23 +185,28 @@ export function campoAparato(t, b) {
     if (!grupos.has(est)) grupos.set(est, []);
     grupos.get(est).push(x);
   });
-  const filas = filasAparato(t);
+  const filas = filasAparato(t, tajo ? 'desvio' : 'aparato');
+  const nombre = tajo ? 'desvío' : 'aparato';
+  // Atributos de cada control: el tajo lleva también su número, porque en el parte hay varios.
+  const sel = (i) => (tajo ? `data-desvio="${ti}.${i}"` : `data-aparato="${i}"`);
+  const txt = (i) => (tajo ? `data-desvio-txt="${ti}.${i}"` : `data-aparato-txt="${i}"`);
+  const quitar = (i) => (tajo ? `data-action="quitar-desvio" data-t="${ti}" data-i="${i}"` : `data-action="quitar-aparato" data-i="${i}"`);
   const opciones = (f) => `
-            <option value="">Sin aparato</option>
+            <option value="">Sin ${nombre}</option>
             ${[...grupos].map(([est, xs]) => `<optgroup label="${esc(est)}">${xs.map((x) => `<option value="${esc(x.nombre)}" ${!f.otro && x.nombre === f.nombre ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</optgroup>`).join('')}
             <option value="__otro" ${f.otro ? 'selected' : ''}>Otro (escribirlo)</option>`;
   return `
-      <div class="campo"><span>Aparato <small>(opcional${filas.length > 1 ? '; PK del más bajo al más alto' : ''})</small></span>
+      <div class="campo"><span>${tajo ? 'Desvío / AD' : 'Aparato'} <small>(opcional${filas.length > 1 ? '; PK del más bajo al más alto' : ''})</small></span>
         ${filas.map((f, i) => `
         <div class="fila-equipo fila-aparato">
           <div class="equipo-campos">
-            <select data-aparato="${i}" aria-label="Aparato ${i + 1}">${opciones(f)}
+            <select ${sel(i)} aria-label="${tajo ? 'Desvío' : 'Aparato'} ${i + 1}">${opciones(f)}
             </select>
-            ${f.otro ? `<input data-aparato-txt="${i}" value="${esc(f.nombre)}" placeholder="Escribe el aparato" autocomplete="off">` : ''}
+            ${f.otro ? `<input ${txt(i)} value="${esc(f.nombre)}" placeholder="Escribe el ${nombre}" autocomplete="off">` : ''}
           </div>
-          ${filas.length > 1 ? `<button class="btn-quitar" data-action="quitar-aparato" data-i="${i}" aria-label="Quitar el aparato ${i + 1}">✕</button>` : ''}
+          ${filas.length > 1 ? `<button class="btn-quitar" ${quitar(i)} aria-label="Quitar el ${nombre} ${i + 1}">✕</button>` : ''}
         </div>`).join('')}
-        <button class="btn secundario" data-action="anadir-aparato">+ Añadir otro aparato</button>
+        <button class="btn secundario" ${tajo ? `data-action="anadir-desvio" data-t="${ti}"` : 'data-action="anadir-aparato"'}>+ Añadir otro ${nombre}</button>
       </div>`;
 }
 
