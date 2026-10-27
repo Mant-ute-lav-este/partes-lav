@@ -7,6 +7,7 @@
  * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, aparatos con sus PK, medidas antiincendios, motivos, cabecera, y máquinas de vía y su personal para el parte de maquinaria).
  * - Recibe los partes y los manda por correo a la oficina, donde Power Automate los
  *   guarda en la carpeta de Teams.
+ * - Manda los datos de cada parte (sin fotos) al portal de la UTE, si está configurado.
  *
  * Los datos viven en la hoja de cálculo «Partes LAV · Datos», que crea configurar().
  * Los secretos (PIMIENTA y CLAVE_ADMIN) se generan solos y se guardan en las
@@ -610,6 +611,8 @@ function enviar_(d) {
     try { props_().deleteProperty('ult:' + String(u.Email).toLowerCase()); } catch (x) { /* nada más que hacer */ }
     apuntarError_('ultimos', String(d.ref || '') + ': ' + String((err && err.message) || err));
   }
+  // Va lo último y nunca da error: el parte ya está en la oficina pase lo que pase con el portal.
+  enviarAlPortal_(d, u, r.fecha);
   return { recibido: r.fecha };
 }
 
@@ -737,6 +740,101 @@ function apuntarError_(tipo, mensaje) {
   } catch (e) { /* sin hoja: nada más que hacer */ }
 }
 
+// ---------- Portal de la UTE ----------
+
+// La dirección y la clave del portal están en las propiedades del script (PORTAL_URL y PORTAL_CLAVE),
+// no aquí: este archivo está en un repositorio público. Sin ellas no se manda nada al portal.
+const PORTAL_LOTE = 200;   // partes por envío que admite el portal
+const MAX_CELDA = 49000;   // Google admite 50.000 caracteres por celda
+
+/**
+ * Manda al portal los datos del parte: el mismo Datos_ que guarda Power Automate (sin fotos), más
+ * quién lo envió y cuándo llegó («servidor»). El portal lo guarda por su «id» y, si llega otra vez,
+ * lo actualiza. Un rectificativo lleva otro «id» y en «rectificaA.id» el del parte al que sustituye.
+ * El parte ya ha salido a la oficina: esto nunca lanza error. Si el portal falla, el parte queda en la
+ * hoja PortalPendientes y se reintenta con el resumen diario (o a mano con reintentarPortal).
+ */
+function enviarAlPortal_(d, u, recibido) {
+  const ref = String(d.ref || '');
+  try {
+    if (!portal_()) return;
+    const a = (Array.isArray(d.archivos) ? d.archivos : []).find((x) => String(x.nombre || '').indexOf('Datos_') === 0);
+    if (!a || a.texto == null) throw new Error('el parte no trae Datos_');
+    const datos = JSON.parse(String(a.texto));
+    datos.servidor = { email: String(u.Email), nombre: String(u.Nombre), recibido: recibido, envioId: String(d.envioId) };
+    const texto = JSON.stringify(datos);
+    try {
+      mandarAlPortal_(texto);
+    } catch (err) {
+      const motivo = String((err && err.message) || err);
+      if (texto.length > MAX_CELDA) {
+        apuntarError_('portal', ref + ': ' + motivo + ' · no cabe en PortalPendientes: mandarlo con los atrasados');
+      } else {
+        asegurarHoja_('PortalPendientes', ['Recibido', 'Ref', 'Datos']).appendRow([recibido, ref, texto]);
+        apuntarError_('portal', ref + ': ' + motivo + ' · queda en PortalPendientes');
+      }
+    }
+  } catch (err) {
+    apuntarError_('portal', ref + ': ' + String((err && err.message) || err));
+  }
+}
+
+/** { url, clave } del portal, o null si no está configurado. */
+function portal_() {
+  const p = props_();
+  const url = p.getProperty('PORTAL_URL');
+  const clave = p.getProperty('PORTAL_CLAVE');
+  return url && clave ? { url: url, clave: clave } : null;
+}
+
+/** Manda al portal un cuerpo JSON ya en texto. Lanza error si el portal no contesta «ok». */
+function mandarAlPortal_(cuerpo) {
+  const c = portal_();
+  const r = UrlFetchApp.fetch(c.url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-clave': c.clave },
+    payload: cuerpo,
+    muteHttpExceptions: true,
+  });
+  const texto = r.getContentText();
+  let j = null;
+  try { j = JSON.parse(texto); } catch (e) { /* no es JSON: se trata como fallo */ }
+  if (r.getResponseCode() >= 300 || !j || !j.ok) {
+    throw new Error('el portal contesta ' + r.getResponseCode() + ': ' + String((j && j.error) || texto).slice(0, 120));
+  }
+}
+
+/**
+ * Vuelve a mandar al portal los partes de PortalPendientes, en lotes de PORTAL_LOTE, y quita los que
+ * han entrado. Lo llama el resumen diario; también se puede ejecutar a mano. Devuelve cuántos quedan.
+ * Los envíos nuevos se apuntan siempre al final, así que se quitan solo las filas de arriba.
+ */
+function reintentarPortal() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try {
+    const t = tabla_('PortalPendientes');
+    if (!t.h || !t.filas.length || !portal_()) return t.filas.length;
+    let hechas = 0;
+    while (hechas < t.filas.length) {
+      const lote = t.filas.slice(hechas, hechas + PORTAL_LOTE);
+      try {
+        mandarAlPortal_('{"partes":[' + lote.map((f) => String(f.Datos)).join(',') + ']}');
+      } catch (err) {
+        apuntarError_('portal', 'reintento: ' + String((err && err.message) || err));
+        break;
+      }
+      hechas += lote.length;
+    }
+    if (hechas) t.h.deleteRows(2, hechas);
+    Logger.log('Mandados al portal: ' + hechas + ' · quedan: ' + (t.filas.length - hechas));
+    return t.filas.length - hechas;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ---------- Copia de seguridad ----------
 
 const COPIAS_A_GUARDAR = 8;   // semanas
@@ -845,6 +943,16 @@ function resumenDiario() {
   cuerpo += '\n\nFallos de campo hoy: ' + fh.total +
     (fh.total ? ' (' + Object.keys(fh.porTipo).map((t) => t + ' ' + fh.porTipo[t]).join(', ') +
       '; ' + fh.usuarios + (fh.usuarios === 1 ? ' móvil' : ' móviles') + ') · detalle en la hoja «Errores».' : '.');
+  if (portal_()) {
+    let pendientes;
+    try {
+      pendientes = reintentarPortal();
+    } catch (err) {
+      pendientes = 'no se ha podido comprobar (' + ((err && err.message) || err) + ')';
+    }
+    if (pendientes) cuerpo += '\n\nPartes pendientes de mandar al portal de la UTE: ' + pendientes +
+      ' · se reintenta cada día con este resumen; detalle en la hoja «Errores».';
+  }
   cuerpo += '\n\nCorreos enviados hoy por el servidor (antes de este): ' + correosHoy_().n +
     ' · cuota restante: ' + MailApp.getRemainingDailyQuota() + '.';
   enviarCorreo_({

@@ -2,6 +2,13 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v16 · 2026-10-27 (la app no cambia)
+- **Envío al portal de la UTE**: al llegar un parte a la oficina, el servidor manda también al portal (Supabase) el mismo `Datos_` que guarda Power Automate, sin fotos, más `servidor` (correo y nombre de quien lo envía, hora de recepción e `envioId`). Un reintento de la app no lo manda dos veces. Un rectificativo lleva otro `id` y, en `rectificaA.id`, el del parte al que sustituye.
+- La dirección y la clave del portal van en las propiedades del script `PORTAL_URL` y `PORTAL_CLAVE`, no en el código (el repositorio es público). Sin ellas no se manda nada.
+- Si el portal falla, el parte llega igual a la oficina: queda en la hoja `PortalPendientes` y en `Errores` (tipo `portal`). El resumen diario de las 16:00 los reintenta en lotes de 200 y avisa si quedan; también se puede ejecutar `reintentarPortal` a mano.
+- Pide un permiso nuevo en Apps Script («Conectarse a un servicio externo»), ya aceptado.
+- Los partes enviados por «Gmail (emergencia)» no pasan por el servidor y no llegan al portal.
+
 ## 0.20.2 · 2026-10-27
 - **Descartar un parte sin enviar**: en un parte cerrado o en cola, abajo, «¿No hay que enviarlo?» → «Descartar este parte». Pide confirmación y quita del móvil el parte, sus fotos y su envío pendiente: no llega a la oficina. Si justo había llegado (el envío en segundo plano), no lo descarta y lo dice. Los enviados no se pueden descartar. Antes, un parte cerrado de prueba o repetido se quedaba para siempre en «Pendientes de enviar» y no dejaba cerrar sesión.
 

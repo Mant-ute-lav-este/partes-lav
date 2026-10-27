@@ -989,6 +989,54 @@ prueba('servidor: si falla la copia, el parte sale igual y se apunta el error', 
   cierto(/fallo en la copia/.test(err[5]), 'mensaje del error');
 });
 
+prueba('servidor: manda al portal el Datos_ sin fotos, con quién lo envió, una sola vez', async () => {
+  const E = await servidorListo();
+  E.post(E.parte({ archivos: adjuntosConFotos() }));
+  igual(E.portal.length, 0, 'sin PORTAL_URL y PORTAL_CLAVE no se manda nada');
+  E.props.PORTAL_URL = 'https://portal.simulado/partes';
+  E.props.PORTAL_CLAVE = 'clave-prueba';
+  const p = E.parte({ archivos: adjuntosConFotos() });
+  const r = E.post(p);
+  igual(r.ok, true, r.error);
+  igual(E.portal.length, 1);
+  const { url, o } = E.portal[0];
+  igual([url, o.method, o.contentType, o.headers['x-clave']], ['https://portal.simulado/partes', 'post', 'application/json', 'clave-prueba']);
+  const datos = JSON.parse(o.payload);
+  igual([datos.ref, datos.trabajos.length], ['SUP-0007', 2], 'el mismo Datos_ que va a la oficina');
+  igual(datos.servidor, { email: 'ana@ejemplo.test', nombre: 'Ana Prueba', recibido: r.recibido, envioId: p.envioId });
+  cierto(!/base64/.test(o.payload), 'no deben ir fotos');
+  E.post({ ...p, peticion: crypto.randomUUID() });
+  igual(E.portal.length, 1, 'un reintento de la app no lo manda otra vez');
+});
+
+prueba('servidor: si el portal falla, el parte sale igual y se reintenta en lote con el resumen', async () => {
+  const E = await servidorListo();
+  E.props.PORTAL_URL = 'https://portal.simulado/partes';
+  E.props.PORTAL_CLAVE = 'clave-prueba';
+  E.g.alPortal = () => ({ codigo: 500, texto: 'caído' });
+  igual(E.post(E.parte({ ref: 'SUP-0007', archivos: adjuntosConFotos() })).ok, true, 'el parte no puede fallar por el portal');
+  E.g.alPortal = () => ({ codigo: 200, texto: '{"ok":false,"error":"clave incorrecta"}' });
+  igual(E.post(E.parte({ ref: 'SUP-0008', archivos: adjuntosConFotos() })).ok, true);
+  E.g.alPortal = () => { throw new Error('sin red'); };
+  igual(E.post(E.parte({ ref: 'SUP-0009', archivos: adjuntosConFotos() })).ok, true, 'ni aunque UrlFetchApp lance error');
+  igual(E.correos.length, 3, 'los tres partes llegan a la oficina');
+  igual(E.hojas.Envios._d.length, 4, 'y quedan en Envios');
+  igual(E.hojas.PortalPendientes._d.slice(1).map((f) => f[1]), ['SUP-0007', 'SUP-0008', 'SUP-0009']);
+  const errores = E.hojas.Errores._d.filter((f) => f[4] === 'portal').map((f) => f[5]);
+  cierto(/500: caído/.test(errores[0]) && /clave incorrecta/.test(errores[1]), errores.join(' | '));
+  // Mientras el portal siga caído, no se pierde nada.
+  igual(E.s.reintentarPortal(), 3);
+  // El portal vuelve: el resumen diario los manda en un solo lote y los quita.
+  E.g.alPortal = null;
+  const antes = E.portal.length;
+  E.s.resumenDiario();
+  igual(E.portal.length, antes + 1, 'un solo envío');
+  const lote = JSON.parse(E.portal.at(-1).o.payload);
+  igual(lote.partes.map((x) => x.ref), ['SUP-0007', 'SUP-0007', 'SUP-0007'], 'los tres (el Datos_ de prueba siempre dice SUP-0007)');
+  igual(E.hojas.PortalPendientes._d.length, 1, 'solo queda la cabecera');
+  cierto(!/pendientes de mandar al portal/.test(E.correos.at(-1).body), 'el resumen no avisa si no queda nada');
+});
+
 prueba('servidor: un reintento no manda el correo dos veces', async () => {
   const E = await servidorListo();
   const p = E.parte();

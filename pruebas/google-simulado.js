@@ -11,6 +11,7 @@ function crearEntorno(codigo) {
   const props = {};
   const cache = {};
   const correos = [];
+  const portal = [];   // peticiones al portal de la UTE (UrlFetchApp)
   let bloqueado = false;
   let aperturas = 0;   // veces que se abre la hoja (openById)
   const g = {};
@@ -108,13 +109,20 @@ function crearEntorno(codigo) {
       sendEmail: (o) => { if (g.alEnviarCorreo) g.alEnviarCorreo(o); correos.push(o); },
       getRemainingDailyQuota: () => 100 - correos.length,
     },
+    UrlFetchApp: {
+      fetch: (url, o) => {
+        portal.push({ url, o });
+        const r = g.alPortal ? g.alPortal(url, o) : { codigo: 200, texto: '{"ok":true}' };
+        return { getResponseCode: () => r.codigo, getContentText: () => r.texto };
+      },
+    },
     ContentService: { createTextOutput: (t) => ({ setMimeType: () => t }), MimeType: {} },
     HtmlService: {}, ScriptApp: { getService: () => ({ getUrl: () => 'https://servidor.simulado/exec' }) },
     Logger: { log: () => {} }, DriveApp: {},
   });
   const nombres = Object.keys(g);
   const s = new Function(...nombres, `${codigo}
-    return { doPost, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_, archivarEnvios, revisarRegistro, enlaceRevision };`)(...nombres.map((n) => g[n]));
+    return { doPost, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_, archivarEnvios, revisarRegistro, enlaceRevision, reintentarPortal };`)(...nombres.map((n) => g[n]));
   const post = (o) => JSON.parse(s.doPost({ postData: { contents: JSON.stringify(o) } }));
-  return { s, post, g, hojas, props, cache, correos, bloqueado: () => bloqueado, aperturas: () => aperturas };
+  return { s, post, g, hojas, props, cache, correos, portal, bloqueado: () => bloqueado, aperturas: () => aperturas };
 }
