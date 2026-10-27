@@ -1740,6 +1740,163 @@ prueba('pantallas: PIN mal 5 veces bloquea, y ni fallar ni acertar borra los fal
   }
 });
 
+// ---------- pantallas: recorridos con toques ----------
+// La app de verdad en el marco, con el servidor simulado: se tocan los botones como un capataz
+// (Cerrar parte → Enviar a la oficina) y se mira lo que queda en el móvil y lo que llega al servidor.
+
+const toca = (que) => {
+  const el = marco.m.app.querySelector(que);
+  if (!el) throw new Error(`no hay ningún botón «${que}» en la pantalla «${marco.m.estado.vista}»`);
+  if (el.disabled) throw new Error(`el botón «${que}» está desactivado en la pantalla «${marco.m.estado.vista}»`);
+  el.click();
+};
+async function esperar(cond, que, ms = 10000) {
+  const inicio = Date.now();
+  while (!cond()) {
+    if (Date.now() - inicio > ms) {
+      const { estado } = marco.m;
+      throw new Error(`${que} (pantalla «${estado.vista}»${estado.errores.length ? ', faltaba: ' + estado.errores.map((x) => x.msg).join(' | ') : ''})`);
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+/** El servidor de Google falso para el marco: contesta «recibido» y apunta cada petición. */
+async function conServidorFalso(fn) {
+  const { f } = await appEnMarco();
+  const real = f.contentWindow.fetch;
+  const llamadas = [];
+  f.contentWindow.fetch = async (url, op) => {
+    if (!String(url).startsWith(SERVIDOR_URL)) return real.call(f.contentWindow, url, op);
+    llamadas.push(JSON.parse(op.body));
+    return respuesta({ ok: true, recibido: '2026-10-27T10:01:00+01:00' });
+  };
+  try { return await fn(llamadas); } finally { f.contentWindow.fetch = real; }
+}
+const perfilConToken = () => ({ ...perfilEjemplo(), token: 'token-prueba' });
+/** Guarda el parte con sus fotos en el móvil y lo abre en la app. */
+async function abrirParteEnApp(p) {
+  const fotos = [...(p.trabajos || []).flatMap((t) => t.fotos), ...(p.formato1 || [])];
+  for (const x of fotos) await db.putFoto({ id: x.id, parteId: p.id, blob: await jpeg() });
+  await db.putParte(p);
+  await pantalla((e) => { e.vista = 'parte'; e.parte = p; e.perfil = perfilConToken(); });
+  return fotos.length;
+}
+
+prueba('recorrido: cada tipo de parte se cierra, se envía y queda «enviado» (cola vacía, un solo envío)', async () => {
+  const { f, errores } = await appEnMarco();
+  const perfilAntes = await db.kvGet('perfil');
+  const colaAntes = await db.listarSalida();
+  for (const it of colaAntes) await db.borrarSalida(it.id);
+  await db.kvSet('perfil', perfilConToken());
+  f.contentWindow.confirm = () => true;   // «¿Cerrar el parte?»
+  const casos = [
+    ['INFRA', infra], ['SUPER', () => conExtras(ej.parteSuper())], ['maquinaria de vía', maqVia],
+    ['locomotora', () => loco()], ['dresina', () => loco('dresina')],
+  ];
+  try {
+    for (const [nombre, crear] of casos) {
+      const p = borrador(crear());
+      const nFotos = await abrirParteEnApp(p);
+      try {
+        const llamadas = await conServidorFalso(async (ll) => {
+          toca('[data-action="cerrar-parte"]');
+          await esperar(() => marco.m.estado.vista === 'envio' && marco.m.estado.envio && marco.m.estado.envio.listo, `${nombre}: no llega a la pantalla de envío`);
+          toca('[data-action="enviar"]');
+          await esperar(() => marco.m.estado.parte && marco.m.estado.parte.estado === 'enviado', `${nombre}: no queda «enviado»`);
+          return ll;
+        });
+        const g = await db.getParte(p.id);
+        igual([g.estado, g.envios.length, Boolean(g.recibido)], ['enviado', 1, true], `${nombre}: parte guardado`);
+        igual((await db.listarSalida()).length, 0, `${nombre}: cola vacía`);
+        igual(llamadas.map((x) => x.accion), ['enviar'], `${nombre}: peticiones al servidor`);
+        const env = llamadas[0];
+        igual([env.ref, env.token], [p.ref, 'token-prueba'], `${nombre}: referencia y sesión`);
+        const nombres = env.archivos.map((x) => x.nombre);
+        cierto(nombres.some((x) => /^Parte_.*\.pdf$/.test(x)), `${nombre}: falta el PDF (${nombres})`);
+        cierto(nombres.some((x) => /^Datos_.*\.txt$/.test(x)), `${nombre}: falta Datos_ (${nombres})`);
+        if (nFotos) cierto(nombres.some((x) => /^Fotos_.*\.txt$/.test(x)), `${nombre}: falta Fotos_ (${nombres})`);
+        const datos = JSON.parse(env.archivos.find((x) => /^Datos_/.test(x.nombre)).texto);
+        igual([datos.ref, datos.tipo], [p.ref, p.tipo], `${nombre}: Datos_`);
+        if (errores.length) throw new Error(`${nombre}: errores en la app: ${errores.splice(0).join(' | ')}`);
+      } finally {
+        await descartarDelMovil(p.id);
+      }
+    }
+  } finally {
+    for (const it of await db.listarSalida()) await db.borrarSalida(it.id);
+    for (const it of colaAntes) await db.putSalida(it);
+    await db.kvSet('perfil', perfilAntes);
+  }
+});
+
+prueba('recorrido: un parte con algo sin rellenar no se cierra y dice qué falta', async () => {
+  const { f, m } = await appEnMarco();
+  f.contentWindow.confirm = () => true;
+  const p = borrador(infra());
+  p.fecha = '';
+  await abrirParteEnApp(p);
+  try {
+    toca('[data-action="cerrar-parte"]');
+    await esperar(() => m.estado.errores.length > 0, 'no avisa de lo que falta');
+    igual(m.estado.vista, 'parte', 'sigue en el parte');
+    igual((await db.getParte(p.id)).estado, 'borrador', 'sigue siendo borrador');
+    cierto(m.app.textContent.includes('Falta por completar'), 'la pantalla enseña lo que falta');
+  } finally {
+    await descartarDelMovil(p.id);
+  }
+});
+
+prueba('recorrido: Corregir un parte enviado crea la revisión 2 en borrador, con sus fotos, y deja el original', async () => {
+  const { f, m } = await appEnMarco();
+  f.contentWindow.confirm = () => true;
+  const original = { ...infra(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00', envios: [{ fecha: '2026-10-14T10:04:00+02:00', recibido: '2026-10-14T10:05:00+02:00' }], cierre: '2026-10-14T10:00:00+02:00' };
+  const nFotos = await abrirParteEnApp(original);
+  await pantalla((e) => { e.vista = 'envio'; e.parte = original; e.perfil = perfilConToken(); });
+  let nuevoId = null;
+  try {
+    toca('[data-action="corregir"]');
+    await esperar(() => m.estado.vista === 'parte' && m.estado.parte.id !== original.id, 'Corregir no abre la revisión nueva');
+    const n = m.estado.parte;
+    nuevoId = n.id;
+    igual([n.rev, n.estado, n.rectificaA.id, n.rectificaA.rev, n.envios], [2, 'borrador', original.id, 1, []], 'revisión nueva');
+    igual((await db.fotosDeParte(n.id)).length, nFotos, 'fotos copiadas');
+    igual((await db.fotosDeParte(original.id)).length, nFotos, 'el original conserva sus fotos');
+    const o = await db.getParte(original.id);
+    igual([o.estado, o.rev], ['enviado', 1], 'el original no cambia');
+    cierto(!(await db.getParte(n.id)).recibido, 'la revisión no hereda «recibido»');
+  } finally {
+    await descartarDelMovil(original.id);
+    if (nuevoId) await descartarDelMovil(nuevoId);
+  }
+});
+
+prueba('recorrido: Descartar un parte cerrado lo quita del móvil con sus fotos, y un enviado no ofrece descartar', async () => {
+  const { f, m } = await appEnMarco();
+  const confirmaciones = [];
+  f.contentWindow.confirm = (t) => { confirmaciones.push(t); return true; };
+  const cerrado = infra();
+  const otro = infra();
+  for (const t of otro.trabajos) for (const x of t.fotos) x.id = crypto.randomUUID();   // los ejemplos comparten ids de foto
+  await abrirParteEnApp(otro);
+  await abrirParteEnApp(cerrado);
+  await pantalla((e) => { e.vista = 'envio'; e.parte = cerrado; e.perfil = perfilConToken(); });
+  try {
+    toca('[data-action="descartar-parte"]');
+    await esperar(() => m.estado.vista === 'inicio', 'Descartar no vuelve al inicio');
+    igual(confirmaciones.length, 1, 'pide confirmación una vez');
+    igual(await db.getParte(cerrado.id), undefined, 'el parte descartado');
+    igual((await db.fotosDeParte(cerrado.id)).length, 0, 'sus fotos');
+    cierto(await db.getParte(otro.id), 'el otro parte sigue');
+    igual((await db.fotosDeParte(otro.id)).length > 0, true, 'las fotos del otro siguen');
+    const enviado = { ...infra(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00' };
+    await pantalla((e) => { e.vista = 'envio'; e.parte = enviado; e.perfil = perfilConToken(); });
+    cierto(!m.app.querySelector('[data-action="descartar-parte"]'), 'un parte enviado no se puede descartar');
+  } finally {
+    await descartarDelMovil(cerrado.id);
+    await descartarDelMovil(otro.id);
+  }
+});
+
 prueba('pantallas: envío', async () => {
   await pantalla((e) => { e.vista = 'envio'; e.parte = ej.parteInfra(); }, 'Cerrado · falta enviarlo');
   await pantalla((e) => { e.vista = 'envio'; e.parte = { ...ej.parteSuper(), estado: 'en-cola', errorEnvio: 'Sin cobertura' }; }, 'No se ha podido enviar');
