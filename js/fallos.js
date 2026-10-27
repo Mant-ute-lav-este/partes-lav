@@ -11,6 +11,12 @@ let enCurso = false;
 
 export function iniciarFallos(v) { version = v; }
 
+/** Los fallos sin mandar. Hasta la 0.20.2 esta clave podía guardar los intentos de PIN ({ n, hasta }): eso se ignora. */
+async function pendientesGuardados() {
+  const v = await db.kvGet('fallos');
+  return Array.isArray(v) ? v : [];
+}
+
 /** Quita correos, números largos (teléfonos, DNI) y rutas de archivo; recorta a 200 caracteres. */
 function limpiar(texto) {
   return String(texto == null ? '' : texto)
@@ -25,7 +31,7 @@ function limpiar(texto) {
 /** Guarda el fallo en el móvil y intenta mandarlo. Nunca lanza error: es un apoyo, no puede romper nada. */
 export async function registrarFallo(tipo, mensaje) {
   try {
-    const pendientes = (await db.kvGet('fallos')) || [];
+    const pendientes = await pendientesGuardados();
     const m = limpiar(mensaje);
     if (!m || pendientes.some((f) => f.tipo === tipo && f.mensaje === m)) return;
     pendientes.push({ tipo: String(tipo).slice(0, 20), mensaje: m, fecha: new Date().toISOString(), version });
@@ -40,11 +46,11 @@ export async function enviarFallos() {
   enCurso = true;
   try {
     const perfil = await db.kvGet('perfil');
-    const pendientes = (await db.kvGet('fallos')) || [];
+    const pendientes = await pendientesGuardados();
     if (!perfil || !perfil.token || !pendientes.length || !navigator.onLine) return;
     await api('fallo', { token: perfil.token, fallos: pendientes }, { intentos: 1, timeout: 15000 });
     // Quita solo los enviados: puede haber entrado alguno nuevo mientras tanto.
-    const ahora = (await db.kvGet('fallos')) || [];
+    const ahora = await pendientesGuardados();
     await db.kvSet('fallos', ahora.slice(pendientes.length));
   } catch { /* se reintenta en el próximo arranque o al volver la cobertura */ } finally {
     enCurso = false;

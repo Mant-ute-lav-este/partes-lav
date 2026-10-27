@@ -258,7 +258,7 @@ export async function onSubmit(e) {
       estado.perfil = { capataz: estado.setupCapataz, pin: nuevoPin };
     }
     await db.kvSet('perfil', estado.perfil);
-    await db.kvSet('fallos', null);
+    await db.kvSet('intentosPin', null);
     estado.cambiandoPin = false;
     toast('PIN guardado');
     ir('inicio');
@@ -303,18 +303,20 @@ export async function onSubmit(e) {
     const r = await conEspera('Guardando el PIN…', () => api('nuevoPin', { email, codigo, pin: pin1 }));
     if (r) await terminarAcceso(r, email, pin1);
   } else if (tipo === 'pin') {
-    const fallos = (await db.kvGet('fallos')) || { n: 0, hasta: 0 };
+    // Clave propia: hasta la 0.20.2 compartía «fallos» con los errores pendientes y se pisaban.
+    const guardados = await db.kvGet('intentosPin');
+    const fallos = guardados && typeof guardados.n === 'number' ? guardados : { n: 0, hasta: 0 };
     if (Date.now() < fallos.hasta) {
       return toast(`Demasiados intentos. Espera ${Math.ceil((fallos.hasta - Date.now()) / 1000)} segundos.`);
     }
     const { salt, hash, iter } = estado.perfil.pin;
     if ((await hashPin(f.pin.value.trim(), salt, iter)) === hash) {
-      await db.kvSet('fallos', null);
+      await db.kvSet('intentosPin', null);
       return entrarApp();
     }
     fallos.n += 1;
     if (fallos.n >= 5) fallos.hasta = Date.now() + 60000 * (fallos.n - 4);
-    await db.kvSet('fallos', fallos);
+    await db.kvSet('intentosPin', fallos);
     f.pin.value = '';
     toast('PIN incorrecto');
   }

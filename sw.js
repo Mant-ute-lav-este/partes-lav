@@ -209,7 +209,8 @@ async function registrarFallo(tipo, mensaje) {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 200);
-    const pendientes = (await op('kv', 'readonly', (s) => s.get('fallos'))) || [];
+    const guardados = await op('kv', 'readonly', (s) => s.get('fallos'));
+    const pendientes = Array.isArray(guardados) ? guardados : [];   // hasta la 0.20.2 podía tener los intentos de PIN
     if (!m || pendientes.some((f) => f.tipo === tipo && f.mensaje === m)) return;
     pendientes.push({ tipo: String(tipo).slice(0, 20), mensaje: m, fecha: new Date().toISOString(), version: VERSION.slice(1) });
     await op('kv', 'readwrite', (s) => s.put(pendientes.slice(-20), 'fallos'));

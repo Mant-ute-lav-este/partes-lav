@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.20.3 (sin publicar)
+- **Arreglo: bloqueo del PIN y avisos de errores.** Los intentos de PIN mal puestos y los errores pendientes de mandar a la oficina se guardaban en el móvil con el mismo nombre y se pisaban: con errores guardados el bloqueo a los 5 intentos no funcionaba, al acertar el PIN se perdían los errores sin mandar, y con un intento fallido apuntado no se guardaban errores nuevos. Ahora los intentos van en `intentosPin`. Si un móvil trae el valor antiguo, se ignora y se sobrescribe con el primer error nuevo (el contador de PIN empieza de cero una vez).
+- Pruebas nuevas: la base de datos de `sw.js` igual que la de `db.js`, textos con trampa en las pantallas, contrato con la app del almacén, PIN mal 5 veces con errores pendientes.
+
 ## Servidor v16 · 2026-10-27 (la app no cambia)
 - **Envío al portal de la UTE**: al llegar un parte a la oficina, el servidor manda también al portal (Supabase) el mismo `Datos_` que guarda Power Automate, sin fotos, más `servidor` (correo y nombre de quien lo envía, hora de recepción e `envioId`). Un reintento de la app no lo manda dos veces. Un rectificativo lleva otro `id` y, en `rectificaA.id`, el del parte al que sustituye.
 - La dirección y la clave del portal van en las propiedades del script `PORTAL_URL` y `PORTAL_CLAVE`, no en el código (el repositorio es público). Sin ellas no se manda nada.

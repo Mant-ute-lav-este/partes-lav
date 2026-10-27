@@ -911,6 +911,28 @@ prueba('fallos: se guardan sin datos personales y sin repetir', async () => {
   }
 });
 
+// Hasta la 0.20.2 los intentos de PIN se guardaban en la misma clave que los fallos ({ n, hasta }, no una
+// lista). Un móvil que se actualice con eso guardado tiene que seguir apuntando fallos, en la app y en sw.js.
+prueba('fallos: un valor antiguo que no es una lista (intentos de PIN de antes) no impide apuntar fallos', async () => {
+  const antes = await db.kvGet('fallos');
+  const perfil = await db.kvGet('perfil');
+  await db.kvSet('perfil', undefined);   // sin sesión: se queda en el móvil, no se manda
+  try {
+    await db.kvSet('fallos', { n: 2, hasta: 0 });
+    iniciarFallos('prueba');
+    await registrarFallo('js', 'error tras actualizar');
+    igual((await db.kvGet('fallos')).map((f) => f.mensaje), ['error tras actualizar'], 'app');
+    const codigo = await fetch('../sw.js', { cache: 'no-store' }).then((r) => r.text());
+    const sw = new Function('self', `${codigo}\nreturn { registrarFallo };`)({ addEventListener() {}, clients: {}, skipWaiting() {} });
+    await db.kvSet('fallos', { n: 2, hasta: 0 });
+    await sw.registrarFallo('envio', 'error en segundo plano');
+    igual((await db.kvGet('fallos')).map((f) => f.mensaje), ['error en segundo plano'], 'sw.js');
+  } finally {
+    await db.kvSet('fallos', antes || []);
+    await db.kvSet('perfil', perfil);
+  }
+});
+
 // ---------- servidor (Code.gs con Google simulado) ----------
 
 let nuevoServidor;
@@ -1665,6 +1687,57 @@ prueba('pantallas: textos con trampa (< > " \' &) no crean elementos ni atributo
   await revisar('registro: nombre', (e) => { e.vista = 'reg-nombre'; e.perfil = null; e.reg = { email: T, texto: T, nombre: T, codigo: T }; });
   await revisar('registro: PIN', (e) => { e.vista = 'reg-pin'; e.perfil = null; e.reg = { email: T, texto: T, nombre: T, codigo: T }; });
   cierto(vistoLiteral > 0, 'ninguna pantalla enseñó la trampa como texto: la prueba no está comprobando nada');
+});
+
+/** Carga un módulo dentro del marco (el mismo que usa la app, no una copia). */
+async function moduloDelMarco(ruta) {
+  const { f } = await appEnMarco();
+  const clave = '__modulo' + Math.random().toString(36).slice(2);
+  const s = f.contentDocument.createElement('script');
+  s.type = 'module';
+  s.textContent = `import * as m from '${ruta}'; window.${clave} = m;`;
+  f.contentDocument.head.append(s);
+  const inicio = Date.now();
+  while (!f.contentWindow[clave]) {
+    if (Date.now() - inicio > 10000) throw new Error(`no se puede cargar ${ruta} en el marco`);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return f.contentWindow[clave];
+}
+
+// Antes, los intentos de PIN y los fallos pendientes compartían clave: con fallos guardados el bloqueo
+// no funcionaba, y al acertar el PIN se borraban los fallos sin mandar.
+prueba('pantallas: PIN mal 5 veces bloquea, y ni fallar ni acertar borra los fallos pendientes', async () => {
+  const { m } = await appEnMarco();
+  const acceso = await moduloDelMarco('./js/vista-acceso.js');
+  const guardado = { fallos: await db.kvGet('fallos'), intentosPin: await db.kvGet('intentosPin') };
+  const pendientes = [{ tipo: 'js', mensaje: 'pendiente de mandar', fecha: '2026-10-27T10:00:00.000Z', version: 'prueba' }];
+  const salt = btoa('sal-de-prueba-16');
+  // Sin token: al entrar no se llama al servidor.
+  const perfil = { capataz: 'Ana Prueba', token: '', pin: { salt, hash: await acceso.hashPin('1234', salt, 1), iter: 1 } };
+  const probar = async (pin) => {
+    await pantalla((e) => { e.vista = 'pin'; e.perfil = perfil; });
+    const form = m.app.querySelector('form[data-form="pin"]');
+    form.pin.value = pin;
+    form.requestSubmit();
+    await new Promise((r) => setTimeout(r, 300));
+    return m.estado.vista;
+  };
+  try {
+    await db.kvSet('fallos', pendientes);
+    await db.kvSet('intentosPin', null);
+    for (let i = 0; i < 5; i++) igual(await probar('0000'), 'pin', `PIN malo ${i + 1}`);
+    igual(await db.kvGet('fallos'), pendientes, 'los fallos siguen tras 5 PIN malos');
+    cierto(((await db.kvGet('intentosPin')) || {}).hasta > Date.now(), 'a los 5 fallos queda bloqueado');
+    igual(await probar('1234'), 'pin', 'bloqueado: ni el PIN bueno entra');
+    await db.kvSet('intentosPin', { n: 5, hasta: 0 });   // pasa el tiempo de bloqueo
+    igual(await probar('1234'), 'inicio', 'entra con el PIN bueno');
+    igual(await db.kvGet('fallos'), pendientes, 'entrar no borra los fallos sin mandar');
+    igual(await db.kvGet('intentosPin'), null, 'entrar pone los intentos a cero');
+  } finally {
+    await db.kvSet('fallos', guardado.fallos || []);
+    await db.kvSet('intentosPin', guardado.intentosPin ?? null);
+  }
 });
 
 prueba('pantallas: envío', async () => {

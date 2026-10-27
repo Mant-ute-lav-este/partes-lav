@@ -156,7 +156,7 @@ export async function guardarPerfilServidor({ email, nombre, token, cuenta }, pi
   const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
   estado.perfil = { email, capataz: nombre, token, cuenta, pin: { salt, hash: await hashPin(pin, salt, ITER_PIN), iter: ITER_PIN } };
   await db.kvSet('perfil', estado.perfil);
-  await db.kvSet('fallos', null);
+  await db.kvSet('intentosPin', null);
 }
 
 export async function terminarAcceso(r, email, pin) {
@@ -172,7 +172,7 @@ export async function terminarAcceso(r, email, pin) {
 export async function cerrarSesion() {
   estado.perfil = null;
   await db.kvSet('perfil', null);
-  await db.kvSet('fallos', null);
+  await db.kvSet('intentosPin', null);
   ir(hayServidor() ? 'bienvenida' : 'setup-capataz');
 }
 
