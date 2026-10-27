@@ -263,16 +263,32 @@ function avisarRegistro_(email, nombre) {
   const aj = ajustes_();
   const admin = aj.admin || aj.destinatario;
   if (!admin) return;
-  const url = ScriptApp.getService().getUrl() + '?accion=revisar&email=' + encodeURIComponent(email) +
-    '&firma=' + firma_('revisar:' + email);
   enviarCorreo_({
     to: admin,
     name: 'Partes LAV',
     subject: 'Registro en la app de partes: ' + nombre,
     body: nombre + ' (' + email + ') se ha registrado en la app de partes.\n\n' +
-      'Para aprobarlo o rechazarlo, abre este enlace:\n' + url +
-      '\n\nHasta que lo apruebes no podrá enviar partes.',
+      'Para aprobarlo o rechazarlo, abre este enlace:\n' + urlRevision_(email) +
+      '\n\nHasta que lo apruebes no podrá enviar partes.' +
+      '\nGuarda este correo: con el mismo enlace podrás darlo de baja más adelante.',
   });
+}
+
+function urlRevision_(email) {
+  return ScriptApp.getService().getUrl() + '?accion=revisar&email=' + encodeURIComponent(email) +
+    '&firma=' + firma_('revisar:' + email);
+}
+
+/**
+ * Para dar de baja a alguien cuyo correo de registro ya no está: ejecutarla a mano en el editor
+ * (cambiando el correo) y abrir el enlace que sale en el registro de ejecución.
+ */
+function enlaceRevision(email) {
+  email = String(email || '').trim().toLowerCase();
+  if (!buscarUsuario_(email)) throw new Error('No hay ninguna cuenta con ese correo: ' + email);
+  const url = urlRevision_(email);
+  Logger.log(url);
+  return url;
 }
 
 /** Llamada desde la página de revisión (pública: sin guion bajo). */
@@ -1040,19 +1056,40 @@ const PAGINA_REVISION_ = `<!doctype html>
   body { font-family: system-ui, sans-serif; max-width: 480px; margin: 24px auto; padding: 0 16px; color: #10141c; }
   button { font: inherit; font-size: 18px; padding: 12px 22px; margin: 8px 8px 0 0; border: 0; border-radius: 10px; color: #fff; cursor: pointer; }
   .si { background: #157a3a; } .no { background: #b42318; }
+  .nota { color: #555; font-size: 14px; }
 </style></head><body>
 <h2>Registro en la app de partes</h2>
 <p><strong><?= nombre ?></strong><br><?= email ?></p>
-<p id="estado">Estado actual: <strong><?= estado ?></strong></p>
-<button class="si" onclick="decidir('activo')">Aprobar</button>
-<button class="no" onclick="decidir('rechazado')">Rechazar</button>
+<p id="estado">Estado actual: <strong><?= estado === 'rechazado' ? 'de baja / rechazado' : estado ?></strong></p>
+<? if (estado === 'pendiente') { ?>
+<button class="si" onclick="decidir(this, 'activo')">Aprobar</button>
+<button class="no" onclick="decidir(this, 'rechazado')">Rechazar</button>
+<? } else if (estado === 'activo') { ?>
+<button class="no" onclick="decidir(this, 'rechazado')">Dar de baja</button>
+<p class="nota">Ya no podrá entrar ni enviar partes. Lo que ya envió se queda en la oficina. Se puede volver a activar con este mismo enlace.</p>
+<? } else { ?>
+<button class="si" onclick="decidir(this, 'activo')">Volver a activar</button>
+<? } ?>
 <script>
-  function decidir(d) {
+  // Dos toques para decidir: un toque sin querer no cambia nada.
+  function decidir(boton, d) {
+    if (!boton.dataset.seguro) {
+      boton.dataset.seguro = '1';
+      boton.textContent = 'Pulsa otra vez para confirmar';
+      return;
+    }
     var el = document.getElementById('estado');
     el.textContent = 'Guardando…';
+    document.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
     google.script.run
-      .withSuccessHandler(function (r) { el.innerHTML = 'Hecho: <strong>' + (r === 'activo' ? 'aprobado' : 'rechazado') + '</strong>.'; })
-      .withFailureHandler(function (e) { el.textContent = 'Error: ' + e.message; })
+      .withSuccessHandler(function (r) {
+        el.innerHTML = 'Hecho: <strong>' + (r === 'activo' ? 'activo (puede entrar y enviar)' : 'de baja / rechazado') + '</strong>.';
+        document.querySelectorAll('button').forEach(function (b) { b.remove(); });
+      })
+      .withFailureHandler(function (e) {
+        el.textContent = 'Error: ' + e.message;
+        document.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+      })
       .revisarRegistro(<?!= JSON.stringify(email) ?>, <?!= JSON.stringify(firma) ?>, d);
   }
 </script>

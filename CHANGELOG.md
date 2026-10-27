@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v14 · 2026-10-27 (la app no cambia)
+- **Bajas de usuarios**: el enlace firmado del correo de registro sirve también después. Con la cuenta activa enseña «Dar de baja» (pasa a «rechazado»: ya no puede entrar, recibir la lista ni enviar partes; lo enviado se queda) y, si está de baja, «Volver a activar». Cada decisión pide dos toques.
+- Si el correo del registro ya no está: ejecutar `enlaceRevision('correo@…')` en el editor de Apps Script y abrir el enlace que sale en el registro de ejecución.
+- El correo de registro dice que se guarde, porque sirve para la baja.
+
 ## 0.19.2 · 2026-10-27
 - **Envío en segundo plano igual que el de la app**: el service worker (`sw.js`) hacía 3 intentos sin tiempo máximo y no apuntaba los fallos; ahora hace los mismos 5 intentos, con las mismas esperas (2, 4, 5 y 5 s) y 240 s máximo por intento, y apunta los rechazos del servidor para la hoja «Errores». Una prueba nueva carga el `sw.js` real y avisa si se separa de `js/salida.js`.
 - Pruebas del servidor nuevas: PIN erróneo (bloqueo a los 5 fallos) y parte de más de 24 MB.

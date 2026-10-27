@@ -1008,6 +1008,30 @@ prueba('servidor: un parte que pesa más de 24 MB no sale y se puede reintentar 
   igual(E.correos.length, 1, 'el reintento sale');
 });
 
+prueba('servidor: dar de baja con el enlace firmado y volver a activar', async () => {
+  const E = await servidorListo();
+  igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
+  const url = E.s.enlaceRevision(' Ana@Ejemplo.test ');
+  const firma = new URL(url).searchParams.get('firma');
+  cierto(url.includes('accion=revisar') && firma, url);
+  let error = '';
+  try { E.s.revisarRegistro('ana@ejemplo.test', 'firma-falsa', 'rechazado'); } catch (e) { error = e.message; }
+  igual(error, 'Enlace no válido.', 'firma falsa');
+  try { E.s.enlaceRevision('nadie@ejemplo.test'); error = ''; } catch (e) { error = e.message; }
+  cierto(/No hay ninguna cuenta/.test(error), 'correo que no existe');
+
+  igual(E.s.revisarRegistro('ana@ejemplo.test', firma, 'rechazado'), 'rechazado');
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
+  cierto(/no está activa/.test(E.post(E.parte()).error), 'no puede enviar');
+  cierto(/no está activa/.test(pedir({ accion: 'config', token: E.token }).error), 'no recibe la lista');
+  cierto(/no está activa/.test(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234' }).error), 'no puede entrar');
+  igual(pedir({ accion: 'estado', token: E.token }).estado, 'rechazado', 'la app ve que está de baja');
+  igual(E.correos.length, 0);
+
+  igual(E.s.revisarRegistro('ana@ejemplo.test', firma, 'activo'), 'activo');
+  igual(E.post(E.parte()).ok, true, 'reactivada: vuelve a enviar');
+});
+
 prueba('servidor: registro de fallos sin nombre ni correo', async () => {
   const E = await servidorListo();
   const r = E.post({ accion: 'fallo', token: E.token, peticion: crypto.randomUUID(), fallos: [{ tipo: 'foto', mensaje: 'm', fecha: 'f', version: 'v' }] });
