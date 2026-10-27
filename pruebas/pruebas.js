@@ -7,7 +7,7 @@ import * as db from '../js/db.js';
 import { textoReferencia, generarPDF } from '../js/pdf.js';
 import { carpetaDestino, nombreBase, prepararEnvio } from '../js/envio.js';
 import { esHeic, procesarFoto } from '../js/fotos.js';
-import { procesarSalida } from '../js/salida.js';
+import { procesarSalida, descartarDelMovil } from '../js/salida.js';
 import { limpiarFotosAntiguas, textoEspacio } from '../js/espacio.js';
 import { iniciarFallos, registrarFallo } from '../js/fallos.js';
 import { leerAspecto, guardarAspecto, aplicarAspecto } from '../js/aspecto.js';
@@ -788,6 +788,30 @@ prueba('salida: sin conexión no pierde nada', () => conPerfil(async () => {
   igual(g.estado, 'cerrado', 'el parte no debe cambiar de estado');
   await db.borrarParte(p.id);
 }));
+
+prueba('descartar: quita del móvil el parte en cola, sus fotos y su envío, y nada más', async () => {
+  const p = ej.parteInfra();
+  const otro = ej.parteInfra();
+  p.estado = 'en-cola';
+  otro.estado = 'en-cola';
+  const ids = [crypto.randomUUID(), crypto.randomUUID()];
+  try {
+    for (const x of [p, otro]) {
+      await db.putParte(x);
+      await db.putFoto({ id: crypto.randomUUID(), parteId: x.id, blob: await jpeg() });
+    }
+    await db.putSalida({ id: ids[0], parteId: p.id, creado: '2026-10-27T10:00:00+01:00', datos: {} });
+    await db.putSalida({ id: ids[1], parteId: otro.id, creado: '2026-10-27T10:00:00+01:00', datos: {} });
+    await descartarDelMovil(p.id);
+    igual(await db.getParte(p.id), undefined, 'el parte descartado');
+    igual((await db.fotosDeParte(p.id)).length, 0, 'sus fotos');
+    igual((await db.listarSalida()).map((x) => x.id).filter((id) => ids.includes(id)), [ids[1]], 'la cola solo guarda el otro');
+    cierto(await db.getParte(otro.id), 'el otro parte sigue');
+    igual((await db.fotosDeParte(otro.id)).length, 1, 'las fotos del otro siguen');
+  } finally {
+    await descartarDelMovil(otro.id);
+  }
+});
 
 // sw.js no puede importar js/salida.js (script clásico): repite su lógica. Esta prueba carga el
 // sw.js real y le hace lo mismo que a la app; si alguien cambia una cola y no la otra, falla.

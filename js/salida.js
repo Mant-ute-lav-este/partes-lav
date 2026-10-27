@@ -47,3 +47,13 @@ async function procesar() {
   }
   return { enviados, pendientes: (await db.listarSalida()).length };
 }
+
+/**
+ * Quita del móvil un parte cerrado o en cola que no se va a enviar: su entrada en la cola, sus
+ * fotos y el parte. Las dos colas (esta y la de sw.js) ya aguantan que el parte no esté.
+ */
+export async function descartarDelMovil(parteId) {
+  for (const x of await db.listarSalida()) if (x.parteId === parteId) await db.borrarSalida(x.id);
+  for (const f of await db.fotosDeParte(parteId)) await db.borrarFoto(f.id);
+  await db.borrarParte(parteId);
+}

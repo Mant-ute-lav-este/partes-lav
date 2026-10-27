@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.20.2 · 2026-10-27
+- **Descartar un parte sin enviar**: en un parte cerrado o en cola, abajo, «¿No hay que enviarlo?» → «Descartar este parte». Pide confirmación y quita del móvil el parte, sus fotos y su envío pendiente: no llega a la oficina. Si justo había llegado (el envío en segundo plano), no lo descarta y lo dice. Los enviados no se pueden descartar. Antes, un parte cerrado de prueba o repetido se quedaba para siempre en «Pendientes de enviar» y no dejaba cerrar sesión.
+
 ## 0.20.1 · 2026-10-27
 - Guía rápida de capataces al día: «Jornada sin trabajos» (también en maquinaria) y Menú → Aspecto (tema y letra). La letra de la guía baja a 10 pt para que siga cabiendo en una página.
 

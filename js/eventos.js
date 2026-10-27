@@ -25,7 +25,7 @@ import {
   filasAparato, aplicarAparatos,
 } from './vista-trabajo.js';
 import {
-  enviarServidor, procesarYMostrar, enviarPorGmail, enviar, corregir, prepararEnvioActual,
+  enviarServidor, procesarYMostrar, enviarPorGmail, enviar, corregir, prepararEnvioActual, descartarParte,
 } from './vista-envio.js';
 
 export function aplicarBind(el) {
@@ -390,6 +390,7 @@ export async function onClick(e) {
     }
     case 'reintentar-salida': registrarSync(); await procesarYMostrar(p.id); break;
     case 'enviar-gmail': enviarPorGmail(); break;
+    case 'descartar-parte': descartarParte(); break;
     case 'menu':
       estado.menu = true;
       render();

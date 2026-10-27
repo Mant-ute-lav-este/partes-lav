@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { prepararEnvio, compartir } from './envio.js';
 import { generarPDF } from './pdf.js';
 import { quitarFotosQueFaltan, colaAtascada, HORAS_EMERGENCIA } from './modelo.js';
-import { procesarSalida } from './salida.js';
+import { procesarSalida, descartarDelMovil } from './salida.js';
 import { esc, uuid, isoLocal, fmtFecha, fmtFechaHora, toast, blobABase64, FORMATO1 } from './util.js';
 import { estado, ir, render, guardarYa, registrarSync } from './estado.js';
 import { cabeceraParte, refParte } from './campos.js';
@@ -77,7 +77,31 @@ export function vEnvioServidor() {
       ${p.estado !== 'enviado' && !colaAtascada(p) ? `<button class="btn enlace" data-action="enviar-gmail" ${e.listo ? '' : 'disabled'}>¿No funciona el envío? Mandarlo por Gmail</button>` : ''}
     </section>
     ${seccionCorregir()}
+    ${p.estado !== 'enviado' ? seccionDescartar() : ''}
   </main>`;
+}
+
+/** Para partes cerrados o en cola que no deben llegar a la oficina (pruebas, repetidos). */
+export function seccionDescartar() {
+  return `
+    <section class="tarjeta">
+      <h2>¿No hay que enviarlo?</h2>
+      <p class="nota">Si es una prueba o está repetido, puedes quitarlo de este móvil. No llegará a la oficina.</p>
+      <button class="btn peligro-texto" data-action="descartar-parte">Descartar este parte</button>
+    </section>`;
+}
+
+export async function descartarParte() {
+  const p = estado.parte;
+  if (!p || p.estado === 'enviado') return;
+  if (!confirm(`¿Descartar el parte ${p.ref}${p.rev > 1 ? ` rev. ${p.rev}` : ''} y sus fotos? No se enviará a la oficina y no se puede deshacer.`)) return;
+  // Puede haber llegado mientras tanto (el service worker envía en segundo plano).
+  const guardado = await db.getParte(p.id);
+  if (guardado && guardado.estado === 'enviado') { estado.parte = guardado; render(); toast('Ya había llegado a la oficina: no se descarta.', 5000); return; }
+  await descartarDelMovil(p.id);
+  estado.parte = null;
+  ir('inicio');
+  toast('Parte descartado', 3000);
 }
 
 export async function enviarServidor() {
@@ -153,6 +177,7 @@ export function vEnvioGmail() {
       <button class="btn secundario" data-action="ver-pdf" ${e.listo ? '' : 'disabled'}>Ver el PDF</button>
     </section>`}
     ${seccionCorregir()}
+    ${enviado ? '' : seccionDescartar()}
   </main>`;
 }
 
