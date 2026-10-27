@@ -22,7 +22,7 @@ export function estadoTexto(p) {
   if (p.estado === 'borrador') return 'Borrador';
   if (p.estado === 'cerrado') return 'Pendiente de enviar';
   if (p.estado === 'en-cola') return p.errorEnvio ? 'No se ha podido enviar: ábrelo' : 'En cola: se enviará solo';
-  return p.recibido ? `Recibido en la oficina ${fmtFechaHora(p.recibido)}` : `Enviado ${fmtFechaHora(ultimoEnvio(p))}`;
+  return p.recibido ? `Recibido en la oficina ${fmtFechaHora(p.recibido)}` : `Enviado${p.porGmail ? ' por Gmail' : ''} ${fmtFechaHora(ultimoEnvio(p))}`;
 }
 
 /** «3 trabajo(s)», «2 tajo(s)»… según el tipo de parte. */

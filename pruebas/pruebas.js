@@ -643,6 +643,17 @@ prueba('fotos antiguas: qué partes caducan y qué se quita al rectificar', () =
   cierto(val.validar(p).length > 0, 'el parte rectificado sin fotos pide fotos nuevas');
 });
 
+prueba('emergencia: «Enviar por Gmail» solo tras más de 12 h en la cola', () => {
+  const ahora = new Date('2026-11-30T12:00:00+01:00');
+  const enCola = (fecha, extra = {}) => ({ ...ej.parteInfra(), estado: 'en-cola', enCola: fecha, ...extra });
+  cierto(modelo.colaAtascada(enCola('2026-11-29T23:59:00+01:00'), ahora), '12 h y 1 min');
+  cierto(!modelo.colaAtascada(enCola('2026-11-30T00:01:00+01:00'), ahora), '11 h y 59 min');
+  cierto(!modelo.colaAtascada(enCola('2026-11-01T10:00:00+01:00', { estado: 'enviado' }), ahora), 'ya enviado: no');
+  cierto(!modelo.colaAtascada(enCola('2026-11-01T10:00:00+01:00', { estado: 'cerrado' }), ahora), 'cerrado: no');
+  cierto(!modelo.colaAtascada(enCola(undefined), ahora), 'en cola desde antes de la 0.19 (sin fecha): no');
+  cierto(!modelo.colaAtascada(enCola('fecha rara'), ahora), 'fecha que no se entiende: no');
+});
+
 prueba('fotos antiguas: solo se borran las de partes enviados hace más de 30 días', async () => {
   const ahora = new Date('2026-11-30T12:00:00+01:00');
   const viejo = '2026-10-01T10:00:00+02:00';

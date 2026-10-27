@@ -233,6 +233,16 @@ export function fotosCaducadas(p, ahora = new Date(), dias = DIAS_FOTOS) {
   return Number.isFinite(t) && ahora.getTime() - t > dias * 86400000;
 }
 
+/** Horas en la cola sin llegar a la oficina antes de ofrecer «Enviar por Gmail (emergencia)». */
+export const HORAS_EMERGENCIA = 12;
+
+/** ¿El parte lleva más de HORAS_EMERGENCIA en la cola? `p.enCola` es la fecha (ISO) en que entró. */
+export function colaAtascada(p, ahora = new Date(), horas = HORAS_EMERGENCIA) {
+  if (!p || p.estado !== 'en-cola') return false;
+  const t = Date.parse(p.enCola || '');
+  return Number.isFinite(t) && ahora.getTime() - t > horas * 3600000;
+}
+
 /** Al rectificar: quita las fotos que ya no están en el móvil, para que la app pida fotos nuevas. */
 export function quitarFotosQueFaltan(p, existe) {
   let quitadas = 0;

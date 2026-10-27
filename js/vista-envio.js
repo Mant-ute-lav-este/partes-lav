@@ -4,7 +4,7 @@
 import * as db from './db.js';
 import { prepararEnvio, compartir } from './envio.js';
 import { generarPDF } from './pdf.js';
-import { quitarFotosQueFaltan } from './modelo.js';
+import { quitarFotosQueFaltan, colaAtascada, HORAS_EMERGENCIA } from './modelo.js';
 import { procesarSalida } from './salida.js';
 import { esc, uuid, isoLocal, fmtFecha, fmtFechaHora, toast, blobABase64, FORMATO1 } from './util.js';
 import { estado, ir, render, guardarYa, registrarSync } from './estado.js';
@@ -43,17 +43,21 @@ export function vEnvioServidor() {
   if (p.estado === 'enviado') {
     tarjeta = `
     <section class="tarjeta ok">
-      <h2>Recibido en la oficina ✓</h2>
+      <h2>${p.porGmail ? 'Enviado por Gmail ✓' : 'Recibido en la oficina ✓'}</h2>
       <p><strong>${fmtFechaHora(p.recibido || ultimoEnvio(p))}</strong></p>
+      ${p.porGmail ? '<p class="nota">Comprueba en Gmail (Enviados) que ha salido.</p>' : ''}
       ${resumenEnvio(p)}
     </section>`;
   } else if (p.estado === 'en-cola') {
+    const atascado = colaAtascada(p);
     tarjeta = `
     <section class="tarjeta pendiente">
       <h2>${p.errorEnvio ? 'No se ha podido enviar' : 'Enviando…'}</h2>
       <p>${p.errorEnvio ? esc(p.errorEnvio) : 'Si no hay cobertura, se enviará solo en cuanto vuelva, aunque cierres la app.'}</p>
       ${resumenEnvio(p)}
       <button class="btn primario" data-action="reintentar-salida">Intentarlo ahora</button>
+      ${atascado ? `<p class="error">Lleva más de ${HORAS_EMERGENCIA} horas sin llegar a la oficina.</p>
+      <button class="btn primario grande" data-action="enviar-gmail" ${e.listo ? '' : 'disabled'}>Enviar por Gmail (emergencia)</button>` : ''}
     </section>`;
   } else {
     tarjeta = `
@@ -70,7 +74,7 @@ export function vEnvioServidor() {
     ${tarjeta}
     <section class="tarjeta">
       <button class="btn secundario" data-action="ver-pdf" ${e.listo ? '' : 'disabled'}>Ver el PDF</button>
-      ${p.estado !== 'enviado' ? `<button class="btn enlace" data-action="enviar-gmail" ${e.listo ? '' : 'disabled'}>¿No funciona el envío? Mandarlo por Gmail</button>` : ''}
+      ${p.estado !== 'enviado' && !colaAtascada(p) ? `<button class="btn enlace" data-action="enviar-gmail" ${e.listo ? '' : 'disabled'}>¿No funciona el envío? Mandarlo por Gmail</button>` : ''}
     </section>
     ${seccionCorregir()}
   </main>`;
@@ -87,6 +91,7 @@ export async function enviarServidor() {
   }
   await db.putSalida({ id: uuid(), parteId: p.id, creado: isoLocal(), datos: { ref: p.ref, asunto: e.asunto, cuerpo: e.cuerpo, archivos } });
   p.estado = 'en-cola';
+  p.enCola = isoLocal();
   delete p.errorEnvio;
   await guardarYa();
   render();
@@ -110,6 +115,9 @@ export async function procesarYMostrar(parteId) {
 /** Envío alternativo con Gmail. Si estaba en la cola automática, lo quita para no mandarlo dos veces. */
 export async function enviarPorGmail() {
   const p = estado.parte;
+  // Puede haber llegado mientras tanto (el service worker envía en segundo plano).
+  const guardado = await db.getParte(p.id);
+  if (guardado && guardado.estado === 'enviado') { estado.parte = guardado; render(); toast('Ya ha llegado a la oficina ✓', 4000); return; }
   const cola = (await db.listarSalida()).filter((x) => x.parteId === p.id);
   if (cola.length && !confirm('Se quitará de la cola de envío automático y lo mandarás tú con Gmail. ¿Seguir?')) return;
   for (const x of cola) await db.borrarSalida(x.id);
@@ -179,6 +187,7 @@ export async function enviar() {
     if (modo === 'compartido') {
       p.envios = (p.envios || []).concat([isoLocal()]);
       p.estado = 'enviado';
+      p.porGmail = true;
       await guardarYa();
       render();
       toast('Listo. Comprueba que Gmail lo ha enviado.', 4000);
@@ -201,6 +210,8 @@ export async function corregir() {
   });
   delete nuevo.recibido;
   delete nuevo.errorEnvio;
+  delete nuevo.enCola;
+  delete nuevo.porGmail;
   // Las fotos que sigan en el móvil se copian; las borradas por antiguas se quitan del parte nuevo
   // y la app pedirá fotos nuevas al cerrarlo.
   const existe = new Set();
