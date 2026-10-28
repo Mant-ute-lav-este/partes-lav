@@ -51,7 +51,7 @@ export function parteSuper() {
   p.nocturna = true;
   p.usaMaquinaria = true;
   p.maquinas = [{ descripcion: 'Bateadora pequeña', otro: false }];
-  p.trabajos = [trabajo(1, { referencia: { tipo: 'INCIDENCIA', codigo: 'I-1', motivo: '' }, fotos: [foto('f5', 'antes'), foto('f6', 'despues')] })];
+  p.trabajos = [trabajo(1, { referencia: { tipo: 'INCIDENCIA', codigo: 'I-1', motivo: '' }, fotos: [foto('f5', 'antes'), foto('f6', 'despues'), foto('f8', 'telentrada'), foto('f9', 'telsalida')] })];
   p.formato1 = [{ ...foto('f7', 'formato'), etiqueta: 'FORMATO 1' }];
   return p;
 }

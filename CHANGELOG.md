@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.22.0 · 2026-10-28
+- **Foto del telefonema en SUPER.** En «Vía y horario», debajo de los números de telefonema, «Foto telefonema de entrada» y «Foto telefonema de salida» con 📷 Cámara (sin galería). Obligatorias si se ocupa la vía, también con «No se han podido hacer fotos»; no se piden con «No se ocupa la vía» ni «No realizado». INFRA no cambia.
+- Van en `t.fotos` con fase `telentrada` / `telsalida` y llegan como `T1_telentrada_1.jpg`, `T1_telsalida_1.jpg`. No salen en el anexo del PDF. Servidor y Power Automate sin cambios.
+- «Copiar … telefonema … del trabajo anterior» copia el número, no la foto.
+
 ## 0.21.1 · 2026-10-27
 - **Desvío / AD en el tajo de maquinaria con desplegable**, el mismo de los aparatos de SUPER: lista de la oficina agrupada por estación y «Aparatos de dilatación», «Otro (escribirlo)», varios por tajo con «+ Añadir otro desvío». Al elegirlos se rellenan los PK del tajo (con varios, del más bajo al más alto; se pueden cambiar). Sin lista de la oficina sigue la caja de texto.
 - El dato sigue en `desvio` (texto, varios separados por comas): Datos_, PDF y partes antiguos no cambian. Las filas de la pantalla (`filasDesvio`) no viajan en el Datos_.

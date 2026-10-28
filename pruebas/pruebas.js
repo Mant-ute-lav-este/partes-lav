@@ -111,6 +111,12 @@ prueba('varias vías: lista, validaciones, PDF y correo', async () => {
   igual(val.faltasTrabajo(s.trabajos[0]), [], 'trabajo con 2 vías');
   s.trabajos[0].via = '';
   igual(cortos(val.faltasTrabajo(s.trabajos[0])), ['vía'], 'sin vía falta');
+  // Foto del telefonema (solo SUPER): obligatoria al entrar en vía; no si no se ocupa la vía.
+  const st = ej.parteSuper().trabajos[0];
+  st.fotos = st.fotos.filter((f) => f.fase !== 'telsalida');
+  igual(cortos(val.faltasTrabajo(st, 'SUPER')), ['foto telefonema de salida'], 'SUPER sin foto del telefonema de salida');
+  igual(val.faltasTrabajo(st, 'INFRA'), [], 'INFRA no pide foto de telefonema');
+  igual(val.faltasTrabajo({ ...st, sinVia: true, horaInicio: '10:00', horaFin: '11:00' }, 'SUPER'), [], 'SUPER sin ocupar vía no la pide');
   const t = ej.parteMaqVia().tajos[0]; t.via = '1, 2';
   igual(val.faltasTajo(t), [], 'tajo con 2 vías');
   t.via = '';

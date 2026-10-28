@@ -132,7 +132,7 @@ export function resumenTrabajo(t, i) {
   const fin = t.noRealizado ? `<span class="mini">No realizado${t.motivoNoRealizado ? ` · ${esc(t.motivoNoRealizado)}` : ''}</span>`
     : t.finalizado === true ? 'Finalizado' : t.finalizado === false ? 'Sin finalizar' : '¿Finalizado?';
   const sinFotos = !t.noRealizado && t.sinFotos ? ` · <span class="mini">Sin fotos${t.motivoSinFotos ? `: ${esc(t.motivoSinFotos)}` : ''}</span>` : '';
-  const faltas = faltasTrabajo(t);
+  const faltas = faltasTrabajo(t, estado.parte.tipo);
   return `
   <button class="item item-trabajo ${faltas.length ? 'incompleto' : 'completo'}" data-action="editar-trabajo" data-i="${i}">
     <span class="num">${faltas.length ? i + 1 : '✓'}</span>

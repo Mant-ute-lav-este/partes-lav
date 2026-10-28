@@ -5,7 +5,7 @@
 const LADO_MAX = 1600;     // píxeles del lado largo
 const CALIDAD = 0.82;      // JPEG
 
-export const FASES = { antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS' };
+export const FASES = { antes: 'ANTES', durante: 'DURANTE', despues: 'DESPUÉS', telentrada: 'TELEFONEMA ENTRADA', telsalida: 'TELEFONEMA SALIDA' };
 
 /** Busca en un JPEG la fecha de la foto. Devuelve { fechaOriginal, fecha, offsetOriginal } o null. */
 export function leerExif(buf) {

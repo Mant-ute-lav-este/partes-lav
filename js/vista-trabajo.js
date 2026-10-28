@@ -210,6 +210,20 @@ export function campoAparato(t, b, ti = null) {
       </div>`;
 }
 
+/** Foto del telefonema de entrada o de salida (SUPER): solo cámara, obligatoria si se ocupa la vía. */
+function fotoTelefonema(t, fase, txt) {
+  const fs = t.fotos.filter((x) => x.fase === fase);
+  return `
+      <div class="fase">
+        <div class="fase-cab"><strong>Foto telefonema de ${txt}</strong> <span class="contador">${fs.length}</span>${t.noRealizado ? '' : '<span class="oblig">mín. 1</span>'}</div>
+        <div class="fila-botones">
+          <button class="btn secundario" data-action="foto" data-fase="${fase}" data-origen="camara">📷 Cámara</button>
+        </div>
+        ${fs.length ? `<div class="miniaturas">${fs.map((x) => `
+          <button class="mini-foto" data-action="ver-foto" data-id="${x.id}"><img data-foto-id="${x.id}" alt="Foto telefonema de ${txt}"></button>`).join('')}</div>` : ''}
+      </div>`;
+}
+
 export function vTrabajo() {
   const p = estado.parte;
   const i = estado.trabajoIdx;
@@ -257,6 +271,7 @@ export function vTrabajo() {
       ${t.sinVia ? '' : `
       <div class="dos">${campo('Telefonema de entrada nº', `${b}.telefonema.numero`, t.telefonema.numero, 'inputmode="numeric" autocomplete="off"')}
         ${campo('Telefonema de salida nº', `${b}.telefonema.salida`, t.telefonema.salida, 'inputmode="numeric" autocomplete="off"')}</div>
+      ${p.tipo === 'SUPER' ? `<div class="dos">${fotoTelefonema(t, 'telentrada', 'entrada')}${fotoTelefonema(t, 'telsalida', 'salida')}</div>` : ''}
       <div class="dos">${campoHora('Entrada en vía', `${b}.entradaVia`, t.entradaVia)}
         ${campoHora('Salida de vía', `${b}.salidaVia`, t.salidaVia)}</div>`}
       <div class="campo"><span>Línea</span>
@@ -328,7 +343,7 @@ export function vTrabajo() {
 
 /** Al pulsar «Listo» en el último trabajo: ¿hay otro trabajo en la jornada? */
 export function vPreguntaOtro(t) {
-  const faltas = faltasTrabajo(t);
+  const faltas = faltasTrabajo(t, estado.parte.tipo);
   return `
   <div class="capa" data-action="cerrar-pregunta"><div class="hoja" data-stop>
     <h2>¿Has hecho otro trabajo en esta jornada?</h2>

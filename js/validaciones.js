@@ -133,7 +133,7 @@ export function extrasDelParte(p) {
  * basta con una de durante o de después. Un trabajo no realizado, o sin fotos posibles, pide el
  * motivo en vez de las fotos (y el no realizado, tampoco horas, vía ni PK).
  */
-export function faltasTrabajo(t) {
+export function faltasTrabajo(t, tipo) {
   const e = [];
   const add = (corto, largo) => e.push({ corto, largo });
   const vacio = (s) => !String(s == null ? '' : s).trim();
@@ -157,6 +157,12 @@ export function faltasTrabajo(t) {
   if (t.finalizado == null) add('¿finalizado?', 'indica si está finalizado (Sí o No).');
   if (t.motivoOtro && vacio(t.motivoActuacion)) add('motivo', 'has elegido «Otro» motivo de actuación: escríbelo.');
   else if (vacio(t.motivoActuacion)) add('motivo', 'elige el motivo de actuación.');
+  // SUPER entrando en vía: foto del telefonema de entrada y del de salida (aunque «no se han podido hacer fotos»).
+  if (tipo === 'SUPER' && !t.noRealizado && !t.sinVia) {
+    const tel = (fase) => (t.fotos || []).some((f) => f.fase === fase);
+    if (!tel('telentrada')) add('foto telefonema de entrada', 'falta la foto del telefonema de ENTRADA.');
+    if (!tel('telsalida')) add('foto telefonema de salida', 'falta la foto del telefonema de SALIDA.');
+  }
   // Sin realizar o sin fotos posibles: en vez de las fotos se pide el motivo.
   if (t.noRealizado) {
     if (vacio(t.motivoNoRealizado)) {
@@ -202,7 +208,7 @@ export function validar(p) {
   }
   if (!p.trabajos.length) add('Añade al menos un trabajo.');
   p.trabajos.forEach((t, i) => {
-    for (const f of faltasTrabajo(t)) add(`Trabajo ${i + 1}: ${f.largo}`, i);
+    for (const f of faltasTrabajo(t, p.tipo)) add(`Trabajo ${i + 1}: ${f.largo}`, i);
   });
   if (p.usaExtras) {
     const hs = extrasDelParte(p);
