@@ -70,6 +70,31 @@ h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4.
 .pc-url .paste::after{top:-5px;box-shadow:-1px -1px 0 rgba(0,0,0,.06)}
 .paste small{font-size:.85em;opacity:.6}
 
+/* Esta misma guía, dibujada dentro del aparato */
+.gp{position:relative;height:100%;overflow:hidden;background:#F2F4F8;color:#0F1A2E}
+.gp-hero{padding:16px 14px 14px;border-bottom:2.5px solid #E2661B;color:#fff;background:repeating-linear-gradient(90deg,transparent 0 30px,rgba(226,102,27,.12) 30px 37px),linear-gradient(160deg,#14213D,#1C2F57)}
+.gp-brand{display:flex;align-items:center;gap:10px}
+.gp-brand .pl{flex:none;width:36px;height:36px;border-radius:9px}
+.gp-brand small{display:block;font-size:8px;font-weight:700;letter-spacing:.12em;color:#F6A672}
+.gp-brand b{display:block;font-family:var(--f-display);font-size:19px;line-height:1.02}
+.gp-box{margin-top:12px;padding:9px;border:1px solid rgba(246,166,114,.55);border-radius:10px;background:rgba(226,102,27,.14)}
+.gp-l{display:flex;align-items:center;gap:6px;margin-bottom:7px;font-family:var(--f-display);font-size:14px;font-weight:700}
+.gp-l em{display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#E2661B;font-family:var(--f-body);font-size:9.5px;font-style:normal}
+.gp-row{display:flex;align-items:center;gap:8px;padding:5px 5px 5px 9px;border-radius:8px;background:rgba(10,16,32,.45)}
+.gp-row code{flex:1;min-width:0;font-family:ui-monospace,Consolas,monospace;font-size:10px;line-height:1.3;color:#fff;overflow-wrap:anywhere}
+.gp-copy{flex:none;padding:8px 11px;border-radius:7px;background:#E2661B;color:#fff;font-size:11.5px;font-weight:700;transition:background .25s}
+.gp-copy.ok{background:#1E8E3E}
+.gp-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:12px}
+.gp-tabs span{padding:7px 9px;border:1px solid #D3DAE4;border-radius:9px;background:#fff;font-size:9.5px;color:#56627A}
+.gp-tabs b{display:block;font-family:var(--f-display);font-size:14px;color:#0F1A2E}
+.gp-dev{height:200px;margin:0 12px;border:1px solid #D3DAE4;border-radius:12px;background:radial-gradient(120% 90% at 50% 0%,#fff,#E8ECF2)}
+.pcw .gp-hero{display:grid;grid-template-columns:1fr 290px;gap:24px;align-items:center;padding:18px 34px}
+.pcw .gp-box{margin:0}
+.pcw .gp-tabs{grid-template-columns:repeat(4,1fr);padding:12px 34px}
+.pcw .gp-dev{height:140px;margin:0 34px}
+.ctoast{position:absolute;z-index:4;left:50%;bottom:44px;padding:9px 16px;border-radius:999px;background:#3A3431;color:#EDE6E2;font-size:12px;white-space:nowrap;transform:translateX(-50%);opacity:0;transition:opacity .3s}
+.ctoast.show{opacity:1}
+
 /* ---------- Pestañas ---------- */
 main.wrap{padding-block:20px 56px}
 .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:18px}
@@ -552,6 +577,12 @@ const keys=r=>[...r].map(k=>`<span>${k}</span>`).join('');
 const kb=(t,enter,hit)=>`<div class="kb ${t}"><div class="kr">${keys(KB[0])}</div><div class="kr">${keys(KB[1])}</div><div class="kr"><span class="w">⇧</span>${keys(KB[2])}<span class="w">⌫</span></div><div class="kr"><span class="w">123</span><span class="sp">espacio</span><span class="w go${hit?' hit':''}">${enter}</span></div></div>`;
 const welcome=(wide)=>`<div class="ap${wide?' wide':''}"><div class="ap-h">Partes LAV</div><div class="ap-c"><div class="card"><h3>Bienvenido</h3><p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p><div class="abtn">Registrarme</div><div class="abtn sec">Ya tengo cuenta</div></div></div></div>`;
 
+/* Esta misma guía, con el botón Copiar que se pulsa en la animación */
+const guidePage=()=>`<div class="gp"><div class="gp-hero"><div class="gp-brand"><i class="pl"></i><div><small>PARTES LAV · UTE LAV ESTE</small><b>Instala la app y regístrate</b></div></div>
+  <div class="gp-box"><span class="gp-l"><em>1</em>Primero, copia la dirección</span><div class="gp-row"><code>${URL_APP}</code><span class="gp-copy hit" data-copy="1">Copiar</span></div></div></div>
+  <div class="gp-tabs"><span>Instalar en<b>iPhone</b></span><span>Instalar en<b>Android</b></span><span>Instalar en<b>Ordenador</b></span><span>Después<b>Registrarse</b></span></div><div class="gp-dev"></div></div>`;
+const GUIDE_URL=HOST+'/partes-lav/guia/instalar.html';
+
 /* ---------- iPhone ---------- */
 const iosHome=(app,hitS)=>`<div class="home ios-home">${sbI('light')}<div class="apps">
   ${ic('Calendario',{bg:'#fff',g:G.cal})}${ic('Fotos',{bg:'#fff',g:G.photos})}${ic('Cámara',{bg:'linear-gradient(#A5A5AB,#6E6E75)',g:G.camera})}${ic('Correo',{bg:'linear-gradient(#45A6FF,#1C6EF2)',g:G.mail})}
@@ -563,7 +594,7 @@ const iosHome=(app,hitS)=>`<div class="home ios-home">${sbI('light')}<div class=
 const safari=st=>st==='typing'
   ? `<div class="saf">${sbI()}<div class="saf-page fav"><h5>Favoritos</h5><div class="favs"><div><b>I</b>Intranet</div><div><b>C</b>Correo</div><div><b>T</b>Tiempo</div><div><b>N</b>Noticias</div></div><h5>Visitados con frecuencia</h5><div class="favs"><div><b>G</b>Google</div><div><b>Y</b>YouTube</div></div></div>
      <div class="saf-type"><span class="paste">Pegar</span><div class="saf-field">${SV.search}<span data-type="${URL_APP}" data-paste="1"></span><span class="caret"></span><span class="clr">✕</span></div><span class="cancel">Cancelar</span></div>${kb('ios','ir',true)}${hb()}</div>`
-  : `<div class="saf">${sbI()}<div class="saf-page">${welcome()}</div>
+  : `<div class="saf">${sbI()}<div class="saf-page">${st==='guide'?guidePage():welcome()}</div>
      <div class="saf-bar"><div class="saf-url"><span class="aa">aA</span><span class="host">${SV.lock}${HOST}</span>${SV.reload}</div>
      <div class="saf-tools"><span>${SV.back}</span><span class="off">${SV.fwd}</span><span class="${st==='loaded'?'hit':''}">${SV.share}</span><span>${SV.book}</span><span>${SV.tabs}</span></div></div>${hb()}</div>`;
 
@@ -593,6 +624,7 @@ const crBar=(st)=>`<div class="cr-bar"><span class="cr-ic">${SV.home}</span>${st
     : `<div class="cr-url">${SV.tune}<span class="u">${URL_APP}</span></div><span class="cr-ic">${SV.plus}</span><span class="cr-tabs">1</span><span class="cr-ic${st==='loaded'?' hit':''}">${SV.dots}</span>`}</div>`;
 const mi=(t,i,hit)=>`<div class="mi${hit?' hit':''}">${i}${t}</div>`;
 const chromeA=st=>{
+  if(st==='guide') return `<div class="cr">${sbA('dk')}<div class="cr-bar"><span class="cr-ic">${SV.home}</span><div class="cr-url">${SV.tune}<span class="u">${GUIDE_URL}</span></div><span class="cr-ic">${SV.plus}</span><span class="cr-tabs">1</span><span class="cr-ic">${SV.dots}</span></div><div class="cr-page">${guidePage()}</div><div class="ctoast">Copiado en el portapapeles</div>${hb()}</div>`;
   if(st==='typing') return `<div class="cr">${sbA('dk')}${crBar(st)}<div class="cr-sugg"><div class="sg">${SV.globe}<div>${URL_APP}<small>Ir a la dirección</small></div></div><div class="sg">${SV.search}<div>mant-ute-lav-este</div></div></div>${kb('gb',SV.arrowR,true)}${hb(1)}</div>`;
   return `<div class="cr">${sbA('dk')}${crBar(st)}<div class="cr-page">${welcome()}
   ${st==='menu'?`<div class="menu"><div class="m-top">${SV.fwd}${SV.starF}${SV.down}${SV.info}${SV.reload}</div>
@@ -612,6 +644,9 @@ const pcWin=st=>{
   if(st==='app') return `<div class="desk"><div class="shortcut hit"><i class="pl"></i>Partes LAV</div>
     <div class="appwin"><div class="tb"><i class="pl"></i>Partes LAV${WC}</div>${welcome(true)}</div>
     <div class="taskbar"><span class="win"></span><span></span><span></span><i class="pl"></i></div></div>`;
+  if(st==='guide') return `<div class="pcw"><div class="pc-tabs"><div class="pc-tab"><i class="pl"></i>Instalar Partes LAV<span class="x">✕</span></div><span class="pc-plus">+</span>${WC}</div>
+    <div class="pc-bar">${SV.back}${SV.fwd}${SV.reload}<div class="pc-url">${SV.tune}<span class="u">${GUIDE_URL}</span>${SV.star}</div>${SV.dots}</div>
+    <div class="pc-page">${guidePage()}</div></div>`;
   const typing=st==='typing';
   return `<div class="pcw"><div class="pc-tabs"><div class="pc-tab">${typing?'Nueva pestaña':'<i class="pl"></i>Partes LAV'}<span class="x">✕</span></div><span class="pc-plus">+</span>${WC}</div>
     <div class="pc-bar">${SV.back}${SV.fwd}${SV.reload}
@@ -633,23 +668,26 @@ const inicio=()=>`<div class="ap">${sbA('navy')}<div class="ap-h"><div>Partes LA
 const C=`<code>${URL_APP}</code>`;
 const GUIDES={
   iphone:{n:2,pre:'Instalar en',label:'iPhone',device:'phone',os:'ios',steps:[
-    {t:'Abre Safari',d:'Es la brújula azul. En iPhone tiene que ser Safari, no Chrome.',s:()=>iosHome(false,true)},
-    {t:'Pega la dirección',d:`Toca la barra de abajo, deja el dedo pulsado y elige <b>Pegar</b>: se pone la dirección que copiaste arriba. Luego pulsa «ir». También puedes escribirla: ${C}`,s:()=>safari('typing'),dur:DUR_TYPE},
+    {t:'Copia la dirección',d:'En esta misma página, arriba del todo, pulsa el botón naranja <b>Copiar</b>. Se pone verde: la dirección ya está guardada para pegarla.',s:()=>safari('guide'),dur:DUR_TYPE},
+    {t:'Abre Safari',d:'Sal a la pantalla de inicio y abre Safari, la brújula azul. En iPhone tiene que ser Safari, no Chrome.',s:()=>iosHome(false,true)},
+    {t:'Pega la dirección',d:`Toca la barra de abajo, deja el dedo pulsado y elige <b>Pegar</b>: se pone la dirección que acabas de copiar. Luego pulsa «ir». También puedes escribirla: ${C}`,s:()=>safari('typing'),dur:DUR_TYPE},
     {t:'Pulsa Compartir',d:'Es el cuadrado con la flecha hacia arriba, en el centro de la barra de abajo. Si no lo ves, toca los tres puntos (···) y después «Compartir».',s:()=>safari('loaded')},
     {t:'Añadir a pantalla de inicio',d:'Baja por la lista hasta ver <b>Añadir a pantalla de inicio</b> (el cuadrado con un +) y tócalo.',s:iosShare},
     {t:'Revisa el nombre y pulsa Añadir',d:'Tiene que poner <b>Partes LAV</b>; si pone otra cosa, bórralo con la ✕ y escríbelo. Pulsa «Añadir», arriba a la derecha. Si ves «Abrir como app web», déjalo activado.',s:iosAdd,dur:6400},
     {t:'¡Instalada!',d:'El icono de Partes LAV ya está en tu pantalla de inicio. Ábrelo y sigue con <b>Registrarse</b>.',s:()=>iosHome(true,false)},
   ]},
   android:{n:2,pre:'Instalar en',label:'Android',device:'phone',os:'and',steps:[
-    {t:'Abre Chrome',d:'Toca el icono de Chrome, el círculo de colores.',s:()=>andHome(false,true)},
-    {t:'Pega la dirección',d:`Toca la barra de arriba, deja el dedo pulsado y elige <b>Pegar</b>: se pone la dirección que copiaste arriba. Luego pulsa la flecha del teclado. También puedes escribirla: ${C}`,s:()=>chromeA('typing'),dur:DUR_TYPE},
+    {t:'Copia la dirección',d:'En esta misma página, arriba del todo, pulsa el botón naranja <b>Copiar</b>. Se pone verde y el móvil avisa de que se ha copiado.',s:()=>chromeA('guide'),dur:DUR_TYPE},
+    {t:'Abre Chrome',d:'Sal a la pantalla de inicio y toca el icono de Chrome, el círculo de colores.',s:()=>andHome(false,true)},
+    {t:'Pega la dirección',d:`Toca la barra de arriba, deja el dedo pulsado y elige <b>Pegar</b>: se pone la dirección que acabas de copiar. Luego pulsa la flecha del teclado. También puedes escribirla: ${C}`,s:()=>chromeA('typing'),dur:DUR_TYPE},
     {t:'Abre el menú',d:'Toca los tres puntos ⋮, arriba a la derecha.',s:()=>chromeA('loaded')},
     {t:'Instalar y crear acceso directo',d:'Está al final del menú. En algunos móviles se llama «Instalar aplicación» o «Añadir a pantalla de inicio».',s:()=>chromeA('menu')},
     {t:'Pulsa Instalar',d:'Elige la primera opción, <b>Instalar</b>. No uses «Crear acceso directo»: así solo se abre como una web dentro de Chrome.',s:()=>chromeA('dialog')},
     {t:'¡Instalada!',d:'Partes LAV ya está en tu pantalla de inicio y entre tus aplicaciones. Ábrela y sigue con <b>Registrarse</b>.',s:()=>andHome(true,false,false)},
   ]},
   pc:{n:2,pre:'Instalar en',label:'Ordenador',device:'pc',os:'win',steps:[
-    {t:'Pega la dirección',d:`Abre Chrome o Edge, haz clic en la barra de arriba y pega la dirección que copiaste con <b>Ctrl+V</b>. Luego pulsa Intro. También puedes escribirla: ${C}`,s:()=>pcWin('typing'),dur:DUR_TYPE},
+    {t:'Copia la dirección',d:'En esta misma página, arriba del todo, haz clic en el botón naranja <b>Copiar</b>. Se pone verde: la dirección ya está guardada.',s:()=>pcWin('guide'),dur:DUR_TYPE},
+    {t:'Pega la dirección',d:`Abre una pestaña nueva en Chrome o Edge (Ctrl+T), haz clic en la barra de arriba y pega con <b>Ctrl+V</b>. Luego pulsa Intro. También puedes escribirla: ${C}`,s:()=>pcWin('typing'),dur:DUR_TYPE},
     {t:'Pulsa el icono de instalar',d:'Es la pantallita con una flecha, a la derecha de la barra de direcciones. Si no sale, mira «Si algo no sale», más abajo.',s:()=>pcWin('loaded')},
     {t:'Pulsa Instalar',d:'Confírmalo en la ventanita que aparece.',s:()=>pcWin('dialog')},
     {t:'¡Instalada!',d:'La app se abre en su propia ventana y deja un acceso directo en el escritorio y en el menú Inicio. Sigue con <b>Registrarse</b>.',s:()=>pcWin('app')},
@@ -722,6 +760,16 @@ function placeTap(target){
 }
 
 async function typeAll(tok){
+  const cp=screen.querySelector('[data-copy]');
+  if(cp){
+    const copied=()=>{cp.classList.add('ok');cp.textContent='¡Copiada!';const t=screen.querySelector('.ctoast');if(t)t.classList.add('show');};
+    if(reduce){copied();return;}
+    await sleep(800); if(tok!==typeTok) return;
+    placeTap(cp);
+    await sleep(1500); if(tok!==typeTok) return;
+    copied();
+    return;
+  }
   const els=[...screen.querySelectorAll('[data-type]')];
   if(!els.length){ if(!reduce) await sleep(450); return; }
   for(const el of els){
@@ -767,7 +815,7 @@ function render(){
   nextGuide.hidden=!(last&&dev!=='registro');
   setPlaying(playing);
   clearTimeout(tapTimer);
-  if(screen.querySelector('[data-type]')) tap.hidden=true;
+  if(screen.querySelector('[data-type],[data-copy]')) tap.hidden=true;
   const tok=++typeTok;
   typeAll(tok).then(()=>{ if(tok===typeTok) placeTap(); });
 }
