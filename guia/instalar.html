@@ -48,11 +48,27 @@ code{font-family:var(--f-mono);font-size:.88em;overflow-wrap:anywhere}
 h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4.4vw,44px);line-height:1;text-wrap:balance}
 .lede{grid-column:1;margin:0;max-width:56ch;color:rgba(255,255,255,.8);font-size:16px}
 .urlbox{grid-column:2;grid-row:1/span 2;display:flex;flex-direction:column;gap:6px;padding:12px 12px 12px 16px;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(255,255,255,.07);min-width:0}
-.urlbox .lbl{font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.62)}
-.url-row{display:flex;align-items:center;gap:10px;min-width:0}
+.urlbox{border-color:rgba(246,166,114,.55);background:rgba(226,102,27,.12)}
+.urlbox .lbl{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-size:17px;font-weight:700;letter-spacing:.02em;color:#fff}
+.lbl-n{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;background:#E2661B;color:#fff;font-family:var(--f-body);font-size:12px}
+.url-row{display:flex;align-items:center;gap:10px;min-width:0;padding:6px 6px 6px 12px;border-radius:10px;background:rgba(10,16,32,.45)}
 .url-row code{flex:1;min-width:0;font-size:14px;color:#fff}
-.copy{flex:none;min-height:34px;padding:0 14px;border:0;border-radius:9px;background:#fff;color:#14213D;font-weight:700;font-size:13.5px}
-.copy:hover{background:#FCE3D3}
+.copy{flex:none;display:flex;align-items:center;gap:6px;min-height:40px;padding:0 16px;border:0;border-radius:9px;background:#E2661B;color:#fff;font-weight:700;font-size:14.5px}
+.copy svg{width:17px;height:17px}
+.copy:hover{background:#C9560F}
+.copy.ok{background:#1E8E3E}
+.urlbox .hint{font-size:13px;color:rgba(255,255,255,.7)}
+.paste{position:absolute;z-index:5;padding:9px 16px;border-radius:10px;background:#2C2C2E;color:#fff;font-size:14px;box-shadow:0 6px 16px rgba(0,0,0,.3);animation:pop .3s ease .5s backwards}
+.paste::after{content:"";position:absolute;left:28px;width:12px;height:12px;background:inherit;transform:rotate(45deg)}
+.saf-type{position:relative}
+.saf-type .paste{left:14px;bottom:52px}
+.saf-type .paste::after{bottom:-5px}
+.cr-bar{position:relative}
+.cr-bar .paste{left:52px;top:50px;background:#F1EAE6;color:#1E1A19}
+.cr-bar .paste::after{top:-5px}
+.pc-url .paste{left:10px;top:40px;padding:7px 14px;border-radius:8px;background:#fff;color:#1F1F1F;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.pc-url .paste::after{top:-5px;box-shadow:-1px -1px 0 rgba(0,0,0,.06)}
+.paste small{font-size:.85em;opacity:.6}
 
 /* ---------- Pestañas ---------- */
 main.wrap{padding-block:20px 56px}
@@ -131,9 +147,10 @@ main.wrap{padding-block:20px 56px}
   .brand .pl{width:44px;height:44px;border-radius:11px}
   .eyebrow{font-size:12px}
   .lede{font-size:15px}
-  .urlbox{grid-column:1;grid-row:auto;padding:7px 7px 7px 12px;border-radius:12px}
-  .urlbox .lbl{display:none}
+  .urlbox{grid-column:1;grid-row:auto;gap:8px;padding:12px;border-radius:14px}
+  .urlbox .lbl{font-size:16px}
   .url-row code{font-size:13px}
+  .urlbox .hint{font-size:12.5px}
   main.wrap{padding-block:14px 48px}
   .tabs{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px}
   .tab{padding:8px 10px 9px 42px}
@@ -404,10 +421,11 @@ main.wrap{padding-block:20px 56px}
       <h1>Instala la app y regístrate</h1>
     </div>
   </div>
-  <p class="lede">Elige tu dispositivo y sigue la animación paso a paso. Primero se instala y después te registras. Ten a mano tu correo de Gmail.</p>
+  <p class="lede">Copia la dirección de la app, elige tu dispositivo y sigue la animación paso a paso. Primero se instala y después te registras. Ten a mano tu correo de Gmail.</p>
   <div class="urlbox">
-    <span class="lbl">Dirección de la app</span>
-    <div class="url-row"><code id="u">mant-ute-lav-este.github.io/partes-lav</code><button class="copy" id="copy" type="button">Copiar</button></div>
+    <span class="lbl"><span class="lbl-n">1</span>Primero, copia la dirección</span>
+    <div class="url-row"><code id="u">mant-ute-lav-este.github.io/partes-lav</code><button class="copy" id="copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="11.5" height="12.5" rx="2"/><path d="M15.5 8V5.5A1.5 1.5 0 0 0 14 4H6a1.5 1.5 0 0 0-1.5 1.5V15A1.5 1.5 0 0 0 6 16.5h2"/></svg><span id="copytxt">Copiar</span></button></div>
+    <span class="hint">Luego la pegarás en el navegador, como se ve en la animación.</span>
   </div>
 </div></header>
 
@@ -460,7 +478,7 @@ main.wrap{padding-block:20px 56px}
 <script>
 const URL_APP='mant-ute-lav-este.github.io/partes-lav';
 const HOST='mant-ute-lav-este.github.io';
-const DUR=5200, DUR_TYPE=6800;
+const DUR=5200, DUR_TYPE=7200;
 const DW={phone:300,pc:640};
 
 const svg=(p,f)=>`<svg viewBox="0 0 24 24"${f?'':' fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"'}>${p}</svg>`;
@@ -544,7 +562,7 @@ const iosHome=(app,hitS)=>`<div class="home ios-home">${sbI('light')}<div class=
 
 const safari=st=>st==='typing'
   ? `<div class="saf">${sbI()}<div class="saf-page fav"><h5>Favoritos</h5><div class="favs"><div><b>I</b>Intranet</div><div><b>C</b>Correo</div><div><b>T</b>Tiempo</div><div><b>N</b>Noticias</div></div><h5>Visitados con frecuencia</h5><div class="favs"><div><b>G</b>Google</div><div><b>Y</b>YouTube</div></div></div>
-     <div class="saf-type"><div class="saf-field">${SV.search}<span data-type="${URL_APP}"></span><span class="caret"></span><span class="clr">✕</span></div><span class="cancel">Cancelar</span></div>${kb('ios','ir',true)}${hb()}</div>`
+     <div class="saf-type"><span class="paste">Pegar</span><div class="saf-field">${SV.search}<span data-type="${URL_APP}" data-paste="1"></span><span class="caret"></span><span class="clr">✕</span></div><span class="cancel">Cancelar</span></div>${kb('ios','ir',true)}${hb()}</div>`
   : `<div class="saf">${sbI()}<div class="saf-page">${welcome()}</div>
      <div class="saf-bar"><div class="saf-url"><span class="aa">aA</span><span class="host">${SV.lock}${HOST}</span>${SV.reload}</div>
      <div class="saf-tools"><span>${SV.back}</span><span class="off">${SV.fwd}</span><span class="${st==='loaded'?'hit':''}">${SV.share}</span><span>${SV.book}</span><span>${SV.tabs}</span></div></div>${hb()}</div>`;
@@ -571,7 +589,7 @@ const andHome=(app,hitC,hitA)=>`<div class="home and-home">${sbA('light')}<div c
   <div class="gsearch">${SV.search}<span>Buscar</span>${SV.mic}</div>${hb(1)}</div>`;
 
 const crBar=(st)=>`<div class="cr-bar"><span class="cr-ic">${SV.home}</span>${st==='typing'
-    ? `<div class="cr-url focus"><span data-type="${URL_APP}"></span><span class="caret w"></span></div><span class="cr-ic">✕</span>`
+    ? `<div class="cr-url focus"><span data-type="${URL_APP}" data-paste="1"></span><span class="caret w"></span></div><span class="cr-ic">✕</span><span class="paste">Pegar</span>`
     : `<div class="cr-url">${SV.tune}<span class="u">${URL_APP}</span></div><span class="cr-ic">${SV.plus}</span><span class="cr-tabs">1</span><span class="cr-ic${st==='loaded'?' hit':''}">${SV.dots}</span>`}</div>`;
 const mi=(t,i,hit)=>`<div class="mi${hit?' hit':''}">${i}${t}</div>`;
 const chromeA=st=>{
@@ -597,7 +615,7 @@ const pcWin=st=>{
   const typing=st==='typing';
   return `<div class="pcw"><div class="pc-tabs"><div class="pc-tab">${typing?'Nueva pestaña':'<i class="pl"></i>Partes LAV'}<span class="x">✕</span></div><span class="pc-plus">+</span>${WC}</div>
     <div class="pc-bar">${SV.back}${SV.fwd}${SV.reload}
-      <div class="pc-url${typing?' focus':''}">${typing?`<span class="u"><span data-type="${URL_APP}"></span><span class="caret g"></span></span>`:`${SV.tune}<span class="u">${URL_APP}</span><span class="pc-inst${st==='loaded'?' hit':''}">${SV.install}</span>${SV.star}`}</div>${SV.dots}</div>
+      <div class="pc-url${typing?' focus':''}">${typing?`<span class="u"><span data-type="${URL_APP}" data-paste="1"></span><span class="caret g"></span></span><span class="paste">Pegar &nbsp;<small>Ctrl+V</small></span>`:`${SV.tune}<span class="u">${URL_APP}</span><span class="pc-inst${st==='loaded'?' hit':''}">${SV.install}</span>${SV.star}`}</div>${SV.dots}</div>
     <div class="pc-page">${typing?'<div class="ntp"><div>Buscar o escribir una dirección web</div></div>':welcome(true)}
     ${typing?`<div class="omni"><div class="sg hit">${SV.globe}<div>${URL_APP}</div></div><div class="sg">${SV.search}<div>mant-ute-lav-este – Buscar</div></div></div>`:''}
     ${st==='dialog'?`<div class="pop"><h4>¿Instalar app?</h4><div class="who"><i class="pl"></i><div><b>Partes LAV</b><small>${HOST}</small></div></div><div class="acts"><span class="gbtn fill hit">Instalar</span><span class="gbtn">Cancelar</span></div></div>`:''}</div></div>`;
@@ -614,29 +632,29 @@ const inicio=()=>`<div class="ap">${sbA('navy')}<div class="ap-h"><div>Partes LA
 /* ---------- Guías ---------- */
 const C=`<code>${URL_APP}</code>`;
 const GUIDES={
-  iphone:{n:1,pre:'Instalar en',label:'iPhone',device:'phone',os:'ios',steps:[
+  iphone:{n:2,pre:'Instalar en',label:'iPhone',device:'phone',os:'ios',steps:[
     {t:'Abre Safari',d:'Es la brújula azul. En iPhone tiene que ser Safari, no Chrome.',s:()=>iosHome(false,true)},
-    {t:'Escribe la dirección',d:`Toca la barra de abajo, escribe ${C} y pulsa «ir».`,s:()=>safari('typing'),dur:DUR_TYPE},
+    {t:'Pega la dirección',d:`Toca la barra de abajo, deja el dedo pulsado y elige <b>Pegar</b>: se pone la dirección que copiaste arriba. Luego pulsa «ir». También puedes escribirla: ${C}`,s:()=>safari('typing'),dur:DUR_TYPE},
     {t:'Pulsa Compartir',d:'Es el cuadrado con la flecha hacia arriba, en el centro de la barra de abajo. Si no lo ves, toca los tres puntos (···) y después «Compartir».',s:()=>safari('loaded')},
     {t:'Añadir a pantalla de inicio',d:'Baja por la lista hasta ver <b>Añadir a pantalla de inicio</b> (el cuadrado con un +) y tócalo.',s:iosShare},
     {t:'Revisa el nombre y pulsa Añadir',d:'Tiene que poner <b>Partes LAV</b>; si pone otra cosa, bórralo con la ✕ y escríbelo. Pulsa «Añadir», arriba a la derecha. Si ves «Abrir como app web», déjalo activado.',s:iosAdd,dur:6400},
     {t:'¡Instalada!',d:'El icono de Partes LAV ya está en tu pantalla de inicio. Ábrelo y sigue con <b>Registrarse</b>.',s:()=>iosHome(true,false)},
   ]},
-  android:{n:1,pre:'Instalar en',label:'Android',device:'phone',os:'and',steps:[
+  android:{n:2,pre:'Instalar en',label:'Android',device:'phone',os:'and',steps:[
     {t:'Abre Chrome',d:'Toca el icono de Chrome, el círculo de colores.',s:()=>andHome(false,true)},
-    {t:'Escribe la dirección',d:`Toca la barra de arriba, escribe ${C} y pulsa la flecha del teclado.`,s:()=>chromeA('typing'),dur:DUR_TYPE},
+    {t:'Pega la dirección',d:`Toca la barra de arriba, deja el dedo pulsado y elige <b>Pegar</b>: se pone la dirección que copiaste arriba. Luego pulsa la flecha del teclado. También puedes escribirla: ${C}`,s:()=>chromeA('typing'),dur:DUR_TYPE},
     {t:'Abre el menú',d:'Toca los tres puntos ⋮, arriba a la derecha.',s:()=>chromeA('loaded')},
     {t:'Instalar y crear acceso directo',d:'Está al final del menú. En algunos móviles se llama «Instalar aplicación» o «Añadir a pantalla de inicio».',s:()=>chromeA('menu')},
     {t:'Pulsa Instalar',d:'Elige la primera opción, <b>Instalar</b>. No uses «Crear acceso directo»: así solo se abre como una web dentro de Chrome.',s:()=>chromeA('dialog')},
     {t:'¡Instalada!',d:'Partes LAV ya está en tu pantalla de inicio y entre tus aplicaciones. Ábrela y sigue con <b>Registrarse</b>.',s:()=>andHome(true,false,false)},
   ]},
-  pc:{n:1,pre:'Instalar en',label:'Ordenador',device:'pc',os:'win',steps:[
-    {t:'Escribe la dirección',d:`Abre Chrome o Edge, escribe ${C} en la barra de arriba y pulsa Intro.`,s:()=>pcWin('typing'),dur:DUR_TYPE},
+  pc:{n:2,pre:'Instalar en',label:'Ordenador',device:'pc',os:'win',steps:[
+    {t:'Pega la dirección',d:`Abre Chrome o Edge, haz clic en la barra de arriba y pega la dirección que copiaste con <b>Ctrl+V</b>. Luego pulsa Intro. También puedes escribirla: ${C}`,s:()=>pcWin('typing'),dur:DUR_TYPE},
     {t:'Pulsa el icono de instalar',d:'Es la pantallita con una flecha, a la derecha de la barra de direcciones. Si no sale, mira «Si algo no sale», más abajo.',s:()=>pcWin('loaded')},
     {t:'Pulsa Instalar',d:'Confírmalo en la ventanita que aparece.',s:()=>pcWin('dialog')},
     {t:'¡Instalada!',d:'La app se abre en su propia ventana y deja un acceso directo en el escritorio y en el menú Inicio. Sigue con <b>Registrarse</b>.',s:()=>pcWin('app')},
   ]},
-  registro:{n:2,pre:'Después',label:'Registrarse',device:'phone',os:'and',steps:[
+  registro:{n:3,pre:'Después',label:'Registrarse',device:'phone',os:'and',steps:[
     {t:'Abre la app',d:'Toca el icono de Partes LAV que acabas de instalar.',s:()=>andHome(true,false,true)},
     {t:'Pulsa Registrarme',d:'Solo se hace una vez. Si ya te registraste en otro móvil, pulsa «Ya tengo cuenta» y entra con tu Gmail y tu PIN.',
       s:()=>reg('Partes LAV',0,`<div class="card"><h3>Bienvenido</h3><p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p><div class="abtn hit">Registrarme</div><div class="abtn sec">Ya tengo cuenta</div></div>`)},
@@ -693,8 +711,8 @@ function setPlaying(p){
   playBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${ico}</svg>${ended?'Ver otra vez':p?'Pausa':'Seguir'}`;
 }
 
-function placeTap(){
-  const h=screen.querySelector('.hit');
+function placeTap(target){
+  const h=target||screen.querySelector('.hit');
   if(!h){tap.hidden=true;return;}
   const pc=GUIDES[dev].device==='pc',z=zoom.getBoundingClientRect(),k=z.width/DW[GUIDES[dev].device],r=h.getBoundingClientRect();
   const fx=pc?.5:(r.width>150*k?.76:.5),fy=pc?.55:.62;
@@ -707,9 +725,17 @@ async function typeAll(tok){
   const els=[...screen.querySelectorAll('[data-type]')];
   if(!els.length){ if(!reduce) await sleep(450); return; }
   for(const el of els){
-    const t=el.dataset.type;
-    if(reduce){el.textContent=t;continue;}
+    const t=el.dataset.type,bubble=el.dataset.paste&&screen.querySelector('.paste');
+    if(reduce){el.textContent=t;if(bubble)bubble.remove();continue;}
     el.textContent='';
+    if(bubble){
+      await sleep(900); if(tok!==typeTok) return;
+      placeTap(bubble);
+      await sleep(1600); if(tok!==typeTok) return;
+      bubble.remove(); el.textContent=t;
+      await sleep(300);
+      continue;
+    }
     await sleep(500);
     for(let i=1;i<=t.length;i++){
       if(tok!==typeTok) return;
@@ -760,9 +786,9 @@ addEventListener('resize',()=>{fit();placeTap();});
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{fit();placeTap();});
 
 $('copy').addEventListener('click',()=>{
-  const btn=$('copy'),txt='https://'+URL_APP+'/';
-  const done=()=>{btn.textContent='¡Copiada!';setTimeout(()=>btn.textContent='Copiar',1800);};
-  const fallback=()=>{const r=document.createRange();r.selectNodeContents($('u'));const s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Pulsa copiar';};
+  const btn=$('copy'),lbl=$('copytxt'),txt='https://'+URL_APP+'/';
+  const done=()=>{lbl.textContent='¡Copiada!';btn.classList.add('ok');setTimeout(()=>{lbl.textContent='Copiar';btn.classList.remove('ok');},2200);};
+  const fallback=()=>{const r=document.createRange();r.selectNodeContents($('u'));const s=getSelection();s.removeAllRanges();s.addRange(r);lbl.textContent='Mantén pulsado y copia';};
   try{navigator.clipboard.writeText(txt).then(done,fallback);}catch(e){fallback();}
 });
 
