@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#14213d">
 <link rel="icon" href="../icons/icon-192.png">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Instalar Partes LAV</title>
+<title>Guía de Partes LAV</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
@@ -434,6 +434,180 @@ main.wrap{padding-block:20px 56px}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
   .prog .on i{animation:none!important;width:0}
 }
+
+/* ====== Tutorial del parte: pantallas de la app (colores fijos de la app, claros) ====== */
+.hero-in.t2{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.hero-in.t2 .lede{grid-column:1}
+.back{grid-column:2;grid-row:1/span 2;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-weight:600;font-size:14.5px;text-decoration:none;white-space:nowrap}
+.back:hover{background:rgba(255,255,255,.16)}
+.tabs.t2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tab.infra .n{background:#C2410C;color:#fff}
+.tab.super .n{background:#1D4ED8;color:#fff}
+.tab[aria-selected="true"].infra{background:#C2410C;border-color:#C2410C;color:#fff}
+.tab[aria-selected="true"].super{background:#1D4ED8;border-color:#1D4ED8;color:#fff}
+.tab[aria-selected="true"] .n{background:rgba(255,255,255,.95);color:#14213D}
+.tab[aria-selected="true"] small{opacity:.85}
+.tag{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;background:var(--sunken);color:var(--muted);font-family:var(--f-body);font-size:12px;font-weight:600;letter-spacing:.02em;vertical-align:middle}
+.tag.only{background:#1D4ED8;color:#fff}
+.sb.infra{background:#C2410C;color:#fff}
+.sb.super{background:#1D4ED8;color:#fff}
+.sb.navy{background:#14213D;color:#fff}
+.sb.maq{background:#4D7C0F;color:#fff}
+
+.a-app{display:flex;flex-direction:column;height:100%;background:#EEF0F4;color:#10141C;font-size:12.5px;line-height:1.35;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.a-bar{display:flex;align-items:center;gap:8px;min-height:46px;padding:0 10px;color:#fff;font-weight:700;font-size:14px}
+.a-bar.infra{background:#C2410C}.a-bar.super{background:#1D4ED8}.a-bar.navy{background:#14213D}
+.a-back{flex:none;display:grid;place-items:center;min-height:32px;padding:0 9px;border-radius:8px;background:rgba(255,255,255,.16);font-size:12px;font-weight:600;white-space:nowrap}
+.a-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.a-title small{display:block;font-size:10.5px;font-weight:500;color:inherit;opacity:.85}
+.a-sv{flex:none;font-size:10px;font-weight:400;opacity:.9}
+.a-mdots{flex:none;font-size:20px;line-height:1;padding:0 4px}
+.a-body{position:relative;flex:1;min-height:0;overflow:hidden;padding:10px 10px 0}
+.a-body.pie{padding-bottom:0}
+.a-card{padding:12px;margin-bottom:10px;border:1px solid #C9CED8;border-radius:11px;background:#fff;box-shadow:0 1px 2px rgba(16,20,28,.08)}
+.a-card.ok{background:#E3F5E9}.a-card.pend{background:#FFF4D6}
+.a-card.cop{border:1.5px dashed #1F5FD1}
+.a-card h2{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 6px;font-size:14px}
+.a-card p{margin:0 0 6px}
+.a-oblig{font-size:8.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#B42318}
+.a-cnt{padding:0 8px;border:1px solid #C9CED8;border-radius:999px;background:#F6F7F9;font-size:11px;font-weight:400}
+.a-nota{margin:0 0 6px;font-size:11px;color:#5B6472}
+.a-nota b,.a-nota strong{color:#10141C}
+.a-lab{display:block;margin:9px 0 3px;font-size:11px;font-weight:600}
+.a-lab small{font-weight:400;color:#5B6472}
+.a-in{display:flex;align-items:center;min-height:38px;padding:0 10px;border:1.5px solid #C9CED8;border-radius:8px;background:#fff;font-size:12.5px;white-space:nowrap;overflow:hidden}
+.a-in.focus{border-color:#1F5FD1;box-shadow:0 0 0 3px rgba(31,95,209,.2)}
+.a-in.sel::after{content:"⌄";margin-left:auto;padding-left:8px;color:#5B6472}
+.a-in.hold{color:#7B8494}
+.a-in.fixed{background:#F6F7F9;font-weight:600}
+.a-in.ta{min-height:52px;align-items:flex-start;padding-top:8px;white-space:normal}
+.a-in .caret{height:13px;background:#1F5FD1}
+.a-seg{display:flex;gap:5px;margin-top:3px}
+.a-seg span{flex:1 1 0;display:flex;align-items:center;justify-content:center;min-height:38px;padding:3px 5px;border:1.5px solid #C9CED8;border-radius:8px;background:#fff;font-size:12px;font-weight:600;text-align:center}
+.a-seg span.on{border-color:#1F5FD1;background:#1F5FD1;color:#fff}
+.a-seg.sm span{font-size:12px}
+.a-chk{display:flex;align-items:center;gap:9px;min-height:32px;margin-top:8px}
+.a-chk i{flex:none;display:grid;place-items:center;width:19px;height:19px;border:1.5px solid #8A93A3;border-radius:5px;background:#fff;color:#fff;font-size:12px;font-style:normal;line-height:1}
+.a-chk.on i{border-color:#1F5FD1;background:#1F5FD1}
+.a-chk small{color:#5B6472;font-size:10.5px}
+.a-chk span{min-width:0}
+.a-btn{display:flex;align-items:center;justify-content:center;min-height:40px;margin-top:8px;padding:6px 10px;border:1.5px solid #C9CED8;border-radius:10px;background:#fff;font-size:12.5px;font-weight:600;text-align:center}
+.a-btn.sec{background:#F6F7F9}
+.a-btn.pri{border-color:#1F5FD1;background:#1F5FD1;color:#fff}
+.a-btn.big{min-height:46px;font-size:14px}
+.a-btn.add{min-height:46px;border:2px dashed #1F5FD1;background:transparent;color:#1F5FD1}
+.a-btn.link{border:0;background:none;color:#1F5FD1;text-decoration:underline}
+.a-btn.danger{border:0;background:none;color:#B42318}
+.a-btn.off{opacity:.5}
+.a-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.a-pk{display:flex;align-items:center;gap:5px}
+.a-pk .a-in{flex:1;min-width:0;justify-content:center}
+.a-pk b{font-size:15px}
+.a-pie{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;gap:8px;padding:8px 10px 24px;border-top:1px solid #C9CED8;background:#fff}
+.a-pie .a-btn{flex:1;margin:0}
+.a-aviso{margin-bottom:10px;padding:9px 11px;border-radius:10px;background:#FFF4D6;color:#6B4500;font-size:11.5px;font-weight:600}
+.a-aviso.fila{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.a-aviso.fila .a-btn{flex:none;width:auto;min-height:32px;margin:0;padding:4px 11px}
+.a-tipos{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:6px}
+.a-tipo{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:92px;border-radius:14px;color:#fff;font-size:11.5px;font-weight:600;box-shadow:0 1px 2px rgba(16,20,28,.12)}
+.a-tipo b{font-size:23px;font-weight:800;letter-spacing:.04em}
+.a-tipo.i{background:#C2410C}.a-tipo.s{background:#1D4ED8}
+.a-tipo.m{grid-column:1/-1;min-height:64px;background:#4D7C0F}.a-tipo.m b{font-size:17px}
+.a-grp{margin:12px 3px 6px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#5B6472}
+.a-item{display:flex;align-items:center;gap:9px;margin-bottom:8px;padding:9px 11px;border:1.5px solid #C9CED8;border-radius:10px;background:#fff;font-size:12px}
+.a-item.cerrado{border-color:#C2410C;background:#FFF4D6}
+.a-item.okb{border-color:#157A3A}
+.a-item .inf{flex:1;min-width:0}
+.a-item small{color:#5B6472;font-size:10.5px}
+.a-item .fl{font-size:18px;color:#5B6472}
+.a-eti{flex:none;padding:5px 6px;border-radius:6px;color:#fff;font-size:10px;font-weight:800}
+.a-eti.i{background:#C2410C}.a-eti.s{background:#1D4ED8}
+.a-num{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#157A3A;color:#fff;font-weight:700;font-size:13px}
+.a-listo{color:#157A3A;font-weight:600}
+.a-falta{color:#B42318;font-weight:600}
+.a-per{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #E1E4EA;font-size:12px}
+.a-per small{display:block;color:#5B6472;font-size:10.5px}
+.a-x{flex:none;display:grid;place-items:center;width:32px;height:32px;border:1.5px solid #C9CED8;border-radius:8px;background:#F6F7F9;color:#B42318;font-size:12px}
+.a-res{display:flex;flex-direction:column;margin-top:6px;padding:8px 10px;border:1.5px dashed #C9CED8;border-radius:9px;background:#F6F7F9;font-size:12px}
+.a-res small{color:#5B6472;font-size:10.5px}
+.a-fase{margin-top:9px;padding-top:9px;border-top:1px solid #E1E4EA}
+.a-fcab{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.a-fbtn{display:flex;gap:8px}
+.a-fbtn .a-btn{flex:1;margin:6px 0 0}
+.a-thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.a-th{position:relative;aspect-ratio:1;overflow:hidden;border:1.5px solid #C9CED8;border-radius:8px;background:linear-gradient(180deg,#9DB3C7 0 46%,#6E6A5E 46% 62%,#4E4B44 62%)}
+.a-th::before{content:"";position:absolute;left:-10%;right:-10%;top:52%;height:2px;background:#C9C4B5;box-shadow:0 7px 0 #C9C4B5,0 14px 0 #C9C4B5}
+.a-th.b{background:linear-gradient(180deg,#B7C6D3 0 40%,#7C7869 40% 58%,#575348 58%)}
+.a-th.c{background:linear-gradient(180deg,#8FA6BD 0 50%,#625E52 50%)}
+.a-th i{position:absolute;left:3px;bottom:3px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,.6);color:#fff;font-size:7.5px;font-style:normal}
+.a-dim{position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.55);animation:fadein .3s}
+.a-sheet{position:absolute;z-index:6;left:0;right:0;bottom:0;padding:14px 12px 24px;border-radius:16px 16px 0 0;background:#fff;animation:up .4s cubic-bezier(.2,.8,.2,1)}
+.a-sheet h2{margin:0 0 6px;font-size:15px}
+.a-sheet .a-btn:first-of-type{margin-top:10px}
+.a-err{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #E1E4EA;font-size:12px}
+.a-err .a-btn{flex:none;width:auto;min-height:32px;margin:0;padding:4px 14px}
+.a-dlg{position:absolute;z-index:7;left:22px;right:22px;top:36%;padding:20px 18px 12px;border-radius:24px;background:#F4EFF4;color:#1D1B20;box-shadow:0 8px 30px rgba(0,0,0,.4);animation:pop .3s}
+.a-dlg p{margin:0 0 14px;font-size:13px;line-height:1.4}
+.a-dlg .acts{display:flex;justify-content:flex-end;gap:6px;font-size:13px;font-weight:600;color:#6750A4}
+.a-dlg .acts span{padding:8px 12px;border-radius:999px}
+.a-toast{position:absolute;z-index:8;left:14px;right:14px;bottom:70px;padding:10px 13px;border-radius:11px;background:#10141C;color:#fff;font-size:12px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.3);animation:up .4s}
+.a-app .hit{outline-offset:1px}
+.a-app .a-chk.hit{outline-offset:3px;border-radius:8px}
+@media (max-width:860px){
+  .hero-in.t2{grid-template-columns:minmax(0,1fr);gap:12px}
+  .hero-in.t2 .lede{font-size:14.5px}
+  .back{grid-column:1;grid-row:auto;justify-self:start;min-height:40px;padding:0 14px;font-size:14px}
+}
+.a-vacio{margin:14px 0;text-align:center;font-size:12px;color:#5B6472}
+/* Respuesta al toque: el botón se hunde; lo que aparece nuevo entra con un pequeño destello */
+.a-app .hit{transition:transform .14s ease,filter .14s ease}
+.a-app .pressed{transform:scale(.95);filter:brightness(.86)}
+.a-new{animation:nuevo .9s ease}
+@keyframes nuevo{0%{background:#DCEBFF}100%{background:transparent}}
+.prog span.ch{margin-left:10px}
+.steps .chh{padding:14px 2px 4px;font-family:var(--f-display);font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-text)}
+.steps .chh:first-child{padding-top:6px}
+.now p{min-height:3em}
+@media (max-width:860px){.now p{min-height:2.9em}}
+/* Pantalla larga que baja como en la app */
+.a-scroll{position:relative;will-change:transform}
+.a-scroll.con-pie{padding-bottom:84px}
+.sin-fundido{animation:none!important}
+.a-eti.m{background:#4D7C0F}
+.a-bar.maq{background:#4D7C0F}
+.a-h3{margin:10px 0 0;font-size:13px}
+.a-btn small{margin-left:4px;font-weight:400;color:#5B6472}
+.a-sub{margin-top:6px;padding:10px;border:1px solid #C9CED8;border-radius:10px;background:#F6F7F9}
+.a-op{margin-top:10px;padding-top:2px;border-top:1px solid #C9CED8}
+.a-seg5 span{padding:3px 0;font-size:11px}
+
+/* ====== Guía completa: tres etapas y selector dentro de cada una ====== */
+.tabs.t3{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:10px}
+.subtabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.chip{display:flex;align-items:baseline;gap:7px;min-height:42px;padding:0 16px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:15px;font-weight:600}
+.chip small{font-size:12.5px;font-weight:500;color:var(--muted)}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-selected="true"]{border-color:var(--fg);background:var(--fg);color:var(--bg)}
+.chip[aria-selected="true"] small{color:inherit;opacity:.7}
+.chip.infra[aria-selected="true"]{border-color:#C2410C;background:#C2410C;color:#fff}
+.chip.super[aria-selected="true"]{border-color:#1D4ED8;background:#1D4ED8;color:#fff}
+.faq-g{margin:22px 0 10px;font-family:var(--f-display);font-size:19px;font-weight:700;letter-spacing:.02em;color:var(--accent-text)}
+.faq-g:first-of-type{margin-top:6px}
+.urlbox .lbl svg{width:17px;height:17px;flex:none}
+@media (max-width:860px){
+  .tabs.t3{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .tabs.t3 .tab{align-items:center;padding:8px 4px 9px;text-align:center}
+  .tabs.t3 .tab .n{position:static;margin:0 0 3px}
+  .tabs.t3 .tab small{display:none}
+  .tabs.t3 .tab b{font-size:17px;line-height:1.05}
+  .subtabs{gap:6px;margin-bottom:14px}
+  .chip{min-height:38px;padding:0 12px;font-size:14px}
+  .chip small{display:none}
+}
+.gp-tabs.t3{grid-template-columns:repeat(3,1fr)}
+.gp-tabs.t3 span{text-align:center;font-weight:700;color:#B5500F}
+.pcw .gp-tabs.t3{grid-template-columns:repeat(3,1fr)}
+.chip.maq[aria-selected="true"]{border-color:#4D7C0F;background:#4D7C0F;color:#fff}
 </style>
 </head>
 <body>
@@ -443,19 +617,20 @@ main.wrap{padding-block:20px 56px}
     <i class="pl" role="img" aria-label="Icono de Partes LAV"></i>
     <div>
       <p class="eyebrow">Partes LAV · UTE LAV Este</p>
-      <h1>Instala la app y regístrate</h1>
+      <h1>Instala la app y haz tu primer parte</h1>
     </div>
   </div>
-  <p class="lede">Copia la dirección de la app, elige tu dispositivo y sigue la animación paso a paso. Primero se instala y después te registras. Ten a mano tu correo de Gmail.</p>
+  <p class="lede">Tres pasos, cada uno con su animación: instala la app, regístrate y aprende a rellenar un parte. Ten a mano tu correo de Gmail.</p>
   <div class="urlbox">
-    <span class="lbl"><span class="lbl-n">1</span>Primero, copia la dirección</span>
+    <span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Dirección de la app: cópiala para instalarla</span>
     <div class="url-row"><code id="u">mant-ute-lav-este.github.io/partes-lav</code><button class="copy" id="copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="11.5" height="12.5" rx="2"/><path d="M15.5 8V5.5A1.5 1.5 0 0 0 14 4H6a1.5 1.5 0 0 0-1.5 1.5V15A1.5 1.5 0 0 0 6 16.5h2"/></svg><span id="copytxt">Copiar</span></button></div>
     <span class="hint">Luego la pegarás en el navegador, como se ve en la animación.</span>
   </div>
 </div></header>
 
 <main class="wrap">
-  <div class="tabs" id="tabs" role="tablist" aria-label="Qué quieres hacer"></div>
+  <div class="tabs t3" id="tabs" role="tablist" aria-label="Qué quieres hacer"></div>
+  <div class="subtabs" id="subtabs" role="tablist" aria-label="Elige"></div>
 
   <section class="player" id="player" aria-label="Animación paso a paso">
     <div class="stage">
@@ -477,7 +652,7 @@ main.wrap{padding-block:20px 56px}
         <button class="cbtn primary" id="play" type="button"></button>
         <button class="cbtn" id="next" type="button">Siguiente<svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
-      <button class="nextguide" id="nextguide" type="button" hidden>Ahora: Registrarse<svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="nextguide" id="nextguide" type="button" hidden>Siguiente<svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <ol class="steps" id="steps"></ol>
     </div>
   </section>
@@ -485,6 +660,7 @@ main.wrap{padding-block:20px 56px}
   <section class="help">
     <h2>Si algo no sale</h2>
     <p>Toca una pregunta para ver la respuesta.</p>
+    <h3 class="faq-g">Instalar y registrarse</h3>
     <div class="faq">
       <details><summary>En iPhone no veo «Compartir»</summary><p>En las versiones nuevas de iOS está dentro de los tres puntos (···), junto a la barra de direcciones. Tócalos y luego «Compartir».</p></details>
       <details><summary>En Android no sale «Instalar y crear acceso directo»</summary><p>Baja hasta el final del menú ⋮. Según el móvil se llama «Instalar aplicación» o «Añadir a pantalla de inicio». Si no aparece ninguna, recarga la página y espera unos segundos.</p></details>
@@ -495,9 +671,21 @@ main.wrap{padding-block:20px 56px}
       <details><summary>He olvidado el PIN</summary><p>Pulsa «He olvidado el PIN» en la pantalla de entrada. Te llega un código a tu Gmail y creas uno nuevo.</p></details>
       <details><summary>¿Hay que actualizar la app?</summary><p>No hace falta reinstalarla. Cuando hay versión nueva basta con cerrarla del todo y volver a abrirla con conexión.</p></details>
     </div>
+    <h3 class="faq-g">Hacer un parte</h3>
+    <div class="faq">
+      <details><summary>No me deja cerrar el parte</summary><p>Sale la lista «Falta por completar» con lo que falta. Toca «Ir» para saltar al trabajo, arréglalo y vuelve a pulsar «Cerrar parte».</p></details>
+      <details><summary>Una persona no está en la lista</summary><p>En «Personal», pulsa «+ Añadir a alguien que no está en la lista», escribe al menos el nombre y pulsa «Añadir». Queda guardada para los próximos partes.</p></details>
+      <details><summary>Me avisa de que el parte pesa demasiado</summary><p>El correo admite unos 20 MB. La app te dice cuántas fotos quitar. Si lo cierras igualmente, puede que no llegue a la oficina.</p></details>
+      <details><summary>Una foto no se puede usar</summary><p>Hazla con la cámara de la app (botón «Cámara»). Las fotos de formato HEIC piden cobertura la primera vez para convertirlas.</p></details>
+      <details><summary>No tengo cobertura</summary><p>Rellena y cierra el parte con normalidad y pulsa «Enviar a la oficina». Queda «En cola» y sale solo cuando vuelva la señal, aunque cierres la app. En el inicio verás «Tienes 1 parte sin enviar».</p></details>
+      <details><summary>Lleva más de 12 horas sin llegar</summary><p>Abre el parte: aparece el botón «Enviar por Gmail (emergencia)». Úsalo solo en ese caso.</p></details>
+      <details><summary>Me he equivocado en un parte ya cerrado o enviado</summary><p>Ábrelo y pulsa «Corregir el parte». Se crea una copia para editar (revisión 2) y la oficina guarda las dos versiones.</p></details>
+      <details><summary>Hice un parte de prueba o está repetido</summary><p>Si aún no se ha enviado, ábrelo y pulsa «Descartar este parte». No llegará a la oficina. Los borradores se borran con la papelera de la lista.</p></details>
+      <details><summary>En el parte de maquinaria no me sale «Registros DRP»</summary><p>Solo sale cuando la máquina es una bateadora o el trabajo es «Bateo». Es opcional: si no hay archivos, no hace falta.</p></details>
+    </div>
   </section>
 
-  <p class="foot">Partes LAV · Mantenimiento UTE LAV Este. Dirección de la app: <a href="https://mant-ute-lav-este.github.io/partes-lav/">mant-ute-lav-este.github.io/partes-lav</a></p>
+  <p class="foot">Partes LAV · Mantenimiento UTE LAV Este. Dirección de la app: <a href="https://mant-ute-lav-este.github.io/partes-lav/">mant-ute-lav-este.github.io/partes-lav</a> · Los nombres y datos de las pantallas son de ejemplo.</p>
 </main>
 
 <script>
@@ -578,9 +766,9 @@ const kb=(t,enter,hit)=>`<div class="kb ${t}"><div class="kr">${keys(KB[0])}</di
 const welcome=(wide)=>`<div class="ap${wide?' wide':''}"><div class="ap-h">Partes LAV</div><div class="ap-c"><div class="card"><h3>Bienvenido</h3><p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p><div class="abtn">Registrarme</div><div class="abtn sec">Ya tengo cuenta</div></div></div></div>`;
 
 /* Esta misma guía, con el botón Copiar que se pulsa en la animación */
-const guidePage=()=>`<div class="gp"><div class="gp-hero"><div class="gp-brand"><i class="pl"></i><div><small>PARTES LAV · UTE LAV ESTE</small><b>Instala la app y regístrate</b></div></div>
-  <div class="gp-box"><span class="gp-l"><em>1</em>Primero, copia la dirección</span><div class="gp-row"><code>${URL_APP}</code><span class="gp-copy hit" data-copy="1">Copiar</span></div></div></div>
-  <div class="gp-tabs"><span>Instalar en<b>iPhone</b></span><span>Instalar en<b>Android</b></span><span>Instalar en<b>Ordenador</b></span><span>Después<b>Registrarse</b></span></div><div class="gp-dev"></div></div>`;
+const guidePage=()=>`<div class="gp"><div class="gp-hero"><div class="gp-brand"><i class="pl"></i><div><small>PARTES LAV · UTE LAV ESTE</small><b>Instala la app y haz tu primer parte</b></div></div>
+  <div class="gp-box"><span class="gp-l">Dirección de la app: cópiala</span><div class="gp-row"><code>${URL_APP}</code><span class="gp-copy hit" data-copy="1">Copiar</span></div></div></div>
+  <div class="gp-tabs t3"><span>1<b>Instalar</b></span><span>2<b>Registrarse</b></span><span>3<b>Hacer un parte</b></span></div><div class="gp-dev"></div></div>`;
 const GUIDE_URL=HOST+'/partes-lav/guia/instalar.html';
 
 /* ---------- iPhone ---------- */
@@ -666,7 +854,7 @@ const inicio=()=>`<div class="ap">${sbA('navy')}<div class="ap-h"><div>Partes LA
 
 /* ---------- Guías ---------- */
 const C=`<code>${URL_APP}</code>`;
-const GUIDES={
+const GI={
   iphone:{n:2,pre:'Instalar en',label:'iPhone',device:'phone',os:'ios',steps:[
     {t:'Copia la dirección',d:'En esta misma página, arriba del todo, pulsa el botón naranja <b>Copiar</b>. Se pone verde: la dirección ya está guardada para pegarla.',s:()=>safari('guide'),dur:DUR_TYPE},
     {t:'Abre Safari',d:'Sal a la pantalla de inicio y abre Safari, la brújula azul. En iPhone tiene que ser Safari, no Chrome.',s:()=>iosHome(false,true)},
@@ -707,7 +895,226 @@ const GUIDES={
     {t:'¡Ya estás dentro!',d:'Verás un aviso amarillo hasta que la oficina apruebe tu registro, pero <b>ya puedes hacer partes</b>: se enviarán solos en cuanto te aprueben.',s:inicio,dur:6400},
   ]},
 };
-const ORDER=['iphone','android','pc','registro'];
+/* ---------- Piezas de la app ----------
+   data-k marca lo que se puede tocar (el paso dice cuál lleva el dedo) y data-c cada tarjeta
+   (el paso dice hasta cuál baja la pantalla). */
+const LAB={infra:'INFRA',super:'SUPER'}, REF={infra:'INF-0035',super:'SUP-0021'}, PREV={infra:'INF-0034',super:'SUP-0020'};
+const K=k=>k?` data-k="${k}"`:'';
+const card=(c,h,inner,cls='')=>`<div class="a-card ${cls}" data-c="${c}"><h2>${h}</h2>${inner}</div>`;
+const OB='<span class="a-oblig">obligatorio</span>';
+const cnt=n=>`<span class="a-cnt">${n}</span>`;
+const lab=(t,sm)=>`<span class="a-lab">${t}${sm?` <small>${sm}</small>`:''}</span>`;
+const inp=(v='',c='',ph=false,k='')=>`<div class="a-in ${c}${ph?' hold':''}"${K(k)}>${v}</div>`;
+const typ=(txt,c='')=>`<div class="a-in focus ${c}"><span data-type="${txt}"></span><span class="caret"></span></div>`;
+const seg=(opts,on,ks=[])=>`<div class="a-seg">${opts.map((o,i)=>`<span class="${[].concat(on).includes(i)?'on':''}"${K(ks[i])}>${o}</span>`).join('')}</div>`;
+const chk=(txt,on,k='',sm='')=>`<div class="a-chk${on?' on':''}"${K(k)}><i>${on?'✓':''}</i><span>${txt}${sm?`<br><small>${sm}</small>`:''}</span></div>`;
+const btn=(txt,c='',k='')=>`<div class="a-btn ${c}"${K(k)}>${txt}</div>`;
+const sheet=inner=>`<div class="a-dim"></div><div class="a-sheet">${inner}</div>`;
+const page=(t,bar,inner,pie='',over='')=>`<div class="a-app">${sb(t)}${bar}<div class="a-body"><div class="a-scroll${pie?' con-pie':''}">${inner}</div>${pie?`<div class="a-pie">${pie}</div>`:''}</div>${over}${hb()}</div>`;
+const bar=(t,back,title)=>`<div class="a-bar ${t}"><span class="a-back">‹ ${back}</span><span class="a-title">${title}</span><span class="a-sv">Guardado</span></div>`;
+const MEDIDAS=['Extintor en el vehículo','Batefuegos','Mochila extintora de agua','Cuba o depósito de agua','Zona de trabajo despejada de vegetación','Vigilancia tras trabajos con riesgo de chispas','Revisión de la zona al terminar'];
+const th=c=>`<div class="a-th ${c}"><i>28/10 22:41 · SIOS 48213</i></div>`;
+
+/* ---------- Pantallas (vistas): cada una es una pantalla real de la app, entera ---------- */
+const VIEWS={
+  inicio(t,s){
+    const item=`<div class="a-item"><span class="a-eti ${t[0]}">${ETI[t]}</span><span class="inf"><strong>27/10/2026</strong> · ${PREV[t]}<br><small>2 ${CUE[t]} · Recibido en la oficina 27/10/2026 18:42</small></span><span class="fl">›</span></div>`;
+    const cola=`<h2 class="a-grp">Pendientes de enviar</h2><div class="a-item cerrado"><span class="a-eti ${t[0]}">${ETI[t]}</span><span class="inf"><strong>28/10/2026</strong> · ${REF[t]}<br><small>1 ${CUE[t]} · En cola: se enviará solo</small></span><span class="fl">›</span></div>`;
+    return page('navy',`<div class="a-bar navy"><span class="a-title">Partes LAV<small>Juan García</small></span><span class="a-mdots">⋮</span></div>`,
+      `${s.cola?`<div class="a-aviso fila"><span>Tienes 1 parte sin enviar</span><div class="a-btn sec"${K('ahora')}>Enviar ahora</div></div>`:''}
+      <div class="a-tipos"><div class="a-tipo i"${K(t==='infra'?'tipo':'')}><b>INFRA</b>Infraestructura</div><div class="a-tipo s"${K(t==='super'?'tipo':'')}><b>SUPER</b>Superestructura</div><div class="a-tipo m"${K(t==="maq"?"tipo":"")}><b>MAQUINARIA</b>Maquinaria de vía</div></div>
+      ${s.vacio?'<p class="a-vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p>':`${s.cola?cola:''}<h2 class="a-grp">Enviados</h2>${item}`}`,'',
+      s.maquina?maqSheet(t):s.repetir?sheet(`<h2>¿Empezar igual que el último parte?</h2><p class="a-nota">${PREV[t]} · 27/10/2026</p>
+        ${chk('Personal',1,'','2 persona(s): Marta López, Pedro Ruiz')}${chk('Maquinaria',1,'','Sí: retroexcavadora mixta')}${chk('Vehículos',1,'','No')}${chk('Medidas antiincendios',1,'','3 medida(s)')}
+        <p class="a-nota" style="margin-top:10px">No se copian los trabajos, las horas extra, las fotos${t==='super'?', el formato 1':''} ni las observaciones.</p>
+        ${btn('Sí, copiar lo marcado','pri big','copiar')}${btn('No, empezar en blanco','sec')}`):'');
+  },
+  parte(t,s){
+    const sup=t==='super';
+    const per=(n,d)=>`<div class="a-per${s.nuevo===n?' a-new':''}"><div><strong>${n}</strong><small>${d}</small></div><span class="a-x">✕</span></div>`;
+    const trab=s.trab?`<div class="a-item okb" style="margin-top:2px"><span class="a-num">✓</span><span class="inf"><strong>SIOS 48213</strong><br><small>Línea 040 · vía ${sup?'1, 2':'2'} · PK 481+045 – 481+300</small><br><small>Finalizado · fotos: 2 antes, 0 durante, 1 después</small><br><small class="a-listo">Completo</small></span><span class="fl">›</span></div>`:'<p class="a-nota">Añade cada trabajo de la jornada por separado, con sus fotos.</p>';
+    const eq=(c,tit,preg,eleg,otro,on,kSi,kNo,kSel)=>card(c,`${tit} ${OB}`,`${lab(preg)}${seg(['Sí','No'],on,[kSi,kNo])}${on===0?`<div class="a-in sel"${K(kSel)} style="margin-top:8px">${eleg}</div>${btn(otro,'sec')}`:''}`);
+    return page(t,bar(t,'Inicio',`${LAB[t]} · ${REF[t]}`),`
+      ${card('jornada','Jornada',`<span class="a-lab">Fecha de la jornada</span>${inp('28/10/2026','',false,'fecha')}
+        ${sup?chk('Jornada nocturna',0,'','(pon la fecha del día en que empezó)'):''}
+        <span class="a-lab">Capataz</span><div class="a-in fixed">Juan García</div>
+        ${chk('Jornada sin trabajos',0,'','(no se ha podido trabajar: lluvia, avería…)')}`)}
+      ${card('personal',`Personal ${cnt(s.marta?2:1)}`,`${per('Juan García','Rover · Capataz')}${s.marta?per('Marta López','Rover · Peón'):''}
+        ${btn('Copiar el personal del último parte','sec')}
+        <span class="a-lab">Añadir de la lista</span>${s.busca?typ('lópez'):inp('Escribe un nombre o una empresa','',true)}
+        ${s.busca?`<div class="a-res"${K('res')}><strong>Marta López</strong><small>Rover · Peón</small></div>`:''}
+        ${btn('+ Añadir a alguien que no está en la lista','sec')}`)}
+      ${eq('maq','Maquinaria','¿Se ha usado maquinaria?','Elige la máquina…','+ Añadir otra máquina',s.eq>=1?0:-1,'maqsi','','maqsel')}
+      ${eq('veh','Vehículos','¿Se han usado vehículos?','Elige el vehículo…','+ Añadir otro vehículo',s.eq>=2?1:-1,'','vehno','')}
+      ${card('trabajos',`Trabajos ${cnt(s.trab?1:0)}`,`${trab}${btn(s.trab?'+ Añadir otro trabajo':'+ Añadir trabajo','add','add')}`)}
+      ${card('medidas',`Medidas antiincendios ${OB}`,`<p class="a-nota">Marca todas las que se hayan tomado.</p>${MEDIDAS.map((m,i)=>chk(m,i===0&&s.med,i===0?'med0':'')).join('')}${chk('Otras',0)}`)}
+      ${sup?card('f1',`Adjuntar formato 1 ${cnt(0)}`,`<p class="a-nota">Opcional. Si el trabajo lleva este formato, haz una foto de cada hoja (hasta 6).</p><div class="a-fbtn">${btn('📷 Cámara','sec','f1cam')}${btn('🖼️ Galería','sec')}</div>`):''}
+      ${card('obs','Observaciones',`<div class="a-in ta hold">Opcional</div>`)}
+      ${btn('Borrar este borrador','danger')}`,
+      `${btn('Guardar y salir','sec')}${btn('Cerrar parte','pri','cerrar')}`,
+      s.over==='extras'?sheet(`<h2>¿Ha habido horas extra?</h2><p class="a-nota">Con «Sí» pones las horas de cada persona y eliges si son normales, nocturnas o festivas.</p>${btn('Sí, apuntarlas','pri big')}${btn('No, cerrar el parte','sec big','extno')}${btn('Volver al parte','link')}`)
+      :s.over==='confirma'?`<div class="a-dim"></div><div class="a-dlg"><p>¿Cerrar el parte? Después ya no se puede cambiar: solo corregir con una revisión nueva.</p><div class="acts"><span>Cancelar</span><span${K('aceptar')}>Aceptar</span></div></div>`:'');
+  },
+  trabajo(t,s){
+    const sup=t==='super', via=s.via||'', lleno=via==='hecho';
+    return page(t,bar(t,'Parte',`Trabajo 1 · ${REF[t]}`),`
+      ${card('ref','Referencia',`${seg(['SIOS','Incidencia','Sin referencia'],s.sios?0:-1,['sios'])}
+        ${s.sios?`${lab('Nº de SIOS')}${s.ref==='tecleo'?typ('48213'):inp('48213')}`:''}
+        ${sup?'':`${lab('Tipo de trabajo','(opcional, solo uno)')}<div style="display:flex;gap:26px">${chk('RREE',0)}${chk('POI',0)}</div>`}
+        ${lab('Nº acta PIDAME')}${inp('')}`)}
+      ${card('via','Vía y horario',`${chk('No se ocupa la vía',0,'','(p. ej. trabajos en base)')}
+        <div class="a-row2"><div>${lab('Telefonema de entrada nº')}${inp(via?'4821':'')}</div><div>${lab('Telefonema de salida nº')}${inp(via?'4830':'')}</div></div>
+        <div class="a-row2"><div>${lab('Entrada en vía')}${via==='tecleo'?typ('22:30'):inp(lleno?'22:30':'hh:mm','',!lleno)}</div><div>${lab('Salida de vía')}${inp(lleno?'05:15':'hh:mm','',!lleno)}</div></div>
+        ${lab('Línea')}${seg(['040','038'],via?0:-1)}
+        ${lab('Vía',sup?'(marca todas las que uses)':'')}${seg(['1','2','3','4','5'],!via?[]:sup?[0,1]:[1])}
+        ${lab('Aparato','(opcional)')}<div class="a-in sel hold">Sin aparato</div>
+        <div class="a-row2" data-c="pk"><div>${lab('PK inicio')}<div class="a-pk">${inp(lleno?'481':'km','',!lleno)}<b>+</b>${inp(lleno?'045':'m','',!lleno)}</div></div><div>${lab('PK fin')}<div class="a-pk">${inp(lleno?'481':'km','',!lleno)}<b>+</b>${inp(lleno?'300':'m','',!lleno)}</div></div></div>`)}
+      ${card('hecho','Trabajo realizado',`${lab(`Motivo de actuación ${OB}`)}<div class="a-in sel"${K('motivo')}>Elige el motivo…</div>
+        ${lab('Metros lineales','(opcional)')}${inp('')}
+        ${lab('Descripción','(opcional)')}<div class="a-in ta hold"></div>
+        ${lab('¿Trabajo finalizado?')}${seg(['Sí','No, sin terminar','No realizado'],s.fin?0:-1,['finsi'])}`)}
+      ${card('fotos','Fotos',`<p class="a-nota">Obligatorio: al menos una de <strong>antes</strong> y una de <strong>después</strong>. Cada foto lleva fecha, hora y referencia, y se le quita la ubicación.</p>
+        <div class="a-fase"><div class="a-fcab"><strong>Antes</strong> ${cnt(2)}</div><div class="a-fbtn">${btn('📷 Cámara','sec')}${btn('🖼️ Galería','sec')}</div><div class="a-thumbs">${th('')}${th('b')}</div></div>
+        <div class="a-fase"><div class="a-fcab"><strong>Durante</strong> ${cnt(0)}</div><div class="a-fbtn">${btn('📷 Cámara','sec')}${btn('🖼️ Galería','sec')}</div></div>
+        <div class="a-fase" data-c="desp"><div class="a-fcab"><strong>Después</strong> ${cnt(s.foto?1:0)} ${s.foto?'':'<span class="a-oblig">mín. 1</span>'}</div><div class="a-fbtn">${btn('📷 Cámara','sec','camdesp')}${btn('🖼️ Galería','sec')}</div>${s.foto?`<div class="a-thumbs a-new">${th('c')}</div>`:''}</div>
+        ${chk('No se han podido hacer fotos',0)}`)}
+      ${btn('Eliminar este trabajo','danger')}`,
+      btn('Listo','pri big','listo'),
+      s.over==='otro'?sheet(`<h2>¿Has hecho otro trabajo en esta jornada?</h2>${btn('Sí, añadir otro trabajo','pri big')}${btn('No, volver al parte','sec big','volver')}`):'');
+  },
+  envio(t,s){
+    const ok=s.m!=='cerrado';
+    const res=`<p>Jornada del 28/10/2026 · 1 ${CUE[t]} · 2 persona(s)</p><p><small>Cerrado en el móvil: 28/10/2026 06:02</small></p>`;
+    return page(t,bar(t,'Inicio',`${LAB[t]} · ${REF[t]}`),
+      `${ok?card('estado','Recibido en la oficina ✓',`<p><strong>28/10/2026 06:03</strong></p>${res}`,`ok${s.m==='ok'?' a-new':''}`)
+        :card('estado','Cerrado · falta enviarlo',`${res}${btn('Enviar a la oficina','pri big','enviar')}`,'pend')}
+      <div class="a-card">${btn('Ver el PDF','sec')}${ok?'':btn('¿No funciona el envío? Mandarlo por Gmail','link')}</div>
+      ${card('corregir','¿Hay algo mal?',`<p class="a-nota">Puedes corregirlo: se crea una copia para editar y, al enviarla, la oficina guarda las dos versiones.</p>${btn('Corregir el parte','sec','corregir')}`)}`,
+      '',s.m==='ok'?'<div class="a-toast">Recibido en la oficina ✓</div>':'');
+  },
+};
+
+
+/* ---------- Parte de maquinaria de vía (bateadora) ---------- */
+Object.assign(LAB,{maq:'MAQUINARIA'}); Object.assign(REF,{maq:'MAQ-0012'}); Object.assign(PREV,{maq:'MAQ-0011'});
+const ETI={infra:'INFRA',super:'SUPER',maq:'MAQ'}, CUE={infra:'trabajo(s)',super:'trabajo(s)',maq:'tajo(s)'};
+const maqSheet=t=>sheet(`<h2>¿Con qué máquina?</h2><p class="a-nota">Según la máquina se abre su parte.</p><h3 class="a-h3">Maquinaria de vía</h3>
+  ${btn('Bateadora 08-475-4S <small>· UIC 99713011401-7</small>','sec','bate')}${btn('Perfiladora PDB-110 <small>· UIC 99713011302-7</small>','sec')}${btn('Estabilizador DGS-62N <small>· UIC 97180150217-2</small>','sec')}${btn('Cancelar','')}`);
+const ovrP=s=>s.over==='extras'?sheet(`<h2>¿Ha habido horas extra?</h2><p class="a-nota">Con «Sí» pones las horas de cada persona y eliges si son normales, nocturnas o festivas.</p>${btn('Sí, apuntarlas','pri big')}${btn('No, cerrar el parte','sec big','extno')}${btn('Volver al parte','link')}`)
+  :s.over==='confirma'?`<div class="a-dim"></div><div class="a-dlg"><p>¿Cerrar el parte? Después ya no se puede cambiar: solo corregir con una revisión nueva.</p><div class="acts"><span>Cancelar</span><span${K('aceptar')}>Aceptar</span></div></div>`:'';
+
+VIEWS.maq=(t,s)=>{
+  const tj=s.tj||0, hh=v=>inp(v||'hh:mm','',!v);
+  const pk=(l,km,m)=>`${lab(l)}<div class="a-pk">${inp(km||'km','',!km)}<b>+</b>${inp(m||'m','',!m)}</div>`;
+  const op=(titulo,on,det='',k='')=>`${lab(titulo)}${seg(['Sí','No'],on,[k])}${det}`;
+  const nota=tj>=5?'<p class="a-listo" data-c="tjfin">Tajo completo</p>'
+    :`<p class="a-falta">Falta: ${tj<1?'llegada a tajo, inicio de trabajo, fin de trabajo, salida de tajo…':tj<2?'vía, PK inicio, PK final…':'alineado, estabilizado, registro, perfilado…'}</p>`;
+  const per=(c,titulo,ob,nombre,k)=>`${lab(`${titulo}${ob?` ${OB}`:''}`)}${nombre?`<div class="a-per${s.pers===(c==='enc'?1:2)?' a-new':''}"><div><strong>${nombre}</strong></div><span class="a-x">✕</span></div>`:`<div class="a-in sel"${K(k)}>Elige…</div>`}`;
+  const p=s.pers||0;
+  return page(t,bar(t,'Inicio',`${LAB[t]} · ${REF[t]}`),`
+    ${card('jornada','Jornada',`${lab('Fecha','(si es de noche, el día en que empieza)')}${inp('28/10/2026','',false,'fecha')}
+      <div class="a-row2"><div>${lab('Horario: inicio')}${hh(s.h&&'22:00')}</div><div>${lab('Horario: fin')}${hh(s.h&&'06:00')}</div></div>
+      ${lab(`¿Va en entrega de vía bloqueada (EVB)? ${OB}`)}${seg(['Sí','No'],s.evb?0:-1,['evbsi'])}
+      ${lab('Lo rellena')}<div class="a-in fixed">Juan García</div>
+      ${chk('Jornada sin trabajos',0,'','(no se ha podido trabajar: lluvia, avería…)')}`)}
+    ${card('maqv',`Máquina ${OB}`,`<div class="a-in sel">Bateadora 08-475-4S · UIC 99713011401-7</div><p class="a-nota" style="margin:4px 0 0">Trabajo: Bateo</p>
+      ${lab('Horas')}${s.hr===1?typ('7,5'):inp(s.hr===2?'7,5':'','')}`)}
+    ${card('viaje','Viaje',`<div class="a-row2"><div>${lab('Hora de salida')}${hh(s.via&&'20:30')}</div><div>${lab('Lugar de salida')}${inp(s.via?'Base Requena':'')}</div></div>
+      <div class="a-row2"><div>${lab('Hora de llegada')}${hh(s.via&&'06:30')}</div><div>${lab('Lugar de llegada')}${inp(s.via?'Base Requena':'')}</div></div>`)}
+    ${card('tajos',`Tajos ${cnt(1)}`,`<div class="a-sub"><h3 class="a-h3" style="margin:0">Tajo 1</h3>
+      <div class="a-row2"><div>${lab('Llegada a tajo')}${tj===0&&s.tec?typ('22:15'):hh(tj>=1&&'22:15')}</div><div>${lab('Inicio de trabajo')}${hh(tj>=1&&'22:40')}</div></div>
+      <div class="a-row2"><div>${lab('Fin de trabajo')}${hh(tj>=1&&'04:50')}</div><div>${lab('Salida de tajo')}${hh(tj>=1&&'05:10')}</div></div>
+      <div data-c="tjvia">${lab('Vía','(marca todas las que uses)')}<div class="a-seg a-seg5">${[1,2,3,4,5].map(v=>`<span class="${tj>=2&&v<=2?'on':''}">Vía ${v}</span>`).join('')}</div></div>
+      <div class="a-row2"><div>${pk('PK inicio',tj>=2&&'481',tj>=2&&'045')}</div><div>${pk('PK final',tj>=2&&'481',tj>=2&&'300')}</div></div>
+      ${lab('Desvío / AD','(opcional)')}<div class="a-in sel hold">Sin desvío</div>
+      <div class="a-op" data-c="ops">${op('Nivelado',tj>=3?0:-1,`${tj>=3?seg(['Calculado','Manual','Visor'],tj>=4?0:-1,['nivcalc']):''}${tj>=4?`<div class="a-row2"><div>${lab('Lev. máx. (mm)')}${inp('14')}</div><div>${pk('PK del lev. máx.','481','120')}</div></div>`:''}`,'nivsi')}</div>
+      <div class="a-op">${op('Alineado',tj>=5?0:-1,tj>=5?seg(['Calculado','Auto','Visor'],1):'')}</div>
+      <div class="a-op">${op('Estabilizado',tj>=5?0:-1,tj>=5?`${lab('¿Programada?')}${seg(['Sí','No'],0)}`:'')}</div>
+      <div class="a-op">${op('Registro',tj>=5?0:-1,tj>=5?seg(['Antes','Después','Ambos'],0):'')}</div>
+      <div class="a-op">${op('Perfilado',tj>=5?1:-1)}</div>
+      ${nota}</div>
+      <div data-c="tjadd">${btn('+ Añadir tajo','add','addtajo')}</div>`)}
+    ${card('obs','Observaciones',`<div class="a-in ta hold">Opcional</div>`)}
+    ${card('drp',`Registros DRP ${cnt(s.drp?1:0)}`,`<p class="a-nota">Opcional. Añade los archivos .drp que hayas bajado de la bateadora (hasta 6, 10 MB en total).</p>${btn('📎 Añadir archivos DRP','sec','drpadd')}
+      ${s.drp?`<div class="a-per a-new"><div><strong>registro_bateadora.drp</strong><small>412 KB</small></div><span class="a-x">✕</span></div>`:''}`)}
+    ${card('pers',`Personal ${cnt(p)}`,`<p class="a-nota">Elige quién ocupa cada puesto. Los que no son obligatorios pueden quedar vacíos.</p>
+      ${per('enc','Encargado de trabajo',1,p>=1&&'Marta López','enc')}${per('mq','Maquinista tipo A',0,'','')}${per('pil','Piloto',0,'','')}${per('omi','OMI',1,p>=2&&'Luis Martín','omi')}${per('op','Operario/s',0,'','')}`)}
+    ${btn('Borrar este borrador','danger')}`,
+    `${btn('Guardar y salir','sec')}${btn('Cerrar parte','pri','cerrar')}`,ovrP(s));
+};
+
+const mkMaq=()=>{
+  const M=(s,to,hit,extra={})=>({v:'maq',s,to,hit,...extra});
+  const E={h:1,evb:1,hr:2,via:1}, F={...E,tj:5,drp:1,pers:2};
+  return [
+    {c:0,t:'Elige el tipo de parte',d:'Toca <b>MAQUINARIA</b>. Es otro tipo de parte, con sus propias pantallas.',ph:[{v:'inicio',s:{vacio:1},hit:'tipo'}]},
+    {c:0,t:'Elige la máquina',d:'Según la máquina se abre su parte. Toca <b>la bateadora</b>. (La locomotora y la dresina tienen el suyo.)',ph:[{v:'inicio',s:{vacio:1,maquina:1},hit:'bate'}]},
+    {c:0,t:'Jornada y horario',d:'Pon la <b>fecha</b>, el horario y contesta si va en <b>EVB</b> (entrega de vía bloqueada): de eso dependen los puestos obligatorios.',ph:[M({},'jornada','fecha'),M({h:1},'jornada','evbsi'),M({h:1,evb:1},'jornada')]},
+    {c:0,t:'Máquina y viaje',d:'La máquina ya viene elegida. Pon sus <b>horas</b> y el viaje de salida y de llegada.',ph:[M({h:1,evb:1,hr:1,tec:1},'maqv'),M({h:1,evb:1,hr:2,via:1},'viaje')]},
+    {c:1,t:'Horas del tajo',d:'Un tajo es cada tramo de trabajo. Escribe <b>llegada, inicio, fin y salida</b> solo con cifras: 2215 → 22:15.',ph:[M({...E,tj:0,tec:1},'tajos'),M({...E,tj:1},'tajos')]},
+    {c:1,t:'Vía y PK del tajo',d:'Marca <b>todas las vías</b> que uses y los PK de inicio y final. El desvío / AD es opcional.',ph:[M({...E,tj:2},'tjvia')]},
+    {c:1,t:'Qué ha hecho la máquina',d:'Contesta <b>Sí o No</b> en cada operación: nivelado, alineado, estabilizado, registro y perfilado. Con Sí salen sus detalles.',ph:[M({...E,tj:2},'ops','nivsi'),M({...E,tj:3},'ops','nivcalc'),M({...E,tj:4},'ops'),M({...E,tj:5},'tjfin')]},
+    {c:1,t:'Más tajos',d:'Si la máquina trabajó en otro tramo, toca <b>+ Añadir tajo</b> y repite.',ph:[M({...E,tj:5},'tjadd','addtajo')]},
+    {c:1,t:'Registros DRP',d:'Opcional y solo en la bateadora: toca <b>Añadir archivos DRP</b> y elige los .drp que bajaste de la máquina.',ph:[M({...E,tj:5},'drp','drpadd'),M({...E,tj:5,drp:1},'drp')]},
+    {c:2,t:'Personal por puesto',d:'Elige quién ocupa cada puesto. Con EVB son obligatorios el <b>encargado</b> y el <b>OMI</b>.',ph:[M({...F,pers:0},'pers','enc'),M({...F,pers:1},'pers','omi'),M(F,'pers')]},
+    {c:2,t:'Cierra el parte',d:'Toca <b>Cerrar parte</b>, contesta lo de las horas extra y <b>Acepta</b>.',ph:[M(F,'obs','cerrar'),M({...F,over:'extras'},'obs','extno'),M({...F,over:'confirma'},'obs','aceptar')]},
+    ...mk('infra').slice(-4,-1),   // enviar, sin cobertura y corregir: son iguales en todos los partes
+  ];
+};
+/* ---------- Pasos ----------
+   Cada fase: vista y su estado (s), tarjeta hasta la que baja (to), lo que toca el dedo (hit).
+   Si dos fases seguidas son de la misma vista, la pantalla no salta: se actualiza y se desplaza. */
+const CH=['Empezar','El trabajo','Cerrar y enviar'];
+const mk=(t)=>{
+  const sup=t==='super';
+  const P0={marta:1,eq:2}, P1={...P0,trab:1}, T0={sios:1,via:'hecho'};
+  const P=(s,to,hit,extra={})=>({v:'parte',s,to,hit,...extra});
+  const T=(s,to,hit,extra={})=>({v:'trabajo',s,to,hit,...extra});
+  return [
+    {c:0,t:'Elige el tipo de parte',d:`Toca <b>${LAB[t]}</b>. Aquí irán saliendo todos tus partes.`,ph:[{v:'inicio',s:{vacio:1},hit:'tipo'}]},
+    {c:0,t:'Revisa la jornada',d:`Comprueba la <b>fecha</b>.${sup?' Si es de noche, marca «Jornada nocturna».':''}`,ph:[P({},'jornada','fecha')]},
+    {c:0,t:'Añade al personal',d:'Tú ya estás. <b>Busca y toca</b> a cada persona que ha venido.',ph:[P({busca:1},'personal','res'),P({marta:1,nuevo:'Marta López'},'personal')]},
+    {c:0,t:'Maquinaria y vehículos',d:'Contesta <b>Sí o No</b> a las dos. Con Sí, elige de la lista.',ph:[P({marta:1},'maq','maqsi'),P({marta:1,eq:1},'maq','maqsel'),P({marta:1,eq:1},'veh','vehno'),P({marta:1,eq:2},'veh')]},
+    {c:1,t:'Añade un trabajo',d:'Baja a Trabajos y toca <b>+ Añadir trabajo</b>.',ph:[P(P0,'trabajos','add')]},
+    {c:1,t:'Referencia',d:'Elige <b>SIOS</b>, Incidencia o Sin referencia y escribe el número.',ph:[T({},'ref','sios'),T({sios:1,ref:'tecleo'},'ref')]},
+    {c:1,t:'Vía y horario',d:`Horas solo con cifras: <b>2230</b> → 22:30. Luego línea, vía${sup?' (puedes marcar varias)':''} y PK.`,ph:[T({sios:1,via:'tecleo'},'via'),T(T0,'pk')]},
+    {c:1,t:'Qué se ha hecho',d:'Elige el <b>motivo</b> de la lista y di si el trabajo está <b>finalizado</b>.',ph:[T(T0,'hecho','motivo'),T(T0,'hecho','finsi'),T({...T0,fin:1},'hecho')]},
+    {c:1,t:'Haz las fotos',d:'Al menos una de <b>antes</b> y una de <b>después</b>.',ph:[T({...T0,fin:1},'fotos',null,{wait:700}),T({...T0,fin:1},'desp','camdesp'),T({...T0,fin:1,foto:1},'desp')]},
+    {c:1,t:'Pulsa Listo',d:'Si no hay más trabajos: <b>No, volver al parte</b>.',ph:[T({...T0,fin:1,foto:1},'desp','listo'),T({...T0,fin:1,foto:1,over:'otro'},'desp','volver')]},
+    {c:2,t:'Medidas antiincendios',d:'El trabajo sale con ✓ verde. Marca <b>todas</b> las medidas tomadas: es obligatorio.',ph:[P(P1,'trabajos',null,{wait:1100}),P(P1,'medidas','med0'),P({...P1,med:1},'medidas')]},
+    ...(sup?[{c:2,t:'Foto del formato 1',d:'Opcional: una foto de cada hoja del formato 1.',ph:[P({...P1,med:1},'f1','f1cam')],only:1}]:[]),
+    {c:2,t:'Cierra el parte',d:'Toca <b>Cerrar parte</b>, contesta lo de las horas extra y <b>Acepta</b>.',ph:[P({...P1,med:1},'obs','cerrar'),P({...P1,med:1,over:'extras'},'obs','extno'),P({...P1,med:1,over:'confirma'},'obs','aceptar')]},
+    {c:2,t:'Envíalo',d:'Toca <b>Enviar a la oficina</b>. En verde = entregado ✓.',ph:[{v:'envio',s:{m:'cerrado'},hit:'enviar'},{v:'envio',s:{m:'ok'}}]},
+    {c:2,t:'¿Sin cobertura?',d:'No pasa nada: se envía <b>solo</b> cuando vuelve la señal.',ph:[{v:'inicio',s:{cola:1},hit:'ahora'}]},
+    {c:2,t:'¿Algo mal? Corrígelo',d:'<b>Corregir el parte</b> crea una revisión nueva. La oficina guarda las dos.',ph:[{v:'envio',s:{m:'visto'},to:'corregir',hit:'corregir'}]},
+    {c:2,t:'La próxima vez, más rápido',d:'Desde el 2.º parte puedes <b>copiar del anterior</b> el personal, los equipos y las medidas.',ph:[{v:'inicio',s:{repetir:1},hit:'copiar'}]},
+  ];
+};
+
+/* ====== Guía completa: Instalar → Registrarse → Hacer un parte ======
+   Las guías de instalación y registro son pantallas fijas por paso (raw); las del parte son pantallas
+   largas que bajan (VIEWS). El mismo reproductor sirve para las dos. */
+const sb=t=>`<div class="sb and ${t}"><span>9:41</span><span class="sb-r">5G ${SIG}<span class="bat"></span></span></div>`;
+const T_TOQUE=1700, T_VER=800, T_BAJAR=350, T_TECLEO=1700, T_LEER=1200;
+const tecleo=f=>f.s&&(f.s.busca||f.s.tec||f.s.ref==='tecleo'||f.s.via==='tecleo');
+const durOf=st=>st.dur||st.ph.reduce((a,f)=>a+(f.hit?T_TOQUE:(f.wait||T_VER))+(f.to?T_BAJAR:0)+(tecleo(f)?T_TECLEO:0),T_LEER);
+
+const deInstalar=(g,cap)=>({...g,CH:[cap],steps:g.steps.map(x=>({c:0,t:x.t,d:x.d,dur:x.dur||DUR,ph:[{raw:x.s}]}))});
+const GUIDES={
+  iphone:{...deInstalar(GI.iphone,'Instalar en iPhone'),sub:'iPhone',subSm:'Safari',next:{to:'registro',txt:'Ahora: Registrarse'}},
+  android:{...deInstalar(GI.android,'Instalar en Android'),sub:'Android',subSm:'Chrome',next:{to:'registro',txt:'Ahora: Registrarse'}},
+  pc:{...deInstalar(GI.pc,'Instalar en el ordenador'),sub:'Ordenador',subSm:'Chrome o Edge',next:{to:'registro',txt:'Ahora: Registrarse'}},
+  registro:{...deInstalar(GI.registro,'Registrarse'),next:{to:'infra',txt:'Ahora: Hacer un parte'}},
+  infra:{device:'phone',os:'and',CH,steps:mk('infra'),sub:'Parte de INFRA',subSm:'Infraestructura',cls:'infra',next:{to:'super',txt:'Ver el parte de SUPER'}},
+  super:{device:'phone',os:'and',CH,steps:mk('super'),sub:'Parte de SUPER',subSm:'Superestructura',cls:'super',next:{to:'maq',txt:'Ver el parte de MAQUINARIA'}},
+  maq:{device:'phone',os:'and',CH,steps:mkMaq(),sub:'Maquinaria de vía',subSm:'Bateadora',cls:'maq'},
+};
+const STAGES=[
+  {k:'instalar',n:1,pre:'Primero',label:'Instalar',subs:['iphone','android','pc']},
+  {k:'registro',n:2,pre:'Después',label:'Registrarse',subs:['registro']},
+  {k:'parte',n:3,pre:'Por último',label:'Hacer un parte',subs:['infra','super','maq']},
+];
+const stageOf=k=>STAGES.find(s=>s.subs.includes(k));
 
 /* ---------- Reproductor ---------- */
 const $=id=>document.getElementById(id);
@@ -715,33 +1122,40 @@ const scr=$('scr'),zoom=$('zoom'),screen=$('screen'),tap=$('tap'),prog=$('prog')
 const playBtn=$('play'),prevBtn=$('prev'),nextBtn=$('next'),nextGuide=$('nextguide');
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let dev=detect(),idx=0,playing=!reduce,ended=false,tapTimer=0,typeTok=0,lastDevice='';
+let dev=detect(),idx=0,playing=!reduce,ended=false,typeTok=0,ultimoAparato=dev in GI&&dev!=='registro'?dev:'android';
 
 function detect(){
   const h=(location.hash||'').slice(1);
   if(GUIDES[h]) return h;
+  if(h==='parte') return 'infra';
   const ua=navigator.userAgent||'';
   if(/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)) return 'iphone';
   if(/Android/.test(ua)) return 'android';
   return 'pc';
 }
 
-$('tabs').innerHTML=ORDER.map(k=>{const g=GUIDES[k];return `<button class="tab" type="button" role="tab" id="tab-${k}" data-k="${k}"><span class="n">${g.n}</span><small>${g.pre}</small><b>${g.label}</b></button>`;}).join('');
-$('tabs').addEventListener('click',e=>{const b=e.target.closest('.tab'); if(b) choose(b.dataset.k,true);});
+$('tabs').innerHTML=STAGES.map(s=>`<button class="tab" type="button" role="tab" id="st-${s.k}" data-st="${s.k}"><span class="n">${s.n}</span><small>${s.pre}</small><b>${s.label}</b></button>`).join('');
+$('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b) return;
+  const s=STAGES.find(x=>x.k===b.dataset.st);
+  choose(s.k==='instalar'?ultimoAparato:s.subs[0],true);
+});
+$('subtabs').addEventListener('click',e=>{const b=e.target.closest('.chip'); if(b) choose(b.dataset.k,false);});
 
 function choose(k,scroll){
-  dev=k; idx=0; ended=false; playing=!reduce; render();
-  if(scroll){const t=player.getBoundingClientRect().top; if(t<0||t>innerHeight*.4) player.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}
+  dev=k; idx=0; ended=false; playing=!reduce; screen.dataset.v='';
+  if(stageOf(k).k==='instalar') ultimoAparato=k;
+  render();
+  if(scroll){const t=player.getBoundingClientRect().top; if(t<0||t>innerHeight*.45) $('tabs').scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}
 }
-
+const dw=()=>DW[GUIDES[dev].device];
 function fit(){
-  const dw=DW[GUIDES[dev].device],W=scr.clientWidth,H=scr.clientHeight;
+  const W=scr.clientWidth,H=scr.clientHeight;
   if(!W||!H) return 1;
-  const k=W/dw;
-  zoom.style.width=dw+'px'; zoom.style.height=(H/k)+'px'; zoom.style.transform=`scale(${k})`;
+  const k=W/dw();
+  zoom.style.width=dw()+'px'; zoom.style.height=(H/k)+'px'; zoom.style.transform=`scale(${k})`;
   return k;
 }
-
 function setPlaying(p){
   playing=p;
   player.classList.toggle('paused',!p);
@@ -749,82 +1163,128 @@ function setPlaying(p){
   playBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${ico}</svg>${ended?'Ver otra vez':p?'Pausa':'Seguir'}`;
 }
 
+/* Desplazamiento (solo pantallas largas): la tarjeta pedida queda arriba sin pasarse del final. */
+function destino(f){
+  const sc=screen.querySelector('.a-scroll'), body=screen.querySelector('.a-body');
+  if(!sc||!body||!f.to) return 0;
+  const el=sc.querySelector(`[data-c="${f.to}"]`);
+  if(!el) return 0;
+  let top=0; for(let n=el;n&&n!==sc;n=n.offsetParent) top+=n.offsetTop;
+  return Math.max(0,Math.min(top-10,Math.max(0,sc.offsetHeight-body.clientHeight)));
+}
+function ponScroll(y,suave){
+  const sc=screen.querySelector('.a-scroll'); if(!sc) return;
+  sc.style.transition=suave?'transform .7s cubic-bezier(.3,.7,.25,1)':'none';
+  sc.style.transform=`translateY(${-y}px)`;
+  sc.dataset.y=y;
+}
+/* Pinta una fase. Pantalla fija: se sustituye. Pantalla larga de la misma vista: se actualiza y baja. */
+function pinta(f){
+  if(f.raw){ screen.innerHTML=f.raw(); screen.dataset.v='raw'; return 0; }
+  const misma=screen.dataset.v===f.v;
+  const sc0=screen.querySelector('.a-scroll'), y0=misma&&sc0?+sc0.dataset.y||0:0;
+  screen.innerHTML=VIEWS[f.v](dev,f.s||{});
+  screen.dataset.v=f.v;
+  if(misma) screen.firstElementChild.classList.add('sin-fundido');
+  if(f.hit){const h=screen.querySelector(`[data-k="${f.hit}"]`); if(h) h.classList.add('hit');}
+  ponScroll(y0,false);
+  const y=destino(f);
+  if(reduce||y===y0){ponScroll(y,false);return 0;}
+  void screen.offsetHeight;
+  ponScroll(y,true);
+  return 750;
+}
 function placeTap(target){
   const h=target||screen.querySelector('.hit');
-  if(!h){tap.hidden=true;return;}
-  const pc=GUIDES[dev].device==='pc',z=zoom.getBoundingClientRect(),k=z.width/DW[GUIDES[dev].device],r=h.getBoundingClientRect();
+  if(!h){tap.hidden=true;return null;}
+  const pc=GUIDES[dev].device==='pc',z=zoom.getBoundingClientRect(),k=z.width/dw(),r=h.getBoundingClientRect();
   const fx=pc?.5:(r.width>150*k?.76:.5),fy=pc?.55:.62;
   tap.style.left=((r.left-z.left)+r.width*fx)/k+'px';
   tap.style.top=((r.top-z.top)+r.height*fy)/k+'px';
   tap.hidden=false;
+  return h;
 }
-
+/* Lo que pasa en la pantalla antes del toque final: copiar, pegar o teclear. */
 async function typeAll(tok){
   const cp=screen.querySelector('[data-copy]');
   if(cp){
     const copied=()=>{cp.classList.add('ok');cp.textContent='¡Copiada!';const t=screen.querySelector('.ctoast');if(t)t.classList.add('show');};
     if(reduce){copied();return;}
-    await sleep(800); if(tok!==typeTok) return;
+    await sleep(500); if(tok!==typeTok) return;
     placeTap(cp);
     await sleep(1500); if(tok!==typeTok) return;
     copied();
     return;
   }
-  const els=[...screen.querySelectorAll('[data-type]')];
-  if(!els.length){ if(!reduce) await sleep(450); return; }
-  for(const el of els){
+  for(const el of screen.querySelectorAll('[data-type]')){
     const t=el.dataset.type,bubble=el.dataset.paste&&screen.querySelector('.paste');
     if(reduce){el.textContent=t;if(bubble)bubble.remove();continue;}
     el.textContent='';
     if(bubble){
-      await sleep(900); if(tok!==typeTok) return;
+      await sleep(600); if(tok!==typeTok) return;
       placeTap(bubble);
       await sleep(1600); if(tok!==typeTok) return;
       bubble.remove(); el.textContent=t;
       await sleep(300);
       continue;
     }
-    await sleep(500);
+    await sleep(350);
     for(let i=1;i<=t.length;i++){
       if(tok!==typeTok) return;
       el.textContent=t.slice(0,i);
-      await sleep(Math.max(28,1500/t.length));
+      await sleep(Math.max(90,1300/t.length));
     }
+    await sleep(200);
   }
-  await sleep(250);
 }
-
+// Fases del paso: pintar (y bajar si hace falta), copiar/pegar/teclear, llevar el dedo y hundir el botón.
+async function animar(st,tok){
+  for(let i=0;i<st.ph.length;i++){
+    const f=st.ph[i];
+    const bajar=pinta(f);
+    if(screen.querySelector('[data-type],[data-copy]')) tap.hidden=true;
+    await sleep(bajar||(i===0?550:350)); if(tok!==typeTok) return;
+    await typeAll(tok); if(tok!==typeTok) return;
+    const h=placeTap();
+    if(!h){ await sleep(f.wait||450); if(tok!==typeTok) return; continue; }
+    await sleep(700); if(tok!==typeTok) return;
+    h.classList.add('pressed');
+    if(i<st.ph.length-1){ await sleep(420); if(tok!==typeTok) return; }
+  }
+}
 function render(){
-  const g=GUIDES[dev],st=g.steps[idx],n=g.steps.length,last=idx===n-1;
-  if(lastDevice!==dev){tap.hidden=true; lastDevice=dev;}
+  const g=GUIDES[dev],st=g.steps[idx],n=g.steps.length,last=idx===n-1,stg=stageOf(dev);
   device.className='device '+g.device;
   zoom.dataset.os=g.os;
-  tap.className='tap'+(g.device==='pc'?' cursor':'');
-  tap.innerHTML=g.device==='pc'?CURSOR:HAND;
   fit();
-  screen.innerHTML=st.s();
-  $('count').textContent=`Paso ${idx+1} de ${n}`;
-  $('stitle').textContent=st.t;
+  $('count').textContent=`${g.CH[st.c]} · Paso ${idx+1} de ${n}`;
+  $('stitle').innerHTML=st.t+(st.only?'<span class="tag only">solo SUPER</span>':'');
   $('sdesc').innerHTML=st.d;
-  prog.style.setProperty('--dur',(st.dur||DUR)+'ms');
-  prog.innerHTML=g.steps.map((_,i)=>`<span class="${i<idx?'done':i===idx?'on':''}"><i></i></span>`).join('');
+  prog.style.setProperty('--dur',durOf(st)+'ms');
+  prog.innerHTML=g.steps.map((s,i)=>`<span class="${i<idx?'done':i===idx?'on':''}${i>0&&s.c!==g.steps[i-1].c?' ch':''}"><i></i></span>`).join('');
   prog.querySelector('.on i').addEventListener('animationend',()=>{ if(idx<n-1){idx++;render();} else {ended=true;setPlaying(false);} });
-  stepsEl.innerHTML=g.steps.map((s,i)=>`<li class="${i<idx?'done':i===idx?'on':''}"><button type="button" data-i="${i}"><span class="n">${i+1}</span><span>${s.t}</span></button></li>`).join('');
-  ORDER.forEach(k=>$('tab-'+k).setAttribute('aria-selected',String(k===dev)));
+  let cAnt=-1;
+  stepsEl.innerHTML=g.steps.map((s,i)=>{const cab=g.CH.length>1&&s.c!==cAnt?`<li class="chh">${g.CH[s.c]}</li>`:''; cAnt=s.c;
+    return `${cab}<li class="${i<idx?'done':i===idx?'on':''}"><button type="button" data-i="${i}"><span class="n">${i+1}</span><span>${s.t}${s.only?'<span class="tag only">solo SUPER</span>':''}</span></button></li>`;}).join('');
+  STAGES.forEach(s=>$('st-'+s.k).setAttribute('aria-selected',String(s===stg)));
+  const subs=stg.subs.length>1?stg.subs:[];
+  $('subtabs').hidden=!subs.length;
+  $('subtabs').innerHTML=subs.map(k=>`<button class="chip ${GUIDES[k].cls||''}" type="button" data-k="${k}" aria-selected="${k===dev}">${GUIDES[k].sub}<small>${GUIDES[k].subSm}</small></button>`).join('');
   prevBtn.disabled=idx===0; nextBtn.disabled=last;
-  nextGuide.hidden=!(last&&dev!=='registro');
+  nextGuide.hidden=!(last&&g.next);
+  if(g.next) nextGuide.firstChild.textContent=g.next.txt;
   setPlaying(playing);
-  clearTimeout(tapTimer);
-  if(screen.querySelector('[data-type],[data-copy]')) tap.hidden=true;
+  tap.className='tap'+(g.device==='pc'?' cursor':''); tap.innerHTML=g.device==='pc'?CURSOR:HAND;
   const tok=++typeTok;
-  typeAll(tok).then(()=>{ if(tok===typeTok) placeTap(); });
+  // Con movimiento reducido se enseña directamente la última fase del paso.
+  if(reduce){pinta(st.ph[st.ph.length-1]);typeAll(tok).then(()=>placeTap());}
+  else animar(st,tok);
 }
-
 stepsEl.addEventListener('click',e=>{const b=e.target.closest('button'); if(b){idx=+b.dataset.i;ended=false;render();}});
 prevBtn.addEventListener('click',()=>{if(idx>0){idx--;ended=false;render();}});
 nextBtn.addEventListener('click',()=>{if(idx<GUIDES[dev].steps.length-1){idx++;ended=false;render();}});
 playBtn.addEventListener('click',()=>{ if(ended){ended=false;idx=0;playing=true;render();return;} setPlaying(!playing); });
-nextGuide.addEventListener('click',()=>choose('registro',true));
+nextGuide.addEventListener('click',()=>{const g=GUIDES[dev]; if(g.next) choose(g.next.to,true);});
 addEventListener('keydown',e=>{
   if(e.target.closest('input,textarea,summary')) return;
   if(e.key==='ArrowRight') nextBtn.click();
