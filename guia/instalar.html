@@ -8,505 +8,761 @@
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Instalar Partes LAV</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: cabecera con la dirección de la app, selector de dispositivo y reproductor (pantalla animada + lista de pasos) que se apila en móvil */
+/* Layout: banda azul marino con traviesas (como el icono), selector de dispositivo en cuadrícula y reproductor
+   (aparato animado + explicación); en móvil el aparato y la explicación caben juntos en una pantalla */
 :root{
-  --bg:#F2F4F7; --surface:#FFFFFF; --fg:#16202B; --muted:#5A6777; --line:#D6DCE4;
-  --accent:#D9530C; --accent-ink:#FFFFFF; --shadow:rgba(20,30,45,.35);
-  --frame:#1C222A; --scr-bg:#FFFFFF; --scr-fg:#1B1F24; --scr-muted:#8A929C; --scr-line:#E4E7EB; --scr-chrome:#F4F4F6;
-  --ios-blue:#0A7AFF; --g-blue:#1A73E8; --home-a:#27466B; --home-b:#7FA3C9;
+  --bg:#F2F4F8; --surface:#FFFFFF; --sunken:#E8ECF2; --fg:#0F1A2E; --muted:#56627A; --line:#D3DAE4;
+  --brand:#14213D; --accent:#E2661B; --accent-ink:#FFFFFF; --accent-text:#B5500F; --rail:#E2661B;
+  --sel-bg:#14213D; --sel-fg:#FFFFFF; --shadow:rgba(15,26,46,.32);
+  --frame:#11161F; --frame-edge:#2B3240;
   --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --dur:5000ms;
+  --f-mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --dur:5200ms;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0E141B; --surface:#17202A; --fg:#E6EBF1; --muted:#98A5B4; --line:#2A3542;
-  --accent:#FF7B36; --accent-ink:#1A0C04; --shadow:rgba(0,0,0,.65); --frame:#05080B; color-scheme:dark }}
+  --bg:#0A1020; --surface:#121A2E; --sunken:#0D1426; --fg:#E8ECF4; --muted:#9AA6BD; --line:#26324C;
+  --accent:#FF8A3D; --accent-ink:#1B0B02; --accent-text:#FF9F5E; --rail:#E2661B;
+  --sel-bg:#E8ECF4; --sel-fg:#0F1A2E; --shadow:rgba(0,0,0,.7); --frame:#05070B; --frame-edge:#3A4356; color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#0E141B; --surface:#17202A; --fg:#E6EBF1; --muted:#98A5B4; --line:#2A3542;
-  --accent:#FF7B36; --accent-ink:#1A0C04; --shadow:rgba(0,0,0,.65); --frame:#05080B; color-scheme:dark }
+  --bg:#0A1020; --surface:#121A2E; --sunken:#0D1426; --fg:#E8ECF4; --muted:#9AA6BD; --line:#26324C;
+  --accent:#FF8A3D; --accent-ink:#1B0B02; --accent-text:#FF9F5E; --rail:#E2661B;
+  --sel-bg:#E8ECF4; --sel-fg:#0F1A2E; --shadow:rgba(0,0,0,.7); --frame:#05070B; --frame-edge:#3A4356; color-scheme:dark }
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.5}
-.wrap{max-width:1060px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-button{font:inherit;cursor:pointer}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-code{font-family:ui-monospace,Consolas,monospace;font-size:.92em;overflow-wrap:anywhere}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+code{font-family:var(--f-mono);font-size:.88em;overflow-wrap:anywhere}
 
-.top{background:var(--surface);border-bottom:1px solid var(--line)}
-.top .wrap{padding-block:28px 24px}
-.eyebrow{margin:0 0 6px;font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
-h1{margin:0 0 8px;font-family:var(--f-display);font-weight:700;font-size:clamp(30px,5vw,44px);line-height:1.04;text-wrap:balance}
-.lede{margin:0 0 18px;color:var(--muted);max-width:62ch}
-.urlbox{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;max-width:680px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-.urlbox span{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.urlbox code{flex:1 1 240px;min-width:0;font-size:14px;user-select:all}
-.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 14px;font-weight:600;font-size:14px}
-.btn:hover{border-color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+/* ---------- Cabecera ---------- */
+.hero{color:#fff;border-bottom:3px solid var(--rail);
+  background:repeating-linear-gradient(90deg,transparent 0 54px,rgba(226,102,27,.10) 54px 66px),linear-gradient(160deg,#14213D 0%,#1C2F57 100%)}
+.hero-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:12px 40px;align-items:end;padding-block:30px 26px}
+.brand{display:flex;align-items:center;gap:14px}
+.brand .pl{flex:none;width:54px;height:54px;border-radius:14px;box-shadow:0 0 0 1px rgba(255,255,255,.18),0 8px 18px -8px rgba(0,0,0,.6)}
+.eyebrow{margin:0 0 3px;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#F6A672}
+h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4.4vw,44px);line-height:1;text-wrap:balance}
+.lede{grid-column:1;margin:0;max-width:56ch;color:rgba(255,255,255,.8);font-size:16px}
+.urlbox{grid-column:2;grid-row:1/span 2;display:flex;flex-direction:column;gap:6px;padding:12px 12px 12px 16px;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(255,255,255,.07);min-width:0}
+.urlbox .lbl{font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.url-row{display:flex;align-items:center;gap:10px;min-width:0}
+.url-row code{flex:1;min-width:0;font-size:14px;color:#fff}
+.copy{flex:none;min-height:34px;padding:0 14px;border:0;border-radius:9px;background:#fff;color:#14213D;font-weight:700;font-size:13.5px}
+.copy:hover{background:#FCE3D3}
 
-main.wrap{padding-block:24px 56px}
-.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
-.tab{display:flex;align-items:baseline;gap:8px;padding:8px 18px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--fg)}
-.tab b{font-family:var(--f-display);font-size:19px;letter-spacing:.02em}
-.tab small{font-size:13px;color:var(--muted)}
-.tab[aria-selected="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
-.tab[aria-selected="true"] small{color:inherit;opacity:.75}
+/* ---------- Pestañas ---------- */
+main.wrap{padding-block:20px 56px}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:18px}
+.tab{position:relative;display:flex;flex-direction:column;align-items:flex-start;padding:10px 12px 11px 46px;border:1.5px solid var(--line);border-radius:13px;background:var(--surface);text-align:left;transition:border-color .15s,background .15s}
+.tab .n{position:absolute;left:13px;top:50%;display:grid;place-items:center;width:23px;height:23px;margin-top:-11.5px;border-radius:50%;background:var(--sunken);color:var(--muted);font-size:12px;font-weight:700}
+.tab small{font-size:12.5px;line-height:1.2;color:var(--muted)}
+.tab b{font-family:var(--f-display);font-size:21px;line-height:1.1;letter-spacing:.01em}
+.tab:hover{border-color:var(--accent)}
+.tab[aria-selected="true"]{border-color:var(--sel-bg);background:var(--sel-bg);color:var(--sel-fg)}
+.tab[aria-selected="true"] small{color:inherit;opacity:.7}
+.tab[aria-selected="true"] .n{background:var(--accent);color:#fff}
 
-.player{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:32px;align-items:start}
-@media (max-width:780px){.player{grid-template-columns:minmax(0,1fr);gap:20px}}
-.stage{display:flex;justify-content:center;align-items:center;min-height:320px;padding:28px 16px;border:1px solid var(--line);border-radius:16px;
-  background:repeating-linear-gradient(90deg,transparent 0 38px,color-mix(in srgb,var(--line) 55%,transparent) 38px 48px),var(--surface)}
-
-.device{position:relative;background:var(--frame);box-shadow:0 20px 44px -20px var(--shadow)}
-.device.phone{width:min(272px,100%);aspect-ratio:9/19.2;border-radius:42px;padding:9px}
-.device.pc{width:100%;max-width:580px;aspect-ratio:16/10.5;border-radius:12px;padding:8px}
-.scr{position:relative;width:100%;height:100%;overflow:hidden;background:var(--scr-bg);color:var(--scr-fg);font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:11px;line-height:1.3}
-.phone .scr{border-radius:33px}
-.pc .scr{border-radius:5px;font-size:10px}
-#screen{position:absolute;inset:0}
+/* ---------- Reproductor ---------- */
+.player{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,400px);gap:32px;align-items:start;scroll-margin-top:10px}
+.stage{display:flex;justify-content:center;align-items:center;padding:24px 16px;border:1px solid var(--line);border-radius:20px;background:radial-gradient(120% 90% at 50% 0%,var(--surface),var(--sunken))}
+.device{position:relative;flex:none;background:var(--frame);box-shadow:0 0 0 1.5px var(--frame-edge),0 26px 50px -24px var(--shadow)}
+.device.phone{height:clamp(420px,calc(100vh - 345px),620px);aspect-ratio:9/19.3;max-width:100%;padding:10px;border-radius:48px}
+.device.pc{width:100%;max-width:680px;aspect-ratio:16/10.4;padding:9px;border-radius:14px}
+.device.pc::after{content:"";position:absolute;left:50%;bottom:-16px;width:34%;height:9px;transform:translateX(-50%);border-radius:0 0 10px 10px;background:var(--frame);box-shadow:0 0 0 1.5px var(--frame-edge)}
+.scr{position:relative;width:100%;height:100%;overflow:hidden;background:#000;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.3;-webkit-font-smoothing:antialiased}
+.phone .scr{border-radius:38px}
+.pc .scr{border-radius:5px}
+#zoom{position:absolute;left:0;top:0;transform-origin:0 0}
+#zoom[data-os="ios"]::after{content:"";position:absolute;z-index:40;top:11px;left:50%;width:92px;height:27px;margin-left:-46px;border-radius:999px;background:#000}
+#zoom[data-os="and"]::after{content:"";position:absolute;z-index:40;top:11px;left:50%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#000}
+#screen{position:absolute;inset:0;font-size:12px}
 #screen>*{position:absolute;inset:0;animation:fadein .35s ease}
-.tap{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;z-index:9;pointer-events:none;
-  border:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 30%,transparent);transition:left .5s ease,top .5s ease;animation:press 1.4s ease-in-out infinite}
-.tap::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--accent);animation:ripple 1.4s ease-out infinite}
-.hit{outline:2px solid color-mix(in srgb,var(--accent) 75%,transparent);outline-offset:2px;border-radius:8px}
-@keyframes ripple{from{transform:scale(1);opacity:.9}to{transform:scale(2.2);opacity:0}}
-@keyframes press{0%,100%{transform:scale(1)}50%{transform:scale(.8)}}
+
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.prog{display:flex;gap:5px}
+.prog span{flex:1;height:5px;overflow:hidden;border-radius:3px;background:var(--line)}
+.prog span.done{background:var(--accent)}
+.prog i{display:block;width:0;height:100%;background:var(--accent)}
+.prog .on i{animation:fill var(--dur) linear forwards}
+.paused .prog .on i{animation-play-state:paused}
+.count{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-text)}
+.now h2{margin:2px 0 6px;font-family:var(--f-display);font-weight:700;font-size:34px;line-height:1.02;text-wrap:balance}
+.now p{min-height:4.6em;margin:0;color:var(--muted);font-size:16.5px}
+.now p b{color:var(--fg)}
+.now code{padding:1px 5px;border-radius:5px;background:var(--sunken);color:var(--fg)}
+.ctrl{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px}
+.cbtn{display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:0 10px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);font-weight:600;font-size:15px;white-space:nowrap}
+.cbtn svg{flex:none;width:18px;height:18px}
+.cbtn:hover:not(:disabled){border-color:var(--accent)}
+.cbtn.primary{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.cbtn:disabled{opacity:.38;cursor:default}
+.nextguide{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border:0;border-radius:12px;background:var(--sel-bg);color:var(--sel-fg);font-weight:700;font-size:16px;animation:fadein .4s ease}
+.nextguide svg{width:18px;height:18px}
+.steps{margin:2px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.steps button{display:grid;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:12px;width:100%;padding:9px 2px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--muted);text-align:left;font-size:15px}
+.steps button:hover{color:var(--fg)}
+.steps .n{display:grid;place-items:center;width:24px;height:24px;border:1.5px solid var(--line);border-radius:50%;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.steps .done button{color:var(--fg)}
+.steps .done .n{border-color:var(--fg);background:var(--fg);color:var(--bg)}
+.steps .on button{color:var(--fg);font-weight:600}
+.steps .on .n{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+
+/* ---------- Ayuda ---------- */
+.help{margin-top:48px}
+.help h2{margin:0 0 4px;font-family:var(--f-display);font-weight:700;font-size:30px}
+.help>p{margin:0 0 14px;color:var(--muted)}
+.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.faq details{border:1px solid var(--line);border-radius:13px;background:var(--surface)}
+.faq summary{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;font-weight:600;cursor:pointer;list-style:none}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";flex:none;font-size:22px;font-weight:600;line-height:1;color:var(--accent-text)}
+.faq details[open] summary::after{content:"–"}
+.faq p{margin:0;padding:0 16px 15px;color:var(--muted);font-size:15.5px}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+.foot a{color:var(--accent-text)}
+
+@media (max-width:860px){
+  .hero-in{grid-template-columns:minmax(0,1fr);gap:12px;padding-block:18px 16px}
+  .brand{gap:12px}
+  .brand .pl{width:44px;height:44px;border-radius:11px}
+  .eyebrow{font-size:12px}
+  .lede{font-size:15px}
+  .urlbox{grid-column:1;grid-row:auto;padding:7px 7px 7px 12px;border-radius:12px}
+  .urlbox .lbl{display:none}
+  .url-row code{font-size:13px}
+  main.wrap{padding-block:14px 48px}
+  .tabs{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px}
+  .tab{padding:8px 10px 9px 42px}
+  .tab .n{left:11px}
+  .tab b{font-size:19px}
+  .player{grid-template-columns:minmax(0,1fr);gap:14px}
+  .stage{padding:16px 10px;border-radius:18px}
+  .device.phone{height:clamp(360px,54vh,560px);padding:8px;border-radius:40px}
+  .phone .scr{border-radius:32px}
+  .now h2{font-size:27px}
+  .now p{min-height:4.5em;font-size:15.5px}
+  .steps{display:none}
+  .ctrl{grid-template-columns:auto minmax(0,1fr) auto}
+  .cbtn{padding:0 13px;font-size:14.5px}
+  .faq{grid-template-columns:minmax(0,1fr)}
+}
+
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 @keyframes up{from{transform:translateY(100%)}to{transform:none}}
-@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes drop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pop{from{transform:scale(.88);opacity:0}to{transform:none;opacity:1}}
 @keyframes blink{50%{opacity:0}}
+@keyframes fill{to{width:100%}}
+@keyframes ring{0%,30%{transform:scale(.4);opacity:0}45%{opacity:.95}100%{transform:scale(1.6);opacity:0}}
+@keyframes press{0%,28%,62%,100%{transform:translate(0,0) scale(1)}42%,50%{transform:translate(0,3px) scale(.94)}}
 
-/* Piezas de las pantallas simuladas (colores fijos: la pantalla del aparato no cambia con el tema) */
-.sb{display:flex;justify-content:space-between;align-items:center;height:30px;padding:10px 22px 4px;font-size:11px;font-weight:600}
+/* ---------- Dedo / puntero ---------- */
+.tap{position:absolute;z-index:50;width:0;height:0;pointer-events:none;transition:left .55s cubic-bezier(.3,.7,.3,1),top .55s cubic-bezier(.3,.7,.3,1)}
+.tap .ring{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2.5px solid #E2661B;background:rgba(226,102,27,.28);animation:ring 1.7s ease-out infinite}
+.tap .hand{position:absolute;left:-13.5px;top:-1px;width:36px;height:46px;transform-origin:13.5px 1px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35));animation:press 1.7s ease-in-out infinite}
+.tap.cursor .ring{left:-12px;top:-12px;width:24px;height:24px}
+.tap.cursor .hand{left:-3px;top:-2px;width:18px;height:22px;transform-origin:3px 2px}
+.hit{outline:2.5px solid #E2661B;outline-offset:2px}
+
+/* ---------- Pantallas simuladas (medidas de diseño: móvil 300 px, ordenador 640 px de ancho) ---------- */
+.sb{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;height:46px;padding:14px 24px 0 32px;font-size:14px;font-weight:600;color:#111}
 .sb.light{color:#fff}
-.sb.and{height:24px;padding:6px 16px 2px;font-size:10px}
-.sb-r{display:flex;align-items:center;gap:4px;font-size:9px}
-.sb-r i{position:relative;display:inline-block;width:18px;height:9px;border:1.5px solid currentColor;border-radius:3px}
-.sb-r i::after{content:"";position:absolute;inset:1px 4px 1px 1px;background:currentColor;border-radius:1px}
-.home{display:flex;flex-direction:column;background:linear-gradient(160deg,var(--home-a),var(--home-b));color:#fff}
-.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 4px;padding:14px 12px 0}
-.ic{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px}
-.ic i{position:relative;display:grid;place-items:center;width:44px;height:44px;border-radius:11px;font-style:normal;font-weight:700;font-size:14px;color:#fff}
-.ic span{white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.35)}
-.dock{display:grid;grid-template-columns:repeat(4,1fr);justify-items:center;margin:auto 10px 12px;padding:9px 4px;border-radius:24px;background:rgba(255,255,255,.25)}
-.and .ic i{border-radius:50%}
-.and .dock{background:transparent;margin-bottom:16px}
-.clock{padding:18px 18px 4px;font-size:40px;font-weight:300;line-height:1}
-.clock small{display:block;margin-top:6px;font-size:10px;font-weight:500}
-.pl{position:relative;display:block;font-style:normal;color:transparent;overflow:hidden;background:#14213D url("data:image/png;base64,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") center/cover no-repeat}
-.ic i.pl{color:transparent}
-.ic.new i{animation:pop .6s ease .2s backwards}
-.safari{background:linear-gradient(#5AC8FA,#0A7AFF)}
-.safari::before{content:"";position:absolute;inset:0;margin:auto;width:28px;height:28px;border-radius:50%;border:2px solid #fff}
-.safari::after{content:"";position:absolute;inset:0;margin:auto;width:4px;height:20px;border-radius:2px;background:linear-gradient(#FF3B30 50%,#fff 50%);transform:rotate(45deg)}
-.chrome{background:#fff}
-.chrome::before{content:"";position:absolute;inset:0;margin:auto;width:32px;height:32px;border-radius:50%;background:conic-gradient(from -30deg,#EA4335 0 120deg,#FBBC04 0 240deg,#34A853 0)}
-.chrome::after{content:"";position:absolute;inset:0;margin:auto;width:13px;height:13px;border-radius:50%;background:#4285F4;box-shadow:0 0 0 2.5px #fff}
+.sb.and{height:34px;padding:9px 18px 0 22px;font-size:12.5px;font-weight:500}
+.sb.dk{background:#1E1A19;color:#EDE6E2}
+.sb.navy{background:#14213D;color:#fff}
+.sb-r{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700}
+.sig{display:inline-flex;align-items:flex-end;gap:1.5px;height:10px}
+.sig i{width:3px;border-radius:1px;background:currentColor}
+.bat{position:relative;width:23px;height:11px;border:1.5px solid currentColor;border-radius:3.5px;opacity:.95}
+.bat::after{content:"";position:absolute;inset:1.5px 5px 1.5px 1.5px;border-radius:1.5px;background:currentColor}
+.hb{position:absolute;z-index:30;left:50%;bottom:7px;width:118px;height:4.5px;margin-left:-59px;border-radius:3px;background:rgba(0,0,0,.85)}
+.hb.l{background:rgba(255,255,255,.9)}
+.grow{flex:1}
+.caret{display:inline-block;width:2px;height:15px;margin-left:1px;vertical-align:-3px;background:#0A7AFF;animation:blink 1s steps(1) infinite}
+.caret.w{background:#EDE6E2}
+.caret.g{background:#1A73E8}
 
-.ap{height:100%;display:flex;flex-direction:column;background:#F5F6F8;color:#1B1F24}
-.ap-h{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#14213D;color:#fff;font-weight:700;font-size:12px}
-.ap-h .pl{width:20px;height:20px;border-radius:5px;font-size:9px}
-.ap-c{display:flex;flex-direction:column;gap:4px;padding:10px 12px}
-.ap.wide .ap-c{width:60%;margin:0 auto}
-.ap-l{margin-top:4px;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:#6B7480}
-.ap-f{padding:6px 8px;border:1px solid #DDE1E6;border-radius:6px;background:#fff;font-size:10px}
-.ap-f.tall{height:44px}
-.ap-b{margin-top:8px;padding:8px;border-radius:6px;background:#14213D;color:#fff;text-align:center;font-weight:700;font-size:11px}
-.dim{position:relative}
-.dim::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.35)}
+.home{display:flex;flex-direction:column;color:#fff}
+.ios-home{background:linear-gradient(165deg,#173254 0%,#2F5D8C 48%,#8FB5D6 100%)}
+.and-home{background:linear-gradient(172deg,#2A2340 0%,#58466B 52%,#C99A7A 100%)}
+.apps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 0;padding:22px 16px 0}
+.ic{display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:14px;font-size:10.5px}
+.ic i{position:relative;display:grid;place-items:center;width:56px;height:56px;border-radius:14px;font-style:normal}
+.ic i svg{width:32px;height:32px}
+.ic span{white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.and-home .ic i{border-radius:50%}
+.and-home .ic i svg{width:28px;height:28px}
+.ic.new i{animation:pop .7s cubic-bezier(.3,1.5,.5,1) .25s backwards}
+.spot{display:flex;align-items:center;gap:5px;align-self:center;margin:auto 0 12px;padding:6px 13px;border-radius:999px;background:rgba(255,255,255,.24);font-size:11.5px;font-weight:600}
+.spot svg{width:12px;height:12px}
+.dock{display:grid;grid-template-columns:repeat(4,1fr);justify-items:center;margin:0 12px 22px;padding:12px 4px;border-radius:32px;background:rgba(255,255,255,.22)}
+.and-home .dock{margin:0 8px 8px;padding:6px 0;background:transparent}
+.clock{padding:16px 22px 6px;font-size:58px;font-weight:300;line-height:1;letter-spacing:-.02em}
+.clock small{display:block;margin-top:8px;font-size:12.5px;font-weight:500;letter-spacing:0}
+.gsearch{display:flex;align-items:center;gap:10px;margin:0 14px 26px;padding:12px 16px;border-radius:999px;background:rgba(255,255,255,.92);color:#444;font-size:13px}
+.gsearch span{flex:1}
+.gsearch svg{width:18px;height:18px}
+.pl{display:block;font-style:normal;background:#14213D url("data:image/png;base64,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") center/cover no-repeat}
+.safari{background:#fff!important}
+.safari::before{content:"";position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle,#62C8FF 0%,#1A7CF5 100%)}
+.safari::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:34px;margin:-17px 0 0 -3px;border-radius:3px;background:linear-gradient(#FF3B30 50%,#fff 50%);transform:rotate(45deg)}
+.chrome{background:#fff!important}
+.chrome::before{content:"";position:absolute;inset:4px;border-radius:50%;background:conic-gradient(from -30deg,#EA4335 0 120deg,#FBBC04 0 240deg,#34A853 0)}
+.chrome::after{content:"";position:absolute;left:50%;top:50%;width:21px;height:21px;margin:-10.5px 0 0 -10.5px;border-radius:50%;background:#4285F4;box-shadow:0 0 0 4px #fff}
 
+/* Pantallas de la app */
+.ap{display:flex;flex-direction:column;background:#EEF0F4;color:#10141C}
+.ap-h{display:flex;align-items:center;gap:8px;min-height:50px;padding:0 14px;background:#14213D;color:#fff;font-weight:700;font-size:16px}
+.ap-h .bk{margin-right:2px;font-size:24px;font-weight:400;line-height:1}
+.ap-h .sub{display:block;font-size:11.5px;font-weight:500;opacity:.78}
+.ap-h .mdots{margin-left:auto;font-size:20px}
+.ap-c{flex:1;position:relative;display:flex;flex-direction:column;gap:12px;padding:14px 12px}
+.card{display:flex;flex-direction:column;gap:11px;padding:16px 14px;border-radius:14px;background:#fff;box-shadow:0 1px 3px rgba(16,20,28,.09)}
+.card h3{margin:0;font-size:19px;font-weight:700}
+.card p{margin:0;font-size:12px;line-height:1.42;color:#5B6472}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:#5B6472}
+.fld b{display:flex;align-items:center;min-height:40px;padding:0 11px;border:1.5px solid #C9CED8;border-radius:9px;background:#fff;color:#10141C;font-size:14px;font-weight:400}
+.fld.focus b{border-color:#1F5FD1;box-shadow:0 0 0 3px rgba(31,95,209,.18)}
+.fld b.pin{justify-content:center;letter-spacing:.45em;font-size:16px}
+.abtn{display:grid;place-items:center;min-height:46px;border-radius:10px;background:#14213D;color:#fff;font-weight:600;font-size:14px}
+.abtn.sec{border:1.5px solid #C9CED8;background:#fff;color:#14213D}
+.alnk{text-align:center;font-size:12px;color:#1F5FD1}
+.aviso{padding:11px 12px;border-radius:10px;background:#FFF4D6;color:#6B4500;font-size:11.5px;line-height:1.4}
+.tipos{display:grid;gap:8px}
+.tipo{display:flex;flex-direction:column;padding:11px 14px;border-radius:12px;color:#fff}
+.tipo b{font-size:18px;letter-spacing:.03em}
+.tipo span{font-size:11px;opacity:.9}
+.vacio{margin:4px 6px;text-align:center;font-size:11.5px;color:#5B6472}
+.ap.wide .ap-c{align-items:center;padding-top:26px}
+.ap.wide .card{width:340px}
+
+/* Safari */
 .saf{display:flex;flex-direction:column;background:#fff}
 .saf-page{flex:1;position:relative;overflow:hidden}
-.saf-bar{padding:8px 12px 14px;border-top:1px solid var(--scr-line);background:var(--scr-chrome)}
-.saf-url{padding:8px 10px;border-radius:10px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px}
-.saf-url .aa{margin-right:6px;font-weight:600}
-.caret{display:inline-block;width:1px;height:12px;margin-left:1px;vertical-align:-2px;background:var(--ios-blue);animation:blink 1s steps(1) infinite}
-.caret.g{background:var(--g-blue)}
-.saf-tools{display:flex;justify-content:space-between;align-items:center;padding:10px 6px 0;color:var(--ios-blue);font-size:17px}
-.saf-tools span{display:grid;place-items:center;width:28px;height:28px}
-.blank{padding:18px 14px;color:var(--scr-muted)}
-.blank h5{margin:0 0 10px;font-size:12px;color:var(--scr-fg)}
-.favs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;font-size:8.5px}
-.favs b{display:block;height:38px;margin-bottom:4px;border-radius:9px;background:#E9EBEE}
-.nt{display:grid;place-items:center;height:100%;padding:20px}
-.nt div{width:100%;padding:9px 12px;border-radius:999px;background:#EEF1F4;color:var(--scr-muted);font-size:10px}
+.dimmed::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.38)}
+.saf-bar{padding:8px 10px 26px;border-top:1px solid #E3E3E6;background:#F7F7F8}
+.saf-url{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;height:40px;padding:0 12px;border-radius:12px;background:#E6E6EA;font-size:14.5px}
+.saf-url .aa{font-weight:600;font-size:13px}
+.saf-url .host{display:flex;align-items:center;justify-content:center;gap:4px}
+.saf-url svg{width:15px;height:15px}
+.saf-tools{display:flex;justify-content:space-around;padding:10px 4px 0;color:#0A7AFF}
+.saf-tools span{display:grid;place-items:center;width:40px;height:34px;border-radius:9px}
+.saf-tools svg{width:24px;height:24px}
+.saf-tools .off{opacity:.3}
+.fav{padding:16px 16px 0;background:#F2F2F7}
+.fav h5{margin:0 0 12px;font-size:17px;font-weight:700}
+.favs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 10px;margin-bottom:20px;text-align:center;font-size:10px;color:#666}
+.favs b{display:grid;place-items:center;height:56px;margin-bottom:5px;border-radius:12px;background:#fff;color:#8E8E93;font-size:20px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.saf-type{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#F7F7F8;border-top:1px solid #E3E3E6}
+.saf-field{flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:40px;padding:0 10px;border-radius:12px;background:#fff;box-shadow:0 0 0 1px #D9D9DE;font-size:14px;white-space:nowrap;overflow:hidden}
+.saf-field svg{flex:none;width:15px;height:15px;color:#8E8E93}
+.saf-field .clr{margin-left:auto}
+.clr{flex:none;display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#B8B8BE;color:#fff;font-size:9px}
+.cancel{color:#0A7AFF;font-size:14px}
+.sheet{position:absolute;left:0;right:0;top:56px;bottom:0;display:flex;flex-direction:column;gap:12px;padding:16px 12px 30px;border-radius:16px 16px 0 0;background:#F2F2F7;animation:up .45s cubic-bezier(.2,.8,.2,1)}
+.sh-head{display:flex;align-items:flex-start;gap:10px;padding:0 2px 12px;border-bottom:1px solid #DCDCE0}
+.sh-head .pl{flex:none;width:44px;height:44px;border-radius:10px}
+.sh-t{flex:1;min-width:0}
+.sh-t b{display:block;font-size:14px}
+.sh-t small{display:block;font-size:11.5px;color:#8A8A90}
+.sh-opt{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;background:#E3E3E8;font-size:11px}
+.sh-x{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#E3E3E8;color:#6B6B70;font-size:11px}
+.sh-apps{display:flex;justify-content:space-between;padding:0 4px;text-align:center;font-size:10px;color:#333}
+.sh-apps i{display:grid;place-items:center;width:52px;height:52px;margin:0 auto 5px;border-radius:13px}
+.sh-apps i svg{width:30px;height:30px}
+.sh-group{overflow:hidden;border-radius:12px;background:#fff}
+.sh-row{display:flex;justify-content:space-between;align-items:center;min-height:42px;padding:0 14px;font-size:14px}
+.sh-row+.sh-row{border-top:1px solid #E5E5EA}
+.sh-row svg{width:21px;height:21px;color:#222}
+.sh-row.hit{border-radius:10px}
+.add{display:flex;flex-direction:column;background:#F2F2F7}
+.add-top{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 14px 16px;font-size:14px}
+.add-top b{font-weight:600}
+.ios-link{padding:4px 6px;border-radius:8px;color:#0A7AFF}
+.add-card{display:flex;align-items:center;gap:12px;margin:0 12px;padding:12px;border-radius:12px;background:#fff}
+.add-card .pl{flex:none;width:58px;height:58px;border-radius:13px}
+.add-f{flex:1;min-width:0}
+.add-name{display:flex;align-items:center;gap:2px;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid #E5E5EA;font-size:15px}
+.add-name .clr{margin-left:auto}
+.add-f small{display:block;font-size:11.5px;color:#8A8A90;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.add-note{margin:10px 22px 0;font-size:11.5px;line-height:1.4;color:#6D6D72}
 
-.sheet{position:absolute;left:0;right:0;top:38px;bottom:0;display:flex;flex-direction:column;gap:8px;padding:12px 10px 18px;border-radius:14px 14px 0 0;background:#F2F2F7;animation:up .4s ease}
-.sh-head{display:flex;align-items:flex-start;gap:8px;padding:0 4px 6px;border-bottom:1px solid #DCDCE0}
-.sh-head>div{flex:1}
-.sh-opt{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:999px;background:#E5E5EA;font-size:9px}
-.sh-x{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#E5E5EA;font-size:9px;color:#666}
-.sh-apps{display:flex;justify-content:space-between;padding:0 4px;font-size:8px;text-align:center}
-.sh-apps i{display:block;width:36px;height:36px;margin:0 auto 3px;border-radius:9px}
-.sh-group{overflow:hidden;border-radius:10px;background:#fff}
-.sh-group .sh-row{border-radius:0}
-.sh-group .sh-row+.sh-row{border-top:1px solid #E5E5EA}
-.sh-group .sh-row.hit{border-radius:8px}
-.add-clr{float:right;display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:#C7C7CC;color:#fff;font-size:7px}
-.kb{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:6px;padding:8px 3px 18px;background:#D1D3D9}
-.kb div{display:flex;justify-content:center;gap:3px}
-.kb span{flex:0 1 22px;padding:6px 0;border-radius:4px;background:#fff;text-align:center;font-size:10px;box-shadow:0 1px 0 #898A8D}
-.kb .w{flex:0 1 40px;background:#ADB1BA;font-size:8.5px}
-.kb .sp{flex:1 1 auto;font-size:8.5px}
-.kb .go{background:var(--ios-blue);color:#fff}
-.sh-head .pl{width:30px;height:30px;border-radius:7px;font-size:11px}
-.sh-head small,.who small{display:block;font-size:8.5px;color:var(--scr-muted)}
-.sh-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:10px;background:#fff;font-size:10.5px}
-.sh-row span{font-size:13px;color:#444}
+/* Teclados */
+.kb{flex:none;display:flex;flex-direction:column;gap:9px;padding:8px 3px 30px;background:#D1D4DA}
+.kr{display:flex;justify-content:center;gap:4px}
+.kb span{flex:0 1 26px;display:grid;place-items:center;height:40px;border-radius:6px;background:#fff;box-shadow:0 1px 0 #8C8F94;color:#111;font-size:17px}
+.kb .w{flex:0 1 38px;background:#ADB2BB;font-size:13px}
+.kb .sp{flex:1 1 auto;font-size:13px}
+.kb .go{flex:0 1 70px;background:#0A7AFF;color:#fff;font-size:14px;font-weight:600}
+.kb.gb{background:#2A2422}
+.kb.gb span{border-radius:9px;background:#47403D;box-shadow:none;color:#EDE6E2}
+.kb.gb .w{background:#5B514D}
+.kb.gb .go{border-radius:999px;background:#F2B8A0;color:#3A1E12}
+.kb.gb .go svg{width:20px;height:20px}
 
-.add{background:#F2F2F7}
-.add-top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 14px;font-size:11px}
-.ios-link{padding:4px;color:var(--ios-blue)}
-.add-card{display:flex;align-items:center;gap:10px;margin:0 10px;padding:10px;border-radius:10px;background:#fff}
-.add-card .pl{flex:none;width:46px;height:46px;border-radius:11px;font-size:16px}
-.add-card>div{min-width:0}
-.add-name{margin-bottom:4px;padding-bottom:5px;border-bottom:1px solid var(--scr-line);font-size:12px}
-.add-card small{font-size:8.5px;color:var(--scr-muted);overflow-wrap:anywhere}
-.add-opt{display:flex;justify-content:space-between;align-items:center;margin:10px 10px 0;padding:9px 12px;border-radius:10px;background:#fff}
-.toggle{position:relative;width:30px;height:18px;border-radius:9px;background:#34C759}
-.toggle::after{content:"";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fff}
-.add-note{margin:10px 18px;font-size:9px;color:var(--scr-muted)}
-
-.cr{display:flex;flex-direction:column;background:#fff}
-.cr-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--scr-line);color:#444}
-.cr-url{flex:1;min-width:0;padding:7px 12px;border-radius:999px;background:#EEF1F4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
-.cr-tabs{display:grid;place-items:center;width:16px;height:16px;border:1.5px solid #444;border-radius:4px;font-size:8px;font-weight:700}
-.cr-dots{width:20px;text-align:center;font-size:16px;font-weight:700}
-.cr-page{flex:1;position:relative;overflow:hidden}
-.menu{position:absolute;top:2px;right:6px;z-index:2;width:70%;padding:6px 0;border-radius:10px;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);animation:fadein .25s}
-.menu div{padding:7px 14px;font-size:10.5px}
-.menu .hit{font-weight:600;border-radius:4px}
-.menu hr{margin:4px 0;border:0;border-top:1px solid var(--scr-line)}
-.modal-bg{position:absolute;inset:0;z-index:3;display:grid;place-items:center;background:rgba(0,0,0,.4)}
-.modal{display:flex;flex-direction:column;gap:12px;width:84%;padding:16px;border-radius:18px;background:#fff;animation:pop .3s}
-.modal h4,.pop h4{margin:0;font-size:13px;font-weight:600}
-.who{display:flex;align-items:center;gap:10px}
-.who .pl{flex:none;width:34px;height:34px;border-radius:50%;font-size:12px}
-.acts{display:flex;justify-content:flex-end;gap:12px;font-weight:600;font-size:11px;color:var(--g-blue)}
-.acts>span{padding:4px 6px}
-
-.pcw{display:flex;flex-direction:column;background:#fff}
-.pc-tabs{display:flex;align-items:flex-end;gap:8px;height:28px;padding:5px 8px 0;background:#DEE3EA;color:#333}
-.pc-tab{display:flex;align-items:center;gap:6px;max-width:150px;padding:5px 12px;border-radius:8px 8px 0 0;background:#fff;white-space:nowrap;font-size:9.5px}
-.pc-tab .pl,.tb .pl,.taskbar .pl{width:12px;height:12px;border-radius:3px;font-size:6px}
-.pc-plus{align-self:center;padding-bottom:3px}
-.win-ctl{align-self:center;margin-left:auto;padding-bottom:3px;font-size:10px;white-space:nowrap}
-.pc-bar{display:flex;align-items:center;gap:9px;padding:5px 8px;border-bottom:1px solid var(--scr-line);color:#555}
-.pc-url{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-radius:999px;background:#EEF1F4}
-.pc-url .u{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pc-inst{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;color:#333}
-.pc-page{flex:1;position:relative;overflow:hidden}
-.pop{position:absolute;top:4px;right:30px;z-index:3;display:flex;flex-direction:column;gap:10px;width:min(210px,70%);padding:12px;border-radius:10px;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.25);animation:pop .3s}
-.pop .acts{gap:6px}
-.gbtn{padding:5px 12px!important;border:1px solid #C7CDD4;border-radius:999px;font-size:10px}
-.gbtn.fill{background:var(--g-blue);border-color:var(--g-blue);color:#fff}
-.desk{background:linear-gradient(135deg,#2E4A6B,#7193B8)}
-.shortcut{position:absolute;left:12px;top:12px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:3px;color:#fff;font-size:9px}
-.shortcut .pl{width:30px;height:30px;border-radius:7px;font-size:11px}
-.appwin{position:absolute;left:20%;right:5%;top:8%;bottom:16%;display:flex;flex-direction:column;overflow:hidden;border-radius:8px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:pop .4s}
-.appwin .ap-h{display:none}
-.tb{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#14213D;color:#fff;font-size:9.5px;font-weight:600}
-.tb .wc{margin-left:auto;font-weight:400;white-space:nowrap}
-.taskbar{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;gap:7px;height:22px;background:rgba(20,28,38,.85)}
-.taskbar span{width:12px;height:12px;border-radius:3px;background:rgba(255,255,255,.35)}
-
-.asheet{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;flex-direction:column;gap:12px;padding:16px 10px 20px;border-radius:16px 16px 0 0;background:#fff;animation:up .4s ease}
-.asheet h4{margin:0;text-align:center;font-size:13px;font-weight:500}
-.aopts{overflow:hidden;border-radius:14px;background:#F1F3F4}
-.aopt{display:flex;align-items:center;gap:10px;padding:10px 12px;font-size:11px}
-.aopt+.aopt{border-top:1px solid #DADCE0}
+/* Chrome en Android (modo oscuro, como en el móvil de la obra) */
+.cr{display:flex;flex-direction:column;background:#1E1A19;color:#EDE6E2}
+.cr-bar{display:flex;align-items:center;gap:12px;padding:6px 12px 10px}
+.cr-ic{display:grid;place-items:center;width:26px;height:30px;border-radius:8px}
+.cr-ic svg{width:22px;height:22px}
+.cr-url{flex:1;min-width:0;display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:999px;background:#38312E;font-size:13.5px;white-space:nowrap;overflow:hidden}
+.cr-url .u{overflow:hidden;text-overflow:ellipsis}
+.cr-url svg{flex:none;width:16px;height:16px}
+.cr-url.focus{background:#2E2826;box-shadow:inset 0 0 0 2px #F2B8A0}
+.cr-tabs{display:grid;place-items:center;flex:none;width:21px;height:21px;border:2px solid currentColor;border-radius:5px;font-size:11px;font-weight:700}
+.cr-page{flex:1;position:relative;overflow:hidden;background:#EEF0F4}
+.cr-sugg{flex:1;padding:4px 0;background:#1E1A19}
+.sg{display:flex;align-items:center;gap:14px;padding:11px 18px;font-size:13.5px}
+.sg svg{flex:none;width:20px;height:20px;color:#BDB3AE}
+.sg small{display:block;font-size:11.5px;color:#BDB3AE}
+.menu{position:absolute;z-index:3;top:4px;right:6px;width:84%;padding:4px 0 8px;border-radius:18px;background:#3A3431;color:#EDE6E2;box-shadow:0 8px 28px rgba(0,0,0,.45);font-size:13.5px;animation:drop .25s ease}
+.m-top{display:flex;justify-content:space-around;padding:8px 6px 8px;border-bottom:1px solid #4E4643}
+.m-top svg{width:20px;height:20px;color:#D9CFCA}
+.mi{display:flex;align-items:center;gap:16px;padding:8px 18px;border-radius:8px}
+.mi svg{flex:none;width:19px;height:19px;color:#D9CFCA}
+.m-sep{height:1px;margin:4px 16px;background:#4E4643}
+.dim{position:absolute;inset:0;z-index:2;background:rgba(0,0,0,.55);animation:fadein .3s}
+.asheet{position:absolute;z-index:3;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:16px;padding:22px 14px 34px;border-radius:22px 22px 0 0;background:#2B2523;color:#EDE6E2;animation:up .45s cubic-bezier(.2,.8,.2,1)}
+.asheet h4{margin:0;text-align:center;font-size:17px;font-weight:400}
+.aopts{overflow:hidden;border-radius:18px;background:#3A3431}
+.aopt{display:flex;align-items:center;gap:12px;padding:12px 14px;font-size:14px}
+.aopt+.aopt{border-top:1px solid #4E4643}
 .aopt>div{flex:1;min-width:0}
-.aopt small{display:block;font-size:9px;color:var(--scr-muted)}
-.aopt .pl{flex:none;width:30px;height:30px;border-radius:6px;overflow:visible}
-.aopt .pl::after{content:"";position:absolute;right:-4px;bottom:-4px;width:13px;height:13px;border-radius:50%;box-shadow:0 0 0 1.5px #fff}
-.aopt .pl.down::after{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 5v13M6 12l6 6 6-6'/%3E%3C/svg%3E") center/9px no-repeat}
-.aopt .pl.chr::after{background:radial-gradient(circle,#4285F4 0 28%,#fff 29% 38%,transparent 39%),conic-gradient(from -30deg,#EA4335 0 120deg,#FBBC04 0 240deg,#34A853 0)}
-.aopt .chev{font-size:15px;color:#5F6368}
+.aopt small{display:block;margin-top:2px;font-size:11.5px;color:#BDB3AE}
+.aopt .chev{font-size:20px;color:#BDB3AE}
+.bi{position:relative;flex:none;width:40px;height:40px}
+.bi .pl{width:40px;height:40px;border-radius:6px}
+.bi em{position:absolute;right:-5px;bottom:-5px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px #3A3431;font-style:normal;color:#222}
+.bi em svg{width:12px;height:12px}
+.bi em.chr{background:conic-gradient(from -30deg,#EA4335 0 120deg,#FBBC04 0 240deg,#34A853 0)}
+.bi em.chr::after{content:"";width:7px;height:7px;border-radius:50%;background:#4285F4;box-shadow:0 0 0 1.5px #fff}
 
-.sb.navy{background:#14213D;color:#fff}
-.rg{display:flex;flex-direction:column;background:#EEF0F4;color:#10141C}
-.rg-bar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#14213D;color:#fff;font-weight:600;font-size:12px}
-.rg-bar .bk{font-size:16px;line-height:1}
-.rg-main{flex:1;position:relative;padding:12px 10px}
-.rg-card{display:flex;flex-direction:column;gap:8px;padding:14px 12px;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.rg-card h3{margin:0;font-size:15px}
-.rg-card p{margin:0;font-size:10px;color:#5B6472}
-.rg-f{display:flex;flex-direction:column;gap:3px;font-size:9.5px;color:#5B6472}
-.rg-f b{padding:8px 9px;border:1px solid #C9CED8;border-radius:8px;background:#fff;color:#10141C;font-weight:400;font-size:11px;overflow-wrap:anywhere}
-.rg-f b.pin{text-align:center;letter-spacing:.3em;font-size:13px}
-.rg-btn{padding:10px;border-radius:9px;background:#14213D;color:#fff;text-align:center;font-weight:600;font-size:11px}
-.rg-btn.sec{border:1px solid #C9CED8;background:#fff;color:#14213D}
-.rg-lnk{text-align:center;font-size:10px;color:#1F5FD1}
-.rg-ph{height:10px;border-radius:4px;background:#E4E7EB}
-.toast{position:absolute;left:10px;right:10px;bottom:14px;padding:9px 11px;border-radius:9px;background:#10141C;color:#fff;font-size:10px;animation:up .4s ease}
-
-/* Panel de pasos */
-.side{display:flex;flex-direction:column;gap:18px;min-width:0}
-.count{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
-.now h2{margin:4px 0 8px;font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1.05;text-wrap:balance}
-.now p{margin:0;min-height:4.5em;color:var(--muted)}
-.ctrl{display:flex;flex-wrap:wrap;gap:8px}
-.steps{display:flex;flex-direction:column;margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
-.steps button{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:12px;width:100%;padding:10px 4px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--fg);text-align:left}
-.steps button:hover .t{color:var(--accent)}
-.n{display:grid;place-items:center;width:26px;height:26px;border:1.5px solid var(--line);border-radius:50%;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted)}
-.done .n{background:var(--fg);border-color:var(--fg);color:var(--bg)}
-.on .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.lbl{display:flex;flex-direction:column;gap:6px}
-.on .t{font-weight:600}
-.bar{display:block;height:3px;overflow:hidden;border-radius:2px;background:var(--line)}
-.bar i{display:block;width:0;height:100%;background:var(--accent)}
-.on .bar i{animation:fill var(--dur) linear forwards}
-.paused .on .bar i{animation-play-state:paused}
-.done .bar i{width:100%}
-@keyframes fill{to{width:100%}}
-
-.help{margin-top:48px}
-.help h2{margin:0 0 14px;font-family:var(--f-display);font-weight:700;font-size:28px}
-.faq{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.faq div{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
-.faq h3{margin:0 0 6px;font-size:16px;font-weight:600}
-.faq p{margin:0;color:var(--muted);font-size:15px}
+/* Ordenador (Windows) */
+.pcw{display:flex;flex-direction:column;background:#fff;color:#1F1F1F;font-size:12px}
+.pc-tabs{display:flex;align-items:flex-end;gap:6px;height:36px;padding:0 0 0 10px;background:#DDE3EA}
+.pc-tab{display:flex;align-items:center;gap:8px;width:200px;height:29px;padding:0 12px;border-radius:9px 9px 0 0;background:#fff;font-size:12px;white-space:nowrap}
+.pc-tab .pl{flex:none;width:14px;height:14px;border-radius:3px}
+.pc-tab .x{margin-left:auto;color:#666;font-size:10px}
+.pc-plus{align-self:center;padding:0 6px;font-size:16px;color:#444}
+.win-ctl{display:flex;align-self:stretch;margin-left:auto;color:#333;font-size:12px}
+.win-ctl span{display:grid;place-items:center;width:44px}
+.pc-bar{display:flex;align-items:center;gap:14px;height:42px;padding:0 12px;border-bottom:1px solid #E3E5E8;color:#444}
+.pc-bar>svg{flex:none;width:16px;height:16px}
+.pc-url{position:relative;flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 14px;border-radius:999px;background:#EEF1F4;font-size:13px}
+.pc-url .u{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-url svg{flex:none;width:15px;height:15px}
+.pc-url.focus{background:#fff;box-shadow:0 0 0 2px #1A73E8}
+.pc-inst{display:grid;place-items:center;width:26px;height:26px;border-radius:50%}
+.pc-inst svg{width:17px;height:17px}
+.pc-page{flex:1;position:relative;overflow:hidden;background:#EEF0F4}
+.ntp{display:grid;place-items:center;height:100%;background:#fff}
+.ntp div{width:340px;padding:12px 18px;border-radius:999px;background:#EEF1F4;color:#777;font-size:13px}
+.omni{position:absolute;z-index:3;left:90px;right:44px;top:72px;padding:6px 0;border-radius:0 0 14px 14px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.18);animation:fadein .25s}
+.omni .sg{color:#1F1F1F;padding:8px 18px;font-size:13px}
+.omni .sg svg{color:#666;width:16px;height:16px}
+.omni .sg.hit{border-radius:6px}
+.pop{position:absolute;z-index:3;top:6px;right:58px;display:flex;flex-direction:column;gap:14px;width:290px;padding:18px;border-radius:12px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:drop .3s ease}
+.pop h4{margin:0;font-size:15px;font-weight:500}
+.pop .who{display:flex;align-items:center;gap:12px}
+.pop .who .pl{width:38px;height:38px;border-radius:9px}
+.pop .who small{display:block;font-size:11.5px;color:#666}
+.pop .acts{display:flex;justify-content:flex-end;gap:8px}
+.gbtn{padding:7px 18px;border:1px solid #C7CDD4;border-radius:999px;color:#1A73E8;font-size:12.5px;font-weight:600}
+.gbtn.fill{border-color:#1A73E8;background:#1A73E8;color:#fff}
+.desk{background:radial-gradient(120% 120% at 70% 20%,#5F86B3 0%,#2C4A72 45%,#16243C 100%)}
+.shortcut{position:absolute;left:16px;top:16px;display:flex;flex-direction:column;align-items:center;gap:4px;width:70px;padding:5px 2px;border-radius:6px;color:#fff;font-size:11px;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.shortcut .pl{width:40px;height:40px;border-radius:9px}
+.appwin{position:absolute;left:120px;right:40px;top:26px;bottom:62px;display:flex;flex-direction:column;overflow:hidden;border-radius:9px;background:#fff;box-shadow:0 16px 40px rgba(0,0,0,.5);animation:pop .5s cubic-bezier(.2,.9,.3,1.1)}
+.tb{display:flex;align-items:center;gap:8px;height:32px;padding-left:10px;background:#14213D;color:#fff;font-size:12px;font-weight:600}
+.tb .pl{width:16px;height:16px;border-radius:4px}
+.tb .win-ctl{color:#fff}
+.appwin .ap{flex:1;position:relative}
+.appwin .ap-h{display:none}
+.taskbar{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;gap:8px;height:44px;background:rgba(232,236,242,.88)}
+.taskbar span,.taskbar .pl{width:28px;height:28px;border-radius:6px}
+.taskbar span{background:rgba(20,33,61,.18)}
+.taskbar .win{background:conic-gradient(#0F6CBD 0 25%,#2B88D8 0 50%,#0F6CBD 0 75%,#2B88D8 0);clip-path:inset(4px round 2px)}
+.taskbar .pl{box-shadow:0 3px 0 -1px #E2661B}
 
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
-  .on .bar i{animation:none;width:0}
+  .prog .on i{animation:none!important;width:0}
 }
 </style>
 </head>
 <body>
 
-<header class="top"><div class="wrap">
-  <p class="eyebrow">UTE LAV Este · Mantenimiento</p>
-  <h1>Instalar Partes LAV en el móvil o el ordenador</h1>
-  <p class="lede">Primero instala la app en tu dispositivo y después regístrate (pestaña «Registrarse»). Sigue la animación: son un par de minutos y no hace falta pasar por la tienda de apps. Ten a mano tu correo de Gmail.</p>
+<header class="hero"><div class="wrap hero-in">
+  <div class="brand">
+    <i class="pl" role="img" aria-label="Icono de Partes LAV"></i>
+    <div>
+      <p class="eyebrow">Partes LAV · UTE LAV Este</p>
+      <h1>Instala la app y regístrate</h1>
+    </div>
+  </div>
+  <p class="lede">Elige tu dispositivo y sigue la animación paso a paso. Primero se instala y después te registras. Ten a mano tu correo de Gmail.</p>
   <div class="urlbox">
-    <span>Dirección de la app</span>
-    <code id="u">https://mant-ute-lav-este.github.io/partes-lav/</code>
-    <button class="btn" id="copy" type="button">Copiar</button>
+    <span class="lbl">Dirección de la app</span>
+    <div class="url-row"><code id="u">mant-ute-lav-este.github.io/partes-lav</code><button class="copy" id="copy" type="button">Copiar</button></div>
   </div>
 </div></header>
 
 <main class="wrap">
-  <div class="tabs" id="tabs" role="tablist" aria-label="Dispositivo"></div>
-  <section class="player" id="player">
+  <div class="tabs" id="tabs" role="tablist" aria-label="Qué quieres hacer"></div>
+
+  <section class="player" id="player" aria-label="Animación paso a paso">
     <div class="stage">
       <div class="device phone" id="device">
-        <div class="scr" id="scr"><div id="screen"></div><div class="tap" id="tap" hidden></div></div>
+        <div class="scr" id="scr">
+          <div id="zoom"><div id="screen"></div><div class="tap" id="tap" hidden></div></div>
+        </div>
       </div>
     </div>
     <div class="side">
+      <div class="prog" id="prog" aria-hidden="true"></div>
       <div class="now" aria-live="polite">
         <span class="count" id="count"></span>
         <h2 id="stitle"></h2>
         <p id="sdesc"></p>
       </div>
       <div class="ctrl">
-        <button class="btn" id="prev" type="button">Anterior</button>
-        <button class="btn primary" id="play" type="button">Pausa</button>
-        <button class="btn" id="next" type="button">Siguiente</button>
+        <button class="cbtn" id="prev" type="button"><svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Atrás</button>
+        <button class="cbtn primary" id="play" type="button"></button>
+        <button class="cbtn" id="next" type="button">Siguiente<svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
+      <button class="nextguide" id="nextguide" type="button" hidden>Ahora: Registrarse<svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <ol class="steps" id="steps"></ol>
     </div>
   </section>
 
   <section class="help">
     <h2>Si algo no sale</h2>
+    <p>Toca una pregunta para ver la respuesta.</p>
     <div class="faq">
-      <div><h3>En iPhone no veo «Compartir»</h3><p>En las versiones nuevas de iOS está dentro de los tres puntos (···), junto a la barra de direcciones. Tócalos y luego Compartir.</p></div>
-      <div><h3>En Android no sale «Instalar y crear acceso directo»</h3><p>Baja hasta el final del menú ⋮. Según el móvil puede llamarse «Instalar aplicación» o «Añadir a pantalla de inicio». Si no aparece ninguna, recarga la página y espera unos segundos.</p></div>
-      <div><h3>En el ordenador no veo el icono de instalar</h3><p>En Chrome: menú ⋮ → Enviar, guardar y compartir → Instalar página como aplicación. En Edge: menú ··· → Aplicaciones → Instalar este sitio como aplicación.</p></div>
-      <div><h3>No me llega el código</h3><p>Mira en «Spam» y en «Promociones» de Gmail. Si tampoco está, pulsa «No me ha llegado: enviar otro».</p></div>
-      <div><h3>No me encuentra al poner mi nombre</h3><p>Prueba con tu nombre y un solo apellido. Si sigue sin encontrarte, habla con la oficina para que te den de alta.</p></div>
-      <div><h3>He olvidado el PIN</h3><p>Pulsa «He olvidado el PIN» en la pantalla de entrada. Te llega un código al Gmail y creas uno nuevo.</p></div>
-      <div><h3>¿Hay que actualizarla?</h3><p>No hace falta reinstalar. Cuando hay versión nueva basta con cerrar la app del todo y volver a abrirla con conexión.</p></div>
+      <details><summary>En iPhone no veo «Compartir»</summary><p>En las versiones nuevas de iOS está dentro de los tres puntos (···), junto a la barra de direcciones. Tócalos y luego «Compartir».</p></details>
+      <details><summary>En Android no sale «Instalar y crear acceso directo»</summary><p>Baja hasta el final del menú ⋮. Según el móvil se llama «Instalar aplicación» o «Añadir a pantalla de inicio». Si no aparece ninguna, recarga la página y espera unos segundos.</p></details>
+      <details><summary>En el ordenador no veo el icono de instalar</summary><p>En Chrome: menú ⋮ → Enviar, guardar y compartir → Instalar página como aplicación. En Edge: menú ··· → Aplicaciones → Instalar este sitio como aplicación.</p></details>
+      <details><summary>Me salen dos iconos de Partes LAV</summary><p>Seguramente se pulsó también «Crear acceso directo» o se instaló dos veces. Deja pulsado uno de los dos iconos y quítalo; con uno basta.</p></details>
+      <details><summary>No me llega el código</summary><p>Mira en «Spam» y en «Promociones» de Gmail. Si tampoco está, pulsa «No me ha llegado: enviar otro».</p></details>
+      <details><summary>No me encuentra al poner mi nombre</summary><p>Prueba con tu nombre y un solo apellido. Si sigue sin encontrarte, avisa a la oficina para que te den de alta.</p></details>
+      <details><summary>He olvidado el PIN</summary><p>Pulsa «He olvidado el PIN» en la pantalla de entrada. Te llega un código a tu Gmail y creas uno nuevo.</p></details>
+      <details><summary>¿Hay que actualizar la app?</summary><p>No hace falta reinstalarla. Cuando hay versión nueva basta con cerrarla del todo y volver a abrirla con conexión.</p></details>
     </div>
   </section>
+
+  <p class="foot">Partes LAV · Mantenimiento UTE LAV Este. Dirección de la app: <a href="https://mant-ute-lav-este.github.io/partes-lav/">mant-ute-lav-este.github.io/partes-lav</a></p>
 </main>
 
 <script>
 const URL_APP='mant-ute-lav-este.github.io/partes-lav';
 const HOST='mant-ute-lav-este.github.io';
-const SHARE='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H5v11h14V10h-2"/></svg>';
-const INSTALL='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 7v6M9.5 10.5 12 13l2.5-2.5"/></svg>';
+const DUR=5200, DUR_TYPE=6800;
+const DW={phone:300,pc:640};
 
-const sb=(cls='')=>`<div class="sb ${cls}"><b>9:41</b><span class="sb-r">5G <i></i></span></div>`;
-const ic=(label,bg,o={})=>`<div class="ic${o.hit?' hit':''}"><i class="${o.cls||''}"${bg?` style="background:${bg}"`:''}></i>${o.dock?'':`<span>${label}</span>`}</div>`;
-const plIcon=hit=>`<div class="ic new${hit?' hit':''}"><i class="pl">PL</i><span>Partes LAV</span></div>`;
-const appBody=wide=>`<div class="ap${wide?' wide':''}"><div class="ap-h"><i class="pl">PL</i>Partes LAV</div><div class="ap-c">
-  <div class="ap-l">Fecha</div><div class="ap-f">28/10/2026</div>
-  <div class="ap-l">Tramo</div><div class="ap-f">PK 12+400 – 15+100</div>
-  <div class="ap-l">Trabajos</div><div class="ap-f tall"></div>
-  <div class="ap-b">Enviar parte</div></div></div>`;
-const who=`<div class="who"><i class="pl">PL</i><div><b>Partes LAV</b><small>${HOST}</small></div></div>`;
+const svg=(p,f)=>`<svg viewBox="0 0 24 24"${f?'':' fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"'}>${p}</svg>`;
+const SV={
+  back:svg('<path d="M15 4.5 7.5 12l7.5 7.5" stroke-width="2.2"/>'),
+  fwd:svg('<path d="m9 4.5 7.5 7.5L9 19.5" stroke-width="2.2"/>'),
+  share:svg('<path d="M12 3.2v11.6M8 7.2l4-4 4 4M8.2 10H6.5A1.5 1.5 0 0 0 5 11.5v8A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-8a1.5 1.5 0 0 0-1.5-1.5h-1.7"/>'),
+  book:svg('<path d="M12 6.5C10 5 6.8 4.6 4 5v13.5c2.8-.4 6 0 8 1.5 2-1.5 5.2-1.9 8-1.5V5c-2.8-.4-6 0-8 1.5Zm0 0V20"/>'),
+  tabs:svg('<rect x="4" y="8" width="12" height="12" rx="2.2"/><path d="M8 5.5h9.5A2.5 2.5 0 0 1 20 8v9.5"/>'),
+  lock:svg('<rect x="6" y="10.5" width="12" height="9.5" rx="2" fill="currentColor" stroke="none"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/>',1),
+  reload:svg('<path d="M19 12a7 7 0 1 1-2.1-5M17.5 3.5v4h-4"/>'),
+  search:svg('<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/>'),
+  mic:svg('<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>'),
+  globe:svg('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5c-2.5-2.6-3.6-5.4-3.6-8.5S9.5 6.1 12 3.5Z"/>'),
+  print:svg('<path d="M7 9V4h10v5M7 17H5a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 5 9h14a1.5 1.5 0 0 1 1.5 1.5v5A1.5 1.5 0 0 1 19 17h-2M7 14h10v6H7Z"/>'),
+  copy:svg('<rect x="8" y="8" width="11.5" height="12.5" rx="2"/><path d="M15.5 8V5.5A1.5 1.5 0 0 0 14 4H6a1.5 1.5 0 0 0-1.5 1.5V15A1.5 1.5 0 0 0 6 16.5h2"/>'),
+  plusSq:svg('<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M12 8.5v7M8.5 12h7"/>'),
+  star:svg('<path d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6Z"/>'),
+  glasses:svg('<circle cx="7" cy="13" r="3.4"/><circle cx="17" cy="13" r="3.4"/><path d="M10.4 13h3.2"/>'),
+  home:svg('<path d="M4 11 12 4l8 7v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1Z"/>'),
+  tune:svg('<circle cx="7" cy="8" r="2.3"/><path d="M11 8h9M4 16h9"/><circle cx="17" cy="16" r="2.3"/>'),
+  plus:svg('<path d="M12 5v14M5 12h14" stroke-width="2.2"/>'),
+  dots:svg('<circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>',1).replace('<svg ','<svg fill="currentColor" '),
+  arrowR:svg('<path d="M5 12h13M13 6l6 6-6 6" stroke-width="2.4"/>'),
+  install:svg('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 7v6M9.5 10.5 12 13l2.5-2.5"/>'),
+  down:svg('<path d="M12 5v13M6.5 12.5 12 18l5.5-5.5" stroke-width="2.6"/>'),
+  newtab:svg('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8.5v7M8.5 12h7"/>'),
+  incog:svg('<path d="M3.5 11h17M6.5 11l1.7-5.5h7.6L17.5 11"/><circle cx="7.5" cy="16" r="2.6"/><circle cx="16.5" cy="16" r="2.6"/><path d="M10.1 16h3.8"/>'),
+  group:svg('<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/><path d="m16.8 3.8 3.4 3.4-3.4 3.4-3.4-3.4Z"/>'),
+  hist:svg('<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3M12 8v4l2.6 1.6"/>'),
+  trash:svg('<path d="M5 7h14M9.5 7V4.5h5V7M7 7l.8 12.5h8.4L17 7"/>'),
+  site:svg('<circle cx="7" cy="7" r="2.3"/><path d="M11 7h9M4 16h9"/><circle cx="17" cy="16" r="2.3"/>'),
+  dl:svg('<path d="M5 19.5h14M7 11l3.5 3.5L17 8"/>'),
+  starF:svg('<path d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6Z" fill="currentColor"/>'),
+  devices:svg('<rect x="3" y="5" width="13" height="10" rx="1.2"/><path d="M2 18.5h11M17 9h4v10h-4Z"/>'),
+  shareA:svg('<circle cx="17.5" cy="5.5" r="2.4"/><circle cx="6.5" cy="12" r="2.4"/><circle cx="17.5" cy="18.5" r="2.4"/><path d="m8.6 10.8 6.8-4M8.6 13.2l6.8 4"/>'),
+  find:svg('<rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="11.5" cy="12" r="3"/><path d="m13.8 14.3 2.4 2.4"/>'),
+  transl:svg('<path d="M4 6h8M8 4v2c0 4-2 7-4.5 8.5M6 10c1 2 3 3.5 5 4M13 20l3.5-9 3.5 9M14.2 17h4.6"/>'),
+  reader:svg('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>'),
+  info:svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.4"/>'),
+  winmin:'—', winmax:'☐', winx:'✕'
+};
+const G={
+  phone:svg('<path fill="#fff" stroke="none" d="M7 3.6 9.3 3.3l1.5 3.9-2 1.4a11 11 0 0 0 6.6 6.6l1.4-2 3.9 1.5-.3 2.3a2.4 2.4 0 0 1-2.6 2C10.6 18.6 5.4 13.4 5 6.2a2.4 2.4 0 0 1 2-2.6Z"/>'),
+  chat:svg('<path fill="#fff" stroke="none" d="M12 4.2c4.6 0 8.3 3 8.3 6.7s-3.7 6.6-8.3 6.6c-.9 0-1.8-.1-2.6-.3L5 19.3l1.1-3.3C4.6 14.8 3.7 13 3.7 10.9 3.7 7.2 7.4 4.2 12 4.2Z"/>'),
+  mail:svg('<rect x="3" y="6" width="18" height="12.5" rx="2" fill="#fff" stroke="none"/><path d="m3.6 7 8.4 6.2L20.4 7" stroke="#1C6EF2" stroke-width="1.6"/>'),
+  camera:svg('<path fill="#fff" stroke="none" d="M8.6 5h6.8l1.3 2H19a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2.3Z"/><circle cx="12" cy="13" r="3.6" fill="#55585E" stroke="none"/>'),
+  gear:svg('<circle cx="12" cy="12" r="6.6" stroke="#fff" stroke-width="3.2" stroke-dasharray="2.6 1.9" stroke-linecap="butt"/><circle cx="12" cy="12" r="3.2" stroke="#fff" stroke-width="1.8"/>'),
+  clock:svg('<circle cx="12" cy="12" r="8.5" fill="#fff" stroke="none"/><path d="M12 6.8V12l3.4 2.1" stroke="#111" stroke-width="1.8"/>'),
+  photos:svg('<g stroke="none" opacity=".92"><ellipse cx="12" cy="7.4" rx="2.6" ry="4" fill="#FF9F0A"/><ellipse cx="16.6" cy="12" rx="4" ry="2.6" fill="#34C759"/><ellipse cx="12" cy="16.6" rx="2.6" ry="4" fill="#0A84FF"/><ellipse cx="7.4" cy="12" rx="4" ry="2.6" fill="#FF375F"/></g>'),
+  cal:'<svg viewBox="0 0 24 24"><text x="12" y="8.6" text-anchor="middle" font-size="4.6" font-weight="700" fill="#FF3B30" font-family="-apple-system,Segoe UI,sans-serif">MIÉ</text><text x="12" y="19.8" text-anchor="middle" font-size="11.5" font-weight="300" fill="#111" font-family="-apple-system,Segoe UI,sans-serif">28</text></svg>',
+  notes:svg('<rect x="2.5" y="2.5" width="19" height="5.5" fill="#FFCC00" stroke="none"/><path d="M5 12h14M5 15.5h14M5 19h9" stroke="#C7C7CC" stroke-width="1.2"/>'),
+  maps:svg('<path d="M1.5 17.5 22.5 7" stroke="#fff" stroke-width="3.6"/><path d="m14.5 5.5-3 13 2.4-.8 1.4-6 5.4-2.2Z" fill="#0A84FF" stroke="none"/>'),
+  music:svg('<path fill="#fff" stroke="none" d="M16.5 4v10.6a2.8 2.8 0 1 1-1.6-2.6V7.4l-5.6 1.3v8.1a2.8 2.8 0 1 1-1.6-2.6V7.2Z"/>'),
+  files:svg('<path fill="#fff" stroke="none" d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>'),
+  airdrop:svg('<circle cx="12" cy="12" r="2.4" fill="#fff" stroke="none"/><path d="M8 16a5.5 5.5 0 1 1 8 0M5.6 18.4a9 9 0 1 1 12.8 0" stroke="#fff" stroke-width="1.8"/>'),
+  weather:svg('<circle cx="9" cy="9" r="4" fill="#FFD60A" stroke="none"/><path d="M8 19.5h9a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.5 1.5A2.8 2.8 0 0 0 8 19.5Z" fill="#fff" stroke="none"/>')
+};
+const HAND='<span class="ring"></span><svg class="hand" viewBox="0 0 36 46"><path d="M10 3.5a3.5 3.5 0 0 1 7 0V18l1.2-.6a3.2 3.2 0 0 1 4.3 1.6l.4.9a3.2 3.2 0 0 1 4.4 2l.3.8a3 3 0 0 1 4.4 2.4V33c0 6.4-5 11.5-11.4 11.5h-2.4c-3.7 0-6.6-1.7-8.5-4.7L3.2 31.6a3.1 3.1 0 0 1 4.9-3.8L10 30Z" fill="#fff" stroke="#14213D" stroke-width="2.2" stroke-linejoin="round"/><path d="M17 18v7.5M22.9 20.8v5.2M27.6 23.9v4.1" stroke="#14213D" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const CURSOR='<span class="ring"></span><svg class="hand" viewBox="0 0 18 22"><path d="M3 2v16.2l4.2-4 2.8 6.3 2.7-1.2-2.8-6.2H16Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 
-const iosHome=(app,hitS,hitA)=>`<div class="home">${sb('light')}<div class="apps">
-  ${ic('Calendario','#FF453A')}${ic('Fotos','#F5B700')}${ic('Cámara','#636366')}${ic('Correo','#1E88FF')}
-  ${ic('Mapas','#34A853')}${ic('Notas','#E8B923')}${ic('Ajustes','#8E8E93')}${app?plIcon(hitA):ic('Reloj','#2C2C2E')}</div>
-  <div class="dock">${ic('Teléfono','#34C759',{dock:1})}${ic('Safari',null,{cls:'safari',dock:1,hit:hitS})}${ic('Mensajes','#30D158',{dock:1})}${ic('Música','#FA2D48',{dock:1})}</div></div>`;
-
-const safari=st=>`<div class="saf">${sb()}<div class="saf-page">${st==='typing'
-    ?`<div class="blank"><h5>Favoritos</h5><div class="favs"><div><b></b>Intranet</div><div><b></b>Correo</div><div><b></b>Tiempo</div><div><b></b>Noticias</div></div></div>`
-    :appBody()}</div>
-  <div class="saf-bar"><div class="saf-url${st==='typing'?' hit':''}">${st==='typing'?`${URL_APP}<span class="caret"></span>`:`<span class="aa">aA</span>${HOST}`}</div>
-  <div class="saf-tools"><span>‹</span><span>›</span><span class="share${st==='loaded'?' hit':''}">${SHARE}</span><span>▭</span><span>⧉</span></div></div></div>`;
-
-const iosShare=()=>`<div class="saf">${sb()}<div class="saf-page dim">${appBody()}</div>
-  <div class="sheet"><div class="sh-head"><i class="pl">PL</i><div><b>Partes LAV</b><small>${HOST}</small><span class="sh-opt">Opciones ›</span></div><span class="sh-x">✕</span></div>
-  <div class="sh-apps"><div><i style="background:radial-gradient(circle,#fff 0 18%,#2F9BFF 19% 30%,#fff 31% 40%,#2F9BFF 41%)"></i>AirDrop</div><div><i style="background:#30D158"></i>Mensajes</div><div><i style="background:#1E88FF"></i>Mail</div><div><i style="background:#25D366"></i>WhatsApp</div></div>
-  <div class="sh-group"><div class="sh-row">Imprimir<span>⎙</span></div><div class="sh-row">Copiar<span>⧉</span></div>
-  <div class="sh-row hit">Añadir a pantalla de inicio<span>⊞</span></div><div class="sh-row">Añadir a favoritos<span>☆</span></div></div>
-  <div class="sh-group"><div class="sh-row">Añadir a la lista de lectura<span>○○</span></div><div class="sh-row">Añadir marcador<span>▯</span></div></div></div></div>`;
-
+/* ---------- Piezas ---------- */
+const SIG='<span class="sig"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:10px"></i></span>';
+const sbI=(cls='')=>`<div class="sb ${cls}"><span>9:41</span><span class="sb-r">${SIG}5G<span class="bat"></span></span></div>`;
+const sbA=(cls='')=>`<div class="sb and ${cls}"><span>9:41</span><span class="sb-r">5G ${SIG}<span class="bat"></span></span></div>`;
+const hb=(l)=>`<div class="hb${l?' l':''}"></div>`;
+const ic=(label,o={})=>`<div class="ic${o.hit?' hit':''}"><i class="${o.cls||''}"${o.bg?` style="background:${o.bg}"`:''}>${o.g||''}</i>${o.dock?'':`<span>${label}</span>`}</div>`;
+const plIcon=(hit)=>`<div class="ic new${hit?' hit':''}"><i class="pl"></i><span>Partes LAV</span></div>`;
 const KB=['qwertyuiop','asdfghjklñ','zxcvbnm'];
-const iosAdd=()=>`<div class="add">${sb()}
+const keys=r=>[...r].map(k=>`<span>${k}</span>`).join('');
+const kb=(t,enter,hit)=>`<div class="kb ${t}"><div class="kr">${keys(KB[0])}</div><div class="kr">${keys(KB[1])}</div><div class="kr"><span class="w">⇧</span>${keys(KB[2])}<span class="w">⌫</span></div><div class="kr"><span class="w">123</span><span class="sp">espacio</span><span class="w go${hit?' hit':''}">${enter}</span></div></div>`;
+const welcome=(wide)=>`<div class="ap${wide?' wide':''}"><div class="ap-h">Partes LAV</div><div class="ap-c"><div class="card"><h3>Bienvenido</h3><p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p><div class="abtn">Registrarme</div><div class="abtn sec">Ya tengo cuenta</div></div></div></div>`;
+
+/* ---------- iPhone ---------- */
+const iosHome=(app,hitS)=>`<div class="home ios-home">${sbI('light')}<div class="apps">
+  ${ic('Calendario',{bg:'#fff',g:G.cal})}${ic('Fotos',{bg:'#fff',g:G.photos})}${ic('Cámara',{bg:'linear-gradient(#A5A5AB,#6E6E75)',g:G.camera})}${ic('Correo',{bg:'linear-gradient(#45A6FF,#1C6EF2)',g:G.mail})}
+  ${ic('Mapas',{bg:'linear-gradient(#8BD996,#3FAE5A)',g:G.maps})}${ic('Notas',{bg:'#fff',g:G.notes})}${ic('Tiempo',{bg:'linear-gradient(#4FA3F7,#1D5FC9)',g:G.weather})}${ic('Ajustes',{bg:'linear-gradient(#A2A2A8,#6E6E75)',g:G.gear})}
+  ${app?plIcon(false):''}</div>
+  <div class="spot">${SV.search}Buscar</div>
+  <div class="dock">${ic('',{bg:'linear-gradient(#6EE38A,#28C24A)',g:G.phone,dock:1})}${ic('',{cls:'safari',dock:1,hit:hitS})}${ic('',{bg:'linear-gradient(#6EE38A,#28C24A)',g:G.chat,dock:1})}${ic('',{bg:'linear-gradient(#FF6B81,#FA2D48)',g:G.music,dock:1})}</div>${hb(1)}</div>`;
+
+const safari=st=>st==='typing'
+  ? `<div class="saf">${sbI()}<div class="saf-page fav"><h5>Favoritos</h5><div class="favs"><div><b>I</b>Intranet</div><div><b>C</b>Correo</div><div><b>T</b>Tiempo</div><div><b>N</b>Noticias</div></div><h5>Visitados con frecuencia</h5><div class="favs"><div><b>G</b>Google</div><div><b>Y</b>YouTube</div></div></div>
+     <div class="saf-type"><div class="saf-field">${SV.search}<span data-type="${URL_APP}"></span><span class="caret"></span><span class="clr">✕</span></div><span class="cancel">Cancelar</span></div>${kb('ios','ir',true)}${hb()}</div>`
+  : `<div class="saf">${sbI()}<div class="saf-page">${welcome()}</div>
+     <div class="saf-bar"><div class="saf-url"><span class="aa">aA</span><span class="host">${SV.lock}${HOST}</span>${SV.reload}</div>
+     <div class="saf-tools"><span>${SV.back}</span><span class="off">${SV.fwd}</span><span class="${st==='loaded'?'hit':''}">${SV.share}</span><span>${SV.book}</span><span>${SV.tabs}</span></div></div>${hb()}</div>`;
+
+const shRow=(t,i,hit)=>`<div class="sh-row${hit?' hit':''}">${t}${i}</div>`;
+const iosShare=()=>`<div class="saf">${sbI()}<div class="saf-page dimmed">${welcome()}</div>
+  <div class="sheet"><div class="sh-head"><i class="pl"></i><div class="sh-t"><b>Partes LAV</b><small>${HOST}</small><span class="sh-opt">Opciones ›</span></div><span class="sh-x">✕</span></div>
+  <div class="sh-apps"><div><i style="background:linear-gradient(#5FC4FF,#1B7FF3)">${G.airdrop}</i>AirDrop</div><div><i style="background:linear-gradient(#6EE38A,#28C24A)">${G.chat}</i>Mensajes</div><div><i style="background:linear-gradient(#45A6FF,#1C6EF2)">${G.mail}</i>Mail</div><div><i style="background:#fff">${G.notes}</i>Notas</div></div>
+  <div class="sh-group">${shRow('Imprimir',SV.print)}${shRow('Copiar',SV.copy)}${shRow('Añadir a pantalla de inicio',SV.plusSq,true)}${shRow('Añadir a favoritos',SV.star)}</div>
+  <div class="sh-group">${shRow('Añadir a la lista de lectura',SV.glasses)}${shRow('Añadir marcador',SV.book)}</div></div>${hb()}</div>`;
+
+const iosAdd=()=>`<div class="add">${sbI()}
   <div class="add-top"><span class="ios-link">Cancelar</span><b>Añadir a pantalla d…</b><span class="ios-link hit"><b>Añadir</b></span></div>
-  <div class="add-card"><i class="pl">PL</i><div><div class="add-name">Partes LAV<span class="caret"></span><span class="add-clr">✕</span></div><small>https://${URL_APP}/</small></div></div>
+  <div class="add-card"><i class="pl"></i><div class="add-f"><div class="add-name"><span>Partes LAV</span><span class="caret"></span><span class="clr">✕</span></div><small>https://${URL_APP}/</small></div></div>
   <p class="add-note">Se añadirá un icono a la pantalla de inicio para acceder más rápido a este sitio web desde tu navegador por omisión.</p>
-  <div class="kb">${KB.map(r=>`<div>${[...r].map(k=>`<span>${k}</span>`).join('')}</div>`).join('')}<div><span class="w">123</span><span class="sp">espacio</span><span class="w go">OK</span></div></div></div>`;
+  <div class="grow"></div>${kb('ios','OK',false)}${hb()}</div>`;
 
-const andHome=(app,hitC,hitA)=>`<div class="home and">${sb('light and')}<div class="clock">9:41<small>miércoles, 28 de octubre</small></div>
-  <div class="apps">${app?plIcon(hitA):''}</div>
-  <div class="dock">${ic('Teléfono','#1A73E8',{dock:1})}${ic('Mensajes','#34A853',{dock:1})}${ic('Chrome',null,{cls:'chrome',dock:1,hit:hitC})}${ic('Cámara','#5F6368',{dock:1})}</div></div>`;
+/* ---------- Android ---------- */
+const andHome=(app,hitC,hitA)=>`<div class="home and-home">${sbA('light')}<div class="clock">9:41<small>miércoles, 28 de octubre</small></div>
+  <div class="apps">${ic('Correo',{bg:'#1C6EF2',g:G.mail})}${ic('Fotos',{bg:'#fff',g:G.photos})}${ic('Calendario',{bg:'#fff',g:G.cal})}${ic('Ajustes',{bg:'#5F6368',g:G.gear})}
+  ${ic('Archivos',{bg:'#1A73E8',g:G.files})}${ic('Reloj',{bg:'#202124',g:G.clock})}${ic('Tiempo',{bg:'#2E6FD8',g:G.weather})}${app?plIcon(hitA):''}</div>
+  <div class="grow"></div>
+  <div class="dock">${ic('',{bg:'#1E8E3E',g:G.phone,dock:1})}${ic('',{bg:'#1A73E8',g:G.chat,dock:1})}${ic('',{cls:'chrome',dock:1,hit:hitC})}${ic('',{bg:'#5F6368',g:G.camera,dock:1})}</div>
+  <div class="gsearch">${SV.search}<span>Buscar</span>${SV.mic}</div>${hb(1)}</div>`;
 
-const chromeA=st=>`<div class="cr">${sb('and')}<div class="cr-bar"><span>⌂</span>
-  <div class="cr-url${st==='typing'?' hit':''}">${st==='typing'?`${URL_APP}<span class="caret g"></span>`:URL_APP}</div>
-  <span class="cr-tabs">1</span><span class="cr-dots${st==='loaded'?' hit':''}">⋮</span></div>
-  <div class="cr-page">${st==='typing'?'<div class="nt"><div>Buscar o escribir dirección web</div></div>':appBody()}
-  ${st==='menu'?`<div class="menu"><div>Nueva pestaña</div><div>Nueva pestaña Incógnito</div><hr><div>Historial</div><div>Borrar datos de navegación</div><hr><div>Descargas</div><div>Marcadores</div><hr><div>Compartir…</div><div>Buscar en la página</div><div>Traducir…</div><div class="hit">Instalar y crear acceso directo</div></div>`:''}
-  ${st==='dialog'?`<div class="modal-bg"></div><div class="asheet"><h4>Instalar y crear acceso directo</h4><div class="aopts">
-    <div class="aopt hit"><i class="pl down">PL</i><div>Instalar</div><span class="chev">›</span></div>
-    <div class="aopt"><i class="pl chr">PL</i><div>Crear acceso directo<small>Los accesos directos se abren en Chrome</small></div><span class="chev">›</span></div></div></div>`:''}
-  </div></div>`;
-
-const rg=(title,back,body,extra='')=>`<div class="rg">${sb('and navy')}<div class="rg-bar">${back?'<span class="bk">‹</span>':''}${title}</div><div class="rg-main">${body}${extra}</div></div>`;
-const fld=(label,val,cls='')=>`<div class="rg-f">${label}<b class="${cls}">${val}</b></div>`;
-
-const pcWin=st=>{
-  if(st==='app') return `<div class="desk"><div class="shortcut hit"><i class="pl">PL</i>Partes LAV</div>
-    <div class="appwin"><div class="tb"><i class="pl">PL</i>Partes LAV<span class="wc">–&nbsp;&nbsp;☐&nbsp;&nbsp;✕</span></div>${appBody(true)}</div>
-    <div class="taskbar"><span></span><span></span><i class="pl">PL</i><span></span></div></div>`;
-  const typing=st==='typing';
-  return `<div class="pcw"><div class="pc-tabs"><div class="pc-tab">${typing?'Nueva pestaña':'<i class="pl">PL</i>Partes LAV'}</div><span class="pc-plus">+</span><span class="win-ctl">–&nbsp;&nbsp;☐&nbsp;&nbsp;✕</span></div>
-    <div class="pc-bar"><span>←</span><span>→</span><span>↻</span>
-      <div class="pc-url${typing?' hit':''}"><span class="u">${typing?`${URL_APP}<span class="caret g"></span>`:URL_APP}</span>${typing?'':`<span class="pc-inst${st==='loaded'?' hit':''}">${INSTALL}</span><span>☆</span>`}</div><span>⋮</span></div>
-    <div class="pc-page">${typing?'<div class="nt"><div>Buscar o escribir dirección web</div></div>':appBody(true)}
-    ${st==='dialog'?`<div class="pop"><h4>¿Instalar aplicación?</h4>${who}<div class="acts"><span class="gbtn fill hit">Instalar</span><span class="gbtn">Cancelar</span></div></div>`:''}</div></div>`;
+const crBar=(st)=>`<div class="cr-bar"><span class="cr-ic">${SV.home}</span>${st==='typing'
+    ? `<div class="cr-url focus"><span data-type="${URL_APP}"></span><span class="caret w"></span></div><span class="cr-ic">✕</span>`
+    : `<div class="cr-url">${SV.tune}<span class="u">${URL_APP}</span></div><span class="cr-ic">${SV.plus}</span><span class="cr-tabs">1</span><span class="cr-ic${st==='loaded'?' hit':''}">${SV.dots}</span>`}</div>`;
+const mi=(t,i,hit)=>`<div class="mi${hit?' hit':''}">${i}${t}</div>`;
+const chromeA=st=>{
+  if(st==='typing') return `<div class="cr">${sbA('dk')}${crBar(st)}<div class="cr-sugg"><div class="sg">${SV.globe}<div>${URL_APP}<small>Ir a la dirección</small></div></div><div class="sg">${SV.search}<div>mant-ute-lav-este</div></div></div>${kb('gb',SV.arrowR,true)}${hb(1)}</div>`;
+  return `<div class="cr">${sbA('dk')}${crBar(st)}<div class="cr-page">${welcome()}
+  ${st==='menu'?`<div class="menu"><div class="m-top">${SV.fwd}${SV.starF}${SV.down}${SV.info}${SV.reload}</div>
+    ${mi('Nueva pestaña',SV.newtab)}${mi('Nueva pestaña Incógnito',SV.incog)}${mi('Añadir pestaña a nuevo grupo',SV.group)}<div class="m-sep"></div>
+    ${mi('Historial',SV.hist)}${mi('Borrar datos de navegación',SV.trash)}${mi('Controles del sitio',SV.site)}<div class="m-sep"></div>
+    ${mi('Descargas',SV.dl)}${mi('Marcadores',SV.starF)}${mi('Pestañas recientes',SV.devices)}<div class="m-sep"></div>
+    ${mi('Compartir…',SV.shareA)}${mi('Buscar en la página',SV.find)}${mi('Traducir…',SV.transl)}${mi('Mostrar modo Lectura',SV.reader)}${mi('Instalar y crear acceso directo',SV.install,true)}</div>`:''}
+  ${st==='dialog'?`<div class="dim"></div><div class="asheet"><h4>Instalar y crear acceso directo</h4><div class="aopts">
+    <div class="aopt hit"><span class="bi"><i class="pl"></i><em>${SV.down}</em></span><div>Instalar</div><span class="chev">›</span></div>
+    <div class="aopt"><span class="bi"><i class="pl"></i><em class="chr"></em></span><div>Crear acceso directo<small>Los accesos directos se abren en Chrome</small></div><span class="chev">›</span></div></div></div>`:''}
+  </div>${hb()}</div>`;
 };
 
+/* ---------- Ordenador ---------- */
+const WC=`<span class="win-ctl"><span>—</span><span>☐</span><span>✕</span></span>`;
+const pcWin=st=>{
+  if(st==='app') return `<div class="desk"><div class="shortcut hit"><i class="pl"></i>Partes LAV</div>
+    <div class="appwin"><div class="tb"><i class="pl"></i>Partes LAV${WC}</div>${welcome(true)}</div>
+    <div class="taskbar"><span class="win"></span><span></span><span></span><i class="pl"></i></div></div>`;
+  const typing=st==='typing';
+  return `<div class="pcw"><div class="pc-tabs"><div class="pc-tab">${typing?'Nueva pestaña':'<i class="pl"></i>Partes LAV'}<span class="x">✕</span></div><span class="pc-plus">+</span>${WC}</div>
+    <div class="pc-bar">${SV.back}${SV.fwd}${SV.reload}
+      <div class="pc-url${typing?' focus':''}">${typing?`<span class="u"><span data-type="${URL_APP}"></span><span class="caret g"></span></span>`:`${SV.tune}<span class="u">${URL_APP}</span><span class="pc-inst${st==='loaded'?' hit':''}">${SV.install}</span>${SV.star}`}</div>${SV.dots}</div>
+    <div class="pc-page">${typing?'<div class="ntp"><div>Buscar o escribir una dirección web</div></div>':welcome(true)}
+    ${typing?`<div class="omni"><div class="sg hit">${SV.globe}<div>${URL_APP}</div></div><div class="sg">${SV.search}<div>mant-ute-lav-este – Buscar</div></div></div>`:''}
+    ${st==='dialog'?`<div class="pop"><h4>¿Instalar app?</h4><div class="who"><i class="pl"></i><div><b>Partes LAV</b><small>${HOST}</small></div></div><div class="acts"><span class="gbtn fill hit">Instalar</span><span class="gbtn">Cancelar</span></div></div>`:''}</div></div>`;
+};
+
+/* ---------- Registro (pantallas reales de la app) ---------- */
+const reg=(title,back,body)=>`<div class="ap">${sbA('navy')}<div class="ap-h">${back?'<span class="bk">‹</span>':''}${title}</div><div class="ap-c">${body}</div>${hb()}</div>`;
+const fld=(label,o={})=>`<div class="fld${o.focus?' focus':''}">${label}<b class="${o.pin?'pin':''}">${o.type?`<span data-type="${o.type}"></span><span class="caret g"></span>`:(o.val||'')}</b></div>`;
+const inicio=()=>`<div class="ap">${sbA('navy')}<div class="ap-h"><div>Partes LAV<span class="sub">Juan García</span></div><span class="mdots">⋮</span></div><div class="ap-c">
+  <div class="aviso">Tu registro está pendiente de que lo apruebe la oficina. Puedes ir haciendo partes: se enviarán solos en cuanto te aprueben.</div>
+  <div class="tipos"><div class="tipo" style="background:#C2410C"><b>INFRA</b><span>Infraestructura</span></div><div class="tipo" style="background:#1D4ED8"><b>SUPER</b><span>Superestructura</span></div><div class="tipo" style="background:#4D7C0F"><b>MAQUINARIA</b><span>Maquinaria de vía</span></div></div>
+  <p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p></div>${hb()}</div>`;
+
+/* ---------- Guías ---------- */
 const C=`<code>${URL_APP}</code>`;
 const GUIDES={
-  iphone:{label:'Instalar en iPhone',sub:'Safari',device:'phone',steps:[
-    {t:'Abre Safari',d:'Es el navegador de la brújula azul. En iPhone hazlo desde Safari, no desde Chrome.',s:()=>iosHome(false,true)},
-    {t:'Entra en la dirección',d:`Toca la barra de abajo, escribe ${C} y pulsa Ir.`,s:()=>safari('typing')},
-    {t:'Pulsa Compartir',d:'El cuadrado con la flecha hacia arriba, en el centro de la barra de abajo. Si no lo ves, toca los tres puntos (···) y luego Compartir.',s:()=>safari('loaded')},
-    {t:'Añadir a pantalla de inicio',d:'Desliza la lista hacia abajo, por debajo de Imprimir y Copiar, y toca «Añadir a pantalla de inicio» (el cuadrado con un +).',s:iosShare},
-    {t:'Revisa el nombre y pulsa Añadir',d:'El nombre tiene que ser <b>Partes LAV</b>. Si sale otro, bórralo con la ✕ y escribe Partes LAV. Luego pulsa «Añadir», arriba a la derecha. Si sale «Abrir como app web», déjalo activado.',s:iosAdd},
-    {t:'Listo',d:'El icono de Partes LAV ya está en la pantalla de inicio. Ábrelo desde ahí y sigue la pestaña «Registrarse».',s:()=>iosHome(true,false,false)},
+  iphone:{n:1,pre:'Instalar en',label:'iPhone',device:'phone',os:'ios',steps:[
+    {t:'Abre Safari',d:'Es la brújula azul. En iPhone tiene que ser Safari, no Chrome.',s:()=>iosHome(false,true)},
+    {t:'Escribe la dirección',d:`Toca la barra de abajo, escribe ${C} y pulsa «ir».`,s:()=>safari('typing'),dur:DUR_TYPE},
+    {t:'Pulsa Compartir',d:'Es el cuadrado con la flecha hacia arriba, en el centro de la barra de abajo. Si no lo ves, toca los tres puntos (···) y después «Compartir».',s:()=>safari('loaded')},
+    {t:'Añadir a pantalla de inicio',d:'Baja por la lista hasta ver <b>Añadir a pantalla de inicio</b> (el cuadrado con un +) y tócalo.',s:iosShare},
+    {t:'Revisa el nombre y pulsa Añadir',d:'Tiene que poner <b>Partes LAV</b>; si pone otra cosa, bórralo con la ✕ y escríbelo. Pulsa «Añadir», arriba a la derecha. Si ves «Abrir como app web», déjalo activado.',s:iosAdd,dur:6400},
+    {t:'¡Instalada!',d:'El icono de Partes LAV ya está en tu pantalla de inicio. Ábrelo y sigue con <b>Registrarse</b>.',s:()=>iosHome(true,false)},
   ]},
-  android:{label:'Instalar en Android',sub:'Chrome',device:'phone',steps:[
-    {t:'Abre Chrome',d:'Toca el icono de Chrome.',s:()=>andHome(false,true)},
-    {t:'Entra en la dirección',d:`Escribe ${C} en la barra de arriba y pulsa Ir.`,s:()=>chromeA('typing')},
-    {t:'Abre el menú',d:'Los tres puntos ⋮, arriba a la derecha.',s:()=>chromeA('loaded')},
-    {t:'Instalar y crear acceso directo',d:'Está casi al final del menú, debajo de Traducir. En algunos móviles se llama «Instalar aplicación» o «Añadir a pantalla de inicio».',s:()=>chromeA('menu')},
-    {t:'Pulsa Instalar',d:'La primera opción. No elijas «Crear acceso directo»: eso solo abre la web dentro de Chrome.',s:()=>chromeA('dialog')},
-    {t:'Listo',d:'Partes LAV aparece en la pantalla de inicio y en el cajón de aplicaciones. Ahora sigue la pestaña «Registrarse».',s:()=>andHome(true,false,false)},
+  android:{n:1,pre:'Instalar en',label:'Android',device:'phone',os:'and',steps:[
+    {t:'Abre Chrome',d:'Toca el icono de Chrome, el círculo de colores.',s:()=>andHome(false,true)},
+    {t:'Escribe la dirección',d:`Toca la barra de arriba, escribe ${C} y pulsa la flecha del teclado.`,s:()=>chromeA('typing'),dur:DUR_TYPE},
+    {t:'Abre el menú',d:'Toca los tres puntos ⋮, arriba a la derecha.',s:()=>chromeA('loaded')},
+    {t:'Instalar y crear acceso directo',d:'Está al final del menú. En algunos móviles se llama «Instalar aplicación» o «Añadir a pantalla de inicio».',s:()=>chromeA('menu')},
+    {t:'Pulsa Instalar',d:'Elige la primera opción, <b>Instalar</b>. No uses «Crear acceso directo»: así solo se abre como una web dentro de Chrome.',s:()=>chromeA('dialog')},
+    {t:'¡Instalada!',d:'Partes LAV ya está en tu pantalla de inicio y entre tus aplicaciones. Ábrela y sigue con <b>Registrarse</b>.',s:()=>andHome(true,false,false)},
   ]},
-  pc:{label:'Instalar en ordenador',sub:'Chrome o Edge',device:'pc',steps:[
-    {t:'Entra en la dirección',d:`Abre Chrome o Edge y escribe ${C} en la barra de direcciones.`,s:()=>pcWin('typing')},
+  pc:{n:1,pre:'Instalar en',label:'Ordenador',device:'pc',os:'win',steps:[
+    {t:'Escribe la dirección',d:`Abre Chrome o Edge, escribe ${C} en la barra de arriba y pulsa Intro.`,s:()=>pcWin('typing'),dur:DUR_TYPE},
     {t:'Pulsa el icono de instalar',d:'Es la pantallita con una flecha, a la derecha de la barra de direcciones. Si no sale, mira «Si algo no sale», más abajo.',s:()=>pcWin('loaded')},
-    {t:'Pulsa Instalar',d:'Confirma en la ventanita que aparece.',s:()=>pcWin('dialog')},
-    {t:'Listo',d:'La app se abre en su propia ventana y queda un acceso directo en el escritorio y en el menú Inicio. Ahora sigue la pestaña «Registrarse».',s:()=>pcWin('app')},
+    {t:'Pulsa Instalar',d:'Confírmalo en la ventanita que aparece.',s:()=>pcWin('dialog')},
+    {t:'¡Instalada!',d:'La app se abre en su propia ventana y deja un acceso directo en el escritorio y en el menú Inicio. Sigue con <b>Registrarse</b>.',s:()=>pcWin('app')},
   ]},
-  registro:{label:'Registrarse',sub:'después de instalar',device:'phone',steps:[
+  registro:{n:2,pre:'Después',label:'Registrarse',device:'phone',os:'and',steps:[
     {t:'Abre la app',d:'Toca el icono de Partes LAV que acabas de instalar.',s:()=>andHome(true,false,true)},
     {t:'Pulsa Registrarme',d:'Solo se hace una vez. Si ya te registraste en otro móvil, pulsa «Ya tengo cuenta» y entra con tu Gmail y tu PIN.',
-      s:()=>rg('Partes LAV',0,`<div class="rg-card"><h3>Bienvenido</h3><p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p><div class="rg-btn hit">Registrarme</div><div class="rg-btn sec">Ya tengo cuenta</div></div>`)},
-    {t:'Escribe tu Gmail',d:'Pon tu correo de Gmail y pulsa «Enviarme el código».',
-      s:()=>rg('Registro · 1 de 4',1,`<div class="rg-card"><h3>Tu correo de Gmail</h3><p>Te mandaremos un código para comprobar que el correo es tuyo.</p>${fld('Correo','juan.garcia@gmail.com')}<div class="rg-btn hit">Enviarme el código</div></div>`)},
-    {t:'Escribe el código',d:'Abre Gmail: te habrá llegado un código de 6 cifras. Si no lo ves, mira en «Spam» o en «Promociones». Escríbelo y pulsa «Comprobar».',
-      s:()=>rg('Registro · 2 de 4',1,`<div class="rg-card"><h3>Escribe el código</h3><p>Te hemos enviado un código de 6 cifras a <b>juan.garcia@gmail.com</b>. Si no lo ves, mira en «Spam» o en «Promociones».</p>${fld('Código','482913','pin')}<div class="rg-btn hit">Comprobar</div><div class="rg-lnk">No me ha llegado: enviar otro</div></div>`)},
-    {t:'Escribe tu nombre',d:'Nombre y al menos un apellido, como te tiene la empresa, y pulsa «Buscarme». Si no te encuentra, habla con la oficina.',
-      s:()=>rg('Registro · 3 de 4',1,`<div class="rg-card"><h3>¿Quién eres?</h3>${fld('Tu nombre y apellidos','Juan García')}<div class="rg-btn hit">Buscarme</div><p>Escribe tu nombre y al menos un apellido, como los tiene la empresa.</p></div>`)},
-    {t:'Crea tu PIN',d:'Comprueba que sale tu nombre. Elige un PIN de 4 a 6 cifras y repítelo. La app te lo pedirá al abrirla: no se lo digas a nadie.',
-      s:()=>rg('Registro · 4 de 4',1,`<div class="rg-card"><h3>Juan García</h3><p>Crea tu PIN de 4 a 6 cifras. Es tu contraseña.</p>${fld('PIN','••••','pin')}${fld('Repite el PIN','••••','pin')}<div class="rg-btn hit">Terminar el registro</div></div>`)},
-    {t:'Listo',d:'Ya estás dentro. Hasta que la oficina apruebe tu registro verás un aviso; cuando lo apruebe, ya puedes hacer partes.',
-      s:()=>rg('Partes LAV',0,`<div class="rg-card"><h3>Juan García</h3><div class="rg-ph"></div><div class="rg-ph" style="width:70%"></div><div class="rg-ph" style="width:85%"></div></div>`,`<div class="toast">Ya estás dentro. Falta que la oficina apruebe tu registro.</div>`)},
+      s:()=>reg('Partes LAV',0,`<div class="card"><h3>Bienvenido</h3><p>Para usar la app tienes que registrarte con tu correo de Gmail. Solo se hace una vez.</p><div class="abtn hit">Registrarme</div><div class="abtn sec">Ya tengo cuenta</div></div>`)},
+    {t:'Escribe tu Gmail',d:'Escribe tu correo de Gmail y pulsa «Enviarme el código».',dur:6400,
+      s:()=>reg('Registro · 1 de 4',1,`<div class="card"><h3>Tu correo de Gmail</h3><p>Te mandaremos un código para comprobar que el correo es tuyo.</p>${fld('Correo',{focus:1,type:'juan.garcia@gmail.com'})}<div class="abtn hit">Enviarme el código</div></div>`)},
+    {t:'Escribe el código',d:'Abre Gmail: te llega un código de 6 cifras. Si no lo ves, mira en «Spam» o «Promociones». Escríbelo y pulsa «Comprobar».',dur:6400,
+      s:()=>reg('Registro · 2 de 4',1,`<div class="card"><h3>Escribe el código</h3><p>Te hemos enviado un código de 6 cifras a <b>juan.garcia@gmail.com</b>. Si no lo ves, mira en «Spam» o en «Promociones».</p>${fld('Código',{focus:1,pin:1,type:'482913'})}<div class="abtn hit">Comprobar</div><div class="alnk">No me ha llegado: enviar otro</div></div>`)},
+    {t:'Escribe tu nombre',d:'Tu nombre y al menos un apellido, como te tiene la empresa. Pulsa «Buscarme». Si no te encuentra, avisa a la oficina.',dur:6400,
+      s:()=>reg('Registro · 3 de 4',1,`<div class="card"><h3>¿Quién eres?</h3>${fld('Tu nombre y apellidos',{focus:1,type:'Juan García'})}<div class="abtn hit">Buscarme</div><p>Escribe tu nombre y al menos un apellido, como los tiene la empresa. Si no te encuentra, habla con la oficina.</p></div>`)},
+    {t:'Crea tu PIN',d:'Comprueba que sale tu nombre. Elige un PIN de 4 a 6 cifras y repítelo. Es tu contraseña: no se lo digas a nadie.',
+      s:()=>reg('Registro · 4 de 4',1,`<div class="card"><h3>Juan García</h3><p>Crea tu PIN de 4 a 6 cifras. Es tu contraseña: te lo pedirá la app al abrirla y para entrar desde otro móvil.</p>${fld('PIN',{pin:1,val:'••••'})}${fld('Repite el PIN',{pin:1,val:'••••'})}<div class="abtn hit">Terminar el registro</div></div>`)},
+    {t:'¡Ya estás dentro!',d:'Verás un aviso amarillo hasta que la oficina apruebe tu registro, pero <b>ya puedes hacer partes</b>: se enviarán solos en cuanto te aprueben.',s:inicio,dur:6400},
   ]},
 };
 const ORDER=['iphone','android','pc','registro'];
 
+/* ---------- Reproductor ---------- */
 const $=id=>document.getElementById(id);
-const scr=$('scr'),screen=$('screen'),tap=$('tap'),stepsEl=$('steps'),playBtn=$('play'),player=$('player');
+const scr=$('scr'),zoom=$('zoom'),screen=$('screen'),tap=$('tap'),prog=$('prog'),stepsEl=$('steps'),player=$('player'),device=$('device');
+const playBtn=$('play'),prevBtn=$('prev'),nextBtn=$('next'),nextGuide=$('nextguide');
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-let dev=detect(),idx=0,playing=!reduce,ended=false,tapTimer;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let dev=detect(),idx=0,playing=!reduce,ended=false,tapTimer=0,typeTok=0,lastDevice='';
 
 function detect(){
   const h=(location.hash||'').slice(1);
   if(GUIDES[h]) return h;
   const ua=navigator.userAgent||'';
-  if(/iPhone|iPad|iPod/.test(ua)) return 'iphone';
+  if(/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)) return 'iphone';
   if(/Android/.test(ua)) return 'android';
   return 'pc';
 }
 
-$('tabs').innerHTML=ORDER.map(k=>`<button class="tab" type="button" role="tab" id="tab-${k}" data-k="${k}"><b>${GUIDES[k].label}</b><small>${GUIDES[k].sub}</small></button>`).join('');
-$('tabs').addEventListener('click',e=>{
-  const b=e.target.closest('.tab'); if(!b) return;
-  dev=b.dataset.k; idx=0; ended=false; playing=!reduce; render();
-});
+$('tabs').innerHTML=ORDER.map(k=>{const g=GUIDES[k];return `<button class="tab" type="button" role="tab" id="tab-${k}" data-k="${k}"><span class="n">${g.n}</span><small>${g.pre}</small><b>${g.label}</b></button>`;}).join('');
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('.tab'); if(b) choose(b.dataset.k,true);});
+
+function choose(k,scroll){
+  dev=k; idx=0; ended=false; playing=!reduce; render();
+  if(scroll){const t=player.getBoundingClientRect().top; if(t<0||t>innerHeight*.4) player.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}
+}
+
+function fit(){
+  const dw=DW[GUIDES[dev].device],W=scr.clientWidth,H=scr.clientHeight;
+  if(!W||!H) return 1;
+  const k=W/dw;
+  zoom.style.width=dw+'px'; zoom.style.height=(H/k)+'px'; zoom.style.transform=`scale(${k})`;
+  return k;
+}
 
 function setPlaying(p){
   playing=p;
   player.classList.toggle('paused',!p);
-  playBtn.textContent=ended?'Repetir':(p?'Pausa':'Reproducir');
+  const ico=ended?'<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3"/>':p?'<path d="M8 5v14M16 5v14"/>':'<path d="M7 4.5v15l12-7.5Z" fill="currentColor"/>';
+  playBtn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${ico}</svg>${ended?'Ver otra vez':p?'Pausa':'Seguir'}`;
 }
 
 function placeTap(){
   const h=screen.querySelector('.hit');
   if(!h){tap.hidden=true;return;}
-  const s=scr.getBoundingClientRect(),r=h.getBoundingClientRect();
-  tap.style.left=(r.left-s.left+r.width/2)+'px';
-  tap.style.top=(r.top-s.top+r.height/2)+'px';
+  const pc=GUIDES[dev].device==='pc',z=zoom.getBoundingClientRect(),k=z.width/DW[GUIDES[dev].device],r=h.getBoundingClientRect();
+  const fx=pc?.5:(r.width>150*k?.76:.5),fy=pc?.55:.62;
+  tap.style.left=((r.left-z.left)+r.width*fx)/k+'px';
+  tap.style.top=((r.top-z.top)+r.height*fy)/k+'px';
   tap.hidden=false;
 }
 
-function render(){
-  const g=GUIDES[dev],st=g.steps[idx];
-  $('device').className='device '+g.device;
-  screen.innerHTML=st.s();
-  $('count').textContent=`Paso ${idx+1} de ${g.steps.length}`;
-  $('stitle').textContent=st.t;
-  $('sdesc').innerHTML=st.d;
-  stepsEl.innerHTML=g.steps.map((s,i)=>`<li class="${i<idx?'done':i===idx?'on':''}"><button type="button" data-i="${i}"><span class="n">${i+1}</span><span class="lbl"><span class="t">${s.t}</span><span class="bar"><i></i></span></span></button></li>`).join('');
-  stepsEl.querySelector('.on .bar i').addEventListener('animationend',()=>{
-    if(idx<g.steps.length-1){idx++;render();}
-    else{ended=true;setPlaying(false);}
-  });
-  ORDER.forEach(k=>$('tab-'+k).setAttribute('aria-selected',String(k===dev)));
-  setPlaying(playing);
-  clearTimeout(tapTimer);
-  tapTimer=setTimeout(placeTap,reduce?0:450);
+async function typeAll(tok){
+  const els=[...screen.querySelectorAll('[data-type]')];
+  if(!els.length){ if(!reduce) await sleep(450); return; }
+  for(const el of els){
+    const t=el.dataset.type;
+    if(reduce){el.textContent=t;continue;}
+    el.textContent='';
+    await sleep(500);
+    for(let i=1;i<=t.length;i++){
+      if(tok!==typeTok) return;
+      el.textContent=t.slice(0,i);
+      await sleep(Math.max(28,1500/t.length));
+    }
+  }
+  await sleep(250);
 }
 
-stepsEl.addEventListener('click',e=>{
-  const b=e.target.closest('button'); if(!b) return;
-  idx=+b.dataset.i; ended=false; render();
+function render(){
+  const g=GUIDES[dev],st=g.steps[idx],n=g.steps.length,last=idx===n-1;
+  if(lastDevice!==dev){tap.hidden=true; lastDevice=dev;}
+  device.className='device '+g.device;
+  zoom.dataset.os=g.os;
+  tap.className='tap'+(g.device==='pc'?' cursor':'');
+  tap.innerHTML=g.device==='pc'?CURSOR:HAND;
+  fit();
+  screen.innerHTML=st.s();
+  $('count').textContent=`Paso ${idx+1} de ${n}`;
+  $('stitle').textContent=st.t;
+  $('sdesc').innerHTML=st.d;
+  prog.style.setProperty('--dur',(st.dur||DUR)+'ms');
+  prog.innerHTML=g.steps.map((_,i)=>`<span class="${i<idx?'done':i===idx?'on':''}"><i></i></span>`).join('');
+  prog.querySelector('.on i').addEventListener('animationend',()=>{ if(idx<n-1){idx++;render();} else {ended=true;setPlaying(false);} });
+  stepsEl.innerHTML=g.steps.map((s,i)=>`<li class="${i<idx?'done':i===idx?'on':''}"><button type="button" data-i="${i}"><span class="n">${i+1}</span><span>${s.t}</span></button></li>`).join('');
+  ORDER.forEach(k=>$('tab-'+k).setAttribute('aria-selected',String(k===dev)));
+  prevBtn.disabled=idx===0; nextBtn.disabled=last;
+  nextGuide.hidden=!(last&&dev!=='registro');
+  setPlaying(playing);
+  clearTimeout(tapTimer);
+  if(screen.querySelector('[data-type]')) tap.hidden=true;
+  const tok=++typeTok;
+  typeAll(tok).then(()=>{ if(tok===typeTok) placeTap(); });
+}
+
+stepsEl.addEventListener('click',e=>{const b=e.target.closest('button'); if(b){idx=+b.dataset.i;ended=false;render();}});
+prevBtn.addEventListener('click',()=>{if(idx>0){idx--;ended=false;render();}});
+nextBtn.addEventListener('click',()=>{if(idx<GUIDES[dev].steps.length-1){idx++;ended=false;render();}});
+playBtn.addEventListener('click',()=>{ if(ended){ended=false;idx=0;playing=true;render();return;} setPlaying(!playing); });
+nextGuide.addEventListener('click',()=>choose('registro',true));
+addEventListener('keydown',e=>{
+  if(e.target.closest('input,textarea,summary')) return;
+  if(e.key==='ArrowRight') nextBtn.click();
+  else if(e.key==='ArrowLeft') prevBtn.click();
 });
-$('prev').addEventListener('click',()=>{ if(idx>0){idx--;ended=false;render();} });
-$('next').addEventListener('click',()=>{ const n=GUIDES[dev].steps.length; if(idx<n-1){idx++;ended=false;render();} });
-playBtn.addEventListener('click',()=>{
-  if(ended){ended=false;idx=0;playing=true;render();return;}
-  setPlaying(!playing);
-});
-addEventListener('resize',placeTap);
+addEventListener('resize',()=>{fit();placeTap();});
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{fit();placeTap();});
 
 $('copy').addEventListener('click',()=>{
-  const txt=$('u').textContent,btn=$('copy');
-  const done=()=>{btn.textContent='Copiado';setTimeout(()=>btn.textContent='Copiar',1600);};
-  const fallback=()=>{const r=document.createRange();r.selectNodeContents($('u'));const s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Pulsa Ctrl+C';};
+  const btn=$('copy'),txt='https://'+URL_APP+'/';
+  const done=()=>{btn.textContent='¡Copiada!';setTimeout(()=>btn.textContent='Copiar',1800);};
+  const fallback=()=>{const r=document.createRange();r.selectNodeContents($('u'));const s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Pulsa copiar';};
   try{navigator.clipboard.writeText(txt).then(done,fallback);}catch(e){fallback();}
 });
 
