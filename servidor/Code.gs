@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 18;
+const VERSION_SERVIDOR = 19;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -155,6 +155,8 @@ function crearHoja_(libro, nombre, cabeceras) {
 
 // ---------- Registro y acceso ----------
 
+const SEGUNDOS_CODIGO = 1800;   // el código por correo vale 30 minutos
+
 /** Código por correo para registrarse o, con para: 'pin', para crear un PIN nuevo. */
 function pedirCodigo_(d) {
   const email = email_(d.email);
@@ -171,10 +173,13 @@ function pedirCodigo_(d) {
   const kg = 'g:' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd');
   const n = Number(cache.get(kn) || 0);
   const g = Number(cache.get(kg) || 0);
-  if (n >= 3) throw new Error('Has pedido demasiados códigos. Espera una hora y vuelve a intentarlo.');
+  if (n >= 5) throw new Error('Has pedido demasiados códigos. Espera una hora y vuelve a intentarlo.');
   if (g >= 40) throw new Error('Hoy se han pedido demasiados códigos. Inténtalo mañana o avisa a la oficina.');
-  const codigo = String(Math.floor(100000 + Math.random() * 900000));
-  cache.put('c:' + email, JSON.stringify({ codigo: codigo, fallos: 0 }), 600);
+  // Si ya hay un código vigente se reenvía el mismo (así el correo anterior sigue valiendo); los fallos se conservan.
+  let previo = null;
+  try { previo = JSON.parse(cache.get('c:' + email) || 'null'); } catch (e) { previo = null; }
+  const codigo = previo && previo.codigo ? String(previo.codigo) : String(Math.floor(100000 + Math.random() * 900000));
+  cache.put('c:' + email, JSON.stringify({ codigo: codigo, fallos: previo && previo.fallos ? previo.fallos : 0 }), SEGUNDOS_CODIGO);
   cache.put(kn, String(n + 1), 3600);
   cache.put(kg, String(g + 1), 21600);
   enviarCorreo_({
@@ -182,7 +187,7 @@ function pedirCodigo_(d) {
     name: 'Partes LAV',
     subject: 'Tu código para la app Partes LAV: ' + codigo,
     body: 'Tu código para ' + (paraPin ? 'crear un PIN nuevo' : 'registrarte') + ' en la app Partes LAV es: ' + codigo +
-      '\n\nCaduca en 10 minutos.\nSi no lo has pedido tú, ignora este correo.',
+      '\n\nCaduca en 30 minutos.\nSi no lo has pedido tú, ignora este correo.',
   });
   return {};
 }
@@ -195,7 +200,7 @@ function comprobarCodigo_(email, codigo, consumir) {
   const o = JSON.parse(guardado);
   if (o.codigo !== String(codigo || '').trim()) {
     o.fallos += 1;
-    if (o.fallos >= 5) cache.remove(k); else cache.put(k, JSON.stringify(o), 600);
+    if (o.fallos >= 5) cache.remove(k); else cache.put(k, JSON.stringify(o), SEGUNDOS_CODIGO);
     throw new Error(o.fallos >= 5 ? 'Demasiados intentos. Pide un código nuevo.' : 'El código no es correcto.');
   }
   if (consumir) cache.remove(k);
@@ -211,7 +216,7 @@ function verificarCodigo_(d) {
   return { nombres: [] };
 }
 
-const MAX_BUSQUEDAS_NOMBRE = 10;   // por correo y hora: que no se pueda sacar la lista probando nombres
+const MAX_BUSQUEDAS_NOMBRE = 15;  // por correo y hora: que no se pueda sacar la lista probando nombres
 
 /** «José  Pérez» → ['jose', 'perez']: sin tildes, mayúsculas ni espacios de más. */
 function palabras_(s) {
@@ -227,18 +232,21 @@ function palabras_(s) {
 function buscarNombre_(d) {
   const email = email_(d.email);
   comprobarCodigo_(email, d.codigo, false);
+  const buscadas = palabras_(d.texto);
+  if (buscadas.length < 2) throw new Error('Escribe tu nombre y al menos un apellido, por ejemplo: Jose Bordetas.');
   const cache = CacheService.getScriptCache();
   const kb = 'b:' + email;
   const n = Number(cache.get(kb) || 0);
   if (n >= MAX_BUSQUEDAS_NOMBRE) throw new Error('Demasiados intentos. Espera una hora o habla con la oficina.');
   cache.put(kb, String(n + 1), 3600);
-  const buscadas = palabras_(d.texto);
-  if (buscadas.length < 2) throw new Error('Escribe tu nombre y al menos un apellido.');
   const encajan = tabla_('Trabajadores').filas.map((t) => String(t.Nombre || '')).filter((nombre) => {
     const suyas = palabras_(nombre);
-    return nombre && buscadas.every((p) => suyas.indexOf(p) >= 0);
+    // Palabra entera; o una inicial suelta (en la lista o escrita) que coincide con la primera letra de la otra:
+    // «Jose L Bordetas» y «Jose Luis Bordetas» valen para «Jose Luis Bordetas Puig».
+    return nombre && buscadas.every((p) => suyas.some((s) => s === p ||
+      (s.length === 1 && p.charAt(0) === s) || (p.length === 1 && s.charAt(0) === p)));
   });
-  if (!encajan.length) throw new Error('No te encontramos. Escríbelo como lo tiene la empresa o habla con la oficina.');
+  if (!encajan.length) throw new Error('No te encontramos. Escribe nombre y un apellido (por ejemplo Jose Bordetas) o habla con la oficina.');
   if (encajan.length > 1) throw new Error('Hay más de una persona con ese nombre: añade el otro apellido.');
   const nombre = encajan[0];
   if (tabla_('Usuarios').filas.some((u) => String(u.Nombre) === nombre && u.Estado !== 'rechazado')) {

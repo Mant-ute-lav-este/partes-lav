@@ -1506,12 +1506,52 @@ prueba('servidor: buscar el nombre al registrarse (tildes, orden, ambiguos, ya r
   igual(r.estado, 'pendiente');
 });
 
+prueba('servidor: nombre con inicial en la lista («Jose L Bordetas» se encuentra como «Jose Luis Bordetas»)', async () => {
+  const E = await servidorListo();
+  const { buscar } = registroConCodigo(E);
+  E.hojas.Trabajadores.appendRow(['Jose L Bordetas', 'UTE', '', '']);
+  igual(buscar('Jose Luis Bordetas').nombre, 'Jose L Bordetas', 'el nombre completo vale');
+  igual(buscar('jose bordetas').nombre, 'Jose L Bordetas', 'sin la inicial vale');
+  igual(buscar('Bordetas Jose L').nombre, 'Jose L Bordetas', 'tal cual vale');
+  cierto(/No te encontramos/.test(buscar('Jose Pablo Bordetas').error), 'otra inicial no vale');
+  cierto(/No te encontramos/.test(buscar('José Luis Pérez').error), 'la inicial solo vale si está en la lista');
+});
+
+prueba('servidor: «Jose Luis Bordetas Puig» en la lista se encuentra también como «Jose L Bordetas»', async () => {
+  const E = await servidorListo();
+  const { buscar } = registroConCodigo(E);
+  E.hojas.Trabajadores.appendRow(['Jose Luis Bordetas Puig', 'UTE', '', '']);
+  for (const t of ['Jose Luis Bordetas Puig', 'Jose Luis Bordetas', 'Jose L Bordetas', 'jose bordetas', 'Bordetas Puig Jose']) {
+    igual(buscar(t).nombre, 'Jose Luis Bordetas Puig', t);
+  }
+  cierto(/No te encontramos/.test(buscar('Jose Pablo Bordetas').error), 'otro segundo nombre no vale');
+  cierto(/No te encontramos/.test(buscar('Jose Luis Bordetas Gil').error), 'otro segundo apellido no vale');
+});
+
+prueba('servidor: una búsqueda de una sola palabra no gasta intentos', async () => {
+  const E = await servidorListo();
+  const { buscar } = registroConCodigo(E);
+  for (let i = 0; i < 20; i++) cierto(/al menos un apellido/.test(buscar('jose').error), 'una palabra');
+  igual(buscar('jose perez gil').nombre, 'José Pérez Gil', 'los intentos siguen enteros');
+});
+
 prueba('servidor: no se puede sacar la lista probando nombres', async () => {
   const E = await servidorListo();
   const { buscar } = registroConCodigo(E);
-  for (let i = 0; i < 9; i++) buscar('nadie ' + i);
-  cierto(/No te encontramos/.test(buscar('nadie 9').error), 'el intento 10 aún vale');
-  cierto(/Demasiados intentos/.test(buscar('jose perez').error), 'el 11 se corta, aunque sea bueno');
+  for (let i = 0; i < 14; i++) buscar('nadie ' + i);
+  cierto(/No te encontramos/.test(buscar('nadie 14').error), 'el intento 15 aún vale');
+  cierto(/Demasiados intentos/.test(buscar('jose perez').error), 'el 16 se corta, aunque sea bueno');
+});
+
+prueba('servidor: códigos por correo (5 por hora; mientras uno vale se reenvía el mismo)', async () => {
+  const E = await servidorListo();
+  const pide = () => E.post({ accion: 'codigo', email: 'otro@ejemplo.test', peticion: crypto.randomUUID() });
+  igual(pide().ok, true);
+  const primero = /(\d{6})/.exec(E.correos.at(-1).subject)[1];
+  igual(pide().ok, true);
+  igual(/(\d{6})/.exec(E.correos.at(-1).subject)[1], primero, 'el mismo código sigue valiendo');
+  for (let i = 0; i < 3; i++) igual(pide().ok, true, 'petición ' + (i + 3));
+  cierto(/demasiados códigos/.test(pide().error), 'la sexta se corta');
 });
 
 prueba('servidor: archivo anual de Envios (sin perder números ni duplicar partes)', async () => {

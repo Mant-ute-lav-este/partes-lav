@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v19 · 2026-11-02 (sin desplegar; registro más ágil)
+- El código por correo vale **30 minutos** (antes 10). Se pueden pedir 5 por hora (antes 3); si el anterior aún vale, se reenvía el mismo.
+- Buscar el nombre al registrarse: una inicial suelta encaja con la palabra entera en los dos sentidos («Jose L Bordetas» ↔ «Jose Luis Bordetas Puig»). Escribir una sola palabra ya no gasta intentos; máximo 15 búsquedas por hora (antes 10). Mensajes con un ejemplo.
+
 ## 0.22.0 · 2026-10-28
 - **Foto del telefonema en SUPER.** En «Vía y horario», debajo de los números de telefonema, «Foto telefonema de entrada» y «Foto telefonema de salida» con 📷 Cámara (sin galería). Obligatorias si se ocupa la vía, también con «No se han podido hacer fotos»; no se piden con «No se ocupa la vía» ni «No realizado». INFRA no cambia.
 - Van en `t.fotos` con fase `telentrada` / `telsalida` y llegan como `T1_telentrada_1.jpg`, `T1_telsalida_1.jpg`. No salen en el anexo del PDF. Servidor y Power Automate sin cambios.
