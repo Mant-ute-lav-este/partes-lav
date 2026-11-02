@@ -218,6 +218,7 @@ function fotoTelefonema(t, fase, txt) {
         <div class="fase-cab"><strong>Foto telefonema de ${txt}</strong> <span class="contador">${fs.length}</span>${t.noRealizado ? '' : '<span class="oblig">mín. 1</span>'}</div>
         <div class="fila-botones">
           <button class="btn secundario" data-action="foto" data-fase="${fase}" data-origen="camara">📷 Cámara</button>
+          <button class="btn secundario" data-action="foto" data-fase="${fase}" data-origen="galeria">🖼️ Galería</button>
         </div>
         ${fs.length ? `<div class="miniaturas">${fs.map((x) => `
           <button class="mini-foto" data-action="ver-foto" data-id="${x.id}"><img data-foto-id="${x.id}" alt="Foto telefonema de ${txt}"></button>`).join('')}</div>` : ''}
