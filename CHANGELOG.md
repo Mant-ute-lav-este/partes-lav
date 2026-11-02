@@ -2,7 +2,7 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
-## Servidor v19 · 2026-11-02 (sin desplegar; registro más ágil)
+## Servidor v19 · 2026-11-02 (desplegado; registro más ágil)
 - El código por correo vale **30 minutos** (antes 10). Se pueden pedir 5 por hora (antes 3); si el anterior aún vale, se reenvía el mismo.
 - Buscar el nombre al registrarse: una inicial suelta encaja con la palabra entera en los dos sentidos («Jose L Bordetas» ↔ «Jose Luis Bordetas Puig»). Escribir una sola palabra ya no gasta intentos; máximo 15 búsquedas por hora (antes 10). Mensajes con un ejemplo.
 
