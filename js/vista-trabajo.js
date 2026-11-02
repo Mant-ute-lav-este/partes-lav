@@ -272,7 +272,7 @@ export function vTrabajo() {
       ${t.sinVia ? '' : `
       <div class="dos">${campo('Telefonema de entrada nº', `${b}.telefonema.numero`, t.telefonema.numero, 'inputmode="numeric" autocomplete="off"')}
         ${campo('Telefonema de salida nº', `${b}.telefonema.salida`, t.telefonema.salida, 'inputmode="numeric" autocomplete="off"')}</div>
-      ${p.tipo === 'SUPER' ? `<div class="dos">${fotoTelefonema(t, 'telentrada', 'entrada')}${fotoTelefonema(t, 'telsalida', 'salida')}</div>` : ''}
+      ${p.tipo === 'SUPER' ? `${fotoTelefonema(t, 'telentrada', 'entrada')}${fotoTelefonema(t, 'telsalida', 'salida')}` : ''}
       <div class="dos">${campoHora('Entrada en vía', `${b}.entradaVia`, t.entradaVia)}
         ${campoHora('Salida de vía', `${b}.salidaVia`, t.salidaVia)}</div>`}
       <div class="campo"><span>Línea</span>

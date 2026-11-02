@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.22.2 · 2026-11-02
+- Foto del telefonema: la de entrada y la de salida van una debajo de otra (con Cámara y Galería lado a lado ya no cabían en dos columnas y la de salida se salía de la pantalla).
+
 ## 0.22.1 · 2026-11-02
 - La foto del telefonema de entrada y de salida (SUPER) admite también **🖼️ Galería**, además de 📷 Cámara (p. ej. si el telefonema llega como captura). Lleva el sello amarillo «GALERÍA» y, si no trae fecha original, el aviso a la oficina como las demás fotos de galería.
 
