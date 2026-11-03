@@ -16,7 +16,7 @@ import { esc } from './util.js';
 import { app, estado, sincronizar, refrescarVista, ir, guardarYa } from './estado.js';
 import { onInput, onChange, onSubmit, onClick } from './eventos.js';
 
-export const APP_VERSION = '0.25.1';
+export const APP_VERSION = '0.26.0';
 
 // ---------- Arranque ----------
 
@@ -53,6 +53,12 @@ async function iniciar() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && estado.vista === 'inicio' && estado.perfil && estado.perfil.token &&
       estado.perfil.cuenta === 'pendiente') sincronizar();
+  });
+  // Al irse a otra app (p. ej. a WhatsApp a compartir fotos) se guarda ya lo escrito: si al volver la
+  // app se recarga, no se pierde lo de los últimos instantes (el guardado normal espera medio segundo).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && estado.parte && estado.parte.estado === 'borrador' &&
+      (estado.vista === 'parte' || estado.vista === 'trabajo')) guardarYa().catch(() => {});
   });
   app.addEventListener('click', onClick);
   app.addEventListener('input', onInput);

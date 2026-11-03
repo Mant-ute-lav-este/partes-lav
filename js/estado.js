@@ -16,6 +16,8 @@ import { vInicio } from './vista-inicio.js';
 import { vParte, pintarResultados } from './vista-parte.js';
 import { vTrabajo, cargarMiniaturas, liberarFotos } from './vista-trabajo.js';
 import { vEnvio, prepararEnvioActual } from './vista-envio.js';
+import { leerCompartidas } from './compartidas.js';
+import { abrirCompartidas, cerrarCompartidas, avisarDescartadas } from './vista-compartidas.js';
 
 export const app = document.getElementById('app');
 
@@ -42,13 +44,20 @@ export const estado = {
   preguntaExtras: false, // «¿Ha habido horas extra?» al cerrar el parte
   repetir: null,         // «¿Empezar igual que el último parte?» al crear un INFRA o SUPER
   avisoCopia: '',        // aviso en el parte recién copiado del anterior
+  nCompartidas: 0,       // fotos compartidas desde WhatsApp esperando a que se coloquen (aviso en Inicio)
+  compartidas: null,     // hoja abierta para colocarlas: { destinos, elegido, miniaturas }
 };
 export const urls = new Map();   // id de foto → URL para las miniaturas
 
-/** Tras desbloquear con el PIN: inicio y, si hay registro, sincroniza con el servidor. */
+/**
+ * Tras desbloquear con el PIN: inicio y, si hay registro, sincroniza con el servidor. Si han llegado
+ * fotos compartidas desde WhatsApp, se abre directamente la hoja para colocarlas.
+ */
 export async function entrarApp() {
   await ir('inicio');
   if (estado.perfil && estado.perfil.token) sincronizar();
+  await avisarDescartadas().catch(() => {});
+  if (estado.nCompartidas) await abrirCompartidas();
 }
 
 /**
@@ -119,7 +128,9 @@ export async function ir(vista) {
     estado.avisoCopia = '';
     liberarFotos();
     estado.lista = await db.listarPartes();
+    try { estado.nCompartidas = (await leerCompartidas()).length; } catch { estado.nCompartidas = 0; }
   }
+  if (estado.compartidas) cerrarCompartidas(false);
   if (vista !== 'parte') {
     estado.busqueda = '';
     estado.otroAbierto = false;
@@ -149,7 +160,7 @@ export function render() {
     (estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : '');
   window.scrollTo(0, y);
   document.body.classList.toggle('sin-scroll',
-    Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
+    Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.compartidas || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
   pintarResultados();
   cargarMiniaturas();
   const auto = app.querySelector('[data-autofocus]');

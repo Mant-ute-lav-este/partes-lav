@@ -386,8 +386,9 @@ export function textoErrorFoto(e, file) {
 /**
  * Añade fotos al trabajo actual o, con `formato: true`, al formato 1 del parte (SUPER).
  * Las del formato salen más grandes (se lee letra a mano) y hay un máximo.
+ * `trasCada(k)`, si se da, se llama después de cada archivo (se haya podido usar o no).
  */
-export async function anadirFotos(archivos, { fase, origen, formato = false }) {
+export async function anadirFotos(archivos, { fase, origen, formato = false, trasCada = null }) {
   const p = estado.parte;
   const t = formato ? null : trabajoActual();
   if (!formato && !t) return;
@@ -423,6 +424,7 @@ export async function anadirFotos(archivos, { fase, origen, formato = false }) {
       registrarFallo('foto', `${textoErrorFoto(e, file)} [${file.type || 'sin tipo'}, ${Math.round(file.size / 1024)} KB]`);
       fallos.push(textoErrorFoto(e, file));
     }
+    if (trasCada) await trasCada(k);
   }
   if (sobran) fallos.push(`Solo caben ${MAX_FORMATO1} fotos del ${FORMATO1.toLowerCase()}: ${sobran === 1 ? 'una no se ha añadido' : `${sobran} no se han añadido`}.`);
   estado.procesando = '';

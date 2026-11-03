@@ -25,6 +25,10 @@ import {
   filasAparato, aplicarAparatos, destinoAparato,
 } from './vista-trabajo.js';
 import { anadirDrp, quitarDrp } from './vista-drp.js';
+import { referenciaDe } from './compartidas.js';
+import {
+  abrirCompartidas, cerrarCompartidas, elegirTrabajoCompartidas, otroTrabajoCompartidas, colocarCompartidas, descartarCompartidas,
+} from './vista-compartidas.js';
 import {
   enviarServidor, procesarYMostrar, enviarPorGmail, enviar, corregir, prepararEnvioActual, descartarParte,
 } from './vista-envio.js';
@@ -436,6 +440,12 @@ export async function onClick(e) {
     case 'repetir-si': contestarRepetir(true); break;
     case 'repetir-no': contestarRepetir(false); break;
     case 'cerrar-repetir': estado.repetir = null; render(); break;
+    case 'compartidas-abrir': abrirCompartidas(); break;
+    case 'compartidas-cerrar': cerrarCompartidas(); break;
+    case 'compartidas-trabajo': elegirTrabajoCompartidas(Number(el.dataset.k)); break;
+    case 'compartidas-otro': otroTrabajoCompartidas(); break;
+    case 'compartidas-fase': colocarCompartidas(el.dataset.fase); break;
+    case 'compartidas-descartar': descartarCompartidas(); break;
     case 'nuevo-realizado': p.realizados.push(nuevoRealizado()); await guardarYa(); render(); break;
     case 'quitar-realizado':
       if (confirm(`¿Quitar el trabajo ${i + 1}?`)) { p.realizados.splice(i, 1); guardarPronto(); render(); }
@@ -507,9 +517,7 @@ export async function onClick(e) {
       if (confirm(`¿Quitar el tajo ${i + 1}?`)) { p.tajos.splice(i, 1); guardarPronto(); render(); }
       break;
     case 'foto': {
-      const t = trabajoActual();
-      const r = t.referencia;
-      if (!r.tipo || (r.tipo === 'SIN_REF' ? !String(r.motivo || '').trim() : !r.codigo.trim())) {
+      if (!referenciaDe(trabajoActual())) {
         toast('Pon primero la referencia: sale en el sello de la foto.', 3500);
         break;
       }

@@ -2,6 +2,12 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.26.0 · 2026-11-03
+- **Fotos desde WhatsApp, primera parte.** «Partes LAV» aparece en la lista de **Compartir** de WhatsApp (y de otras apps), solo para fotos. Al compartir, la app se abre (con el PIN, como siempre) y pregunta **«¿De qué trabajo son?»** (borradores INFRA y SUPER; si solo hay uno, no pregunta) y **«¿Dónde van?»** (Antes, Durante, Después y, en SUPER con vía, los telefonemas). Se añaden igual que desde 🖼️ Galería: mismo sello y mismo aviso a la oficina si no traen fecha original. Hasta 30 fotos a la vez, de hasta 25 MB cada una.
+- Si no se colocan en ese momento, en Inicio sale «Tienes N fotos compartidas esperando · Colocarlas». También se pueden descartar (siguen en WhatsApp).
+- Android tarda de unas horas a un par de días en poner «Partes LAV» en la lista de Compartir tras actualizar (reinstalar la app lo hace al momento, pero solo conviene sin borradores ni partes pendientes: se pueden perder). El botón de Galería no cambia todavía (eso irá en la segunda parte).
+- Al irse a otra app, el parte abierto se guarda al instante (antes esperaba medio segundo).
+
 ## 0.25.0 · 2026-11-03
 - **Política de seguridad (CSP) en `index.html`**: segunda barrera contra código inyectado. Solo se ejecuta código de la propia app y de `cdnjs.cloudflare.com` (jsPDF y heic2any); solo se habla con el servidor de Google; nada de estilos ni scripts en línea. `unsafe-eval` queda permitido solo por heic2any (conversión de fotos HEIC). Para el capataz no cambia nada.
 - El script del aspecto (tema y letra) pasa de `index.html` a `js/aspecto-inicio.js`, igual de rápido (sin parpadeo).

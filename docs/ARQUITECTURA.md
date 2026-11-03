@@ -30,8 +30,9 @@ Carpeta sincronizada en el OneDrive de quien la tenga sincronizada
 
 | Archivo | Contenido |
 |---|---|
-| `index.html`, `manifest.webmanifest`, `icons/` | Página y datos de instalación |
-| `sw.js` | Service worker: caché sin conexión y envío en segundo plano. **Script clásico, sin `import`.** |
+| `index.html`, `manifest.webmanifest`, `icons/` | Página y datos de instalación. El manifest declara `share_target`: la app sale en «Compartir» de WhatsApp (solo fotos) |
+| `sw.js` | Service worker: caché sin conexión, envío en segundo plano y recogida de las fotos compartidas (POST a `./compartir` → clave `compartidas` de `kv` → abre la app). **Script clásico, sin `import`.** |
+| `js/compartidas.js`, `js/vista-compartidas.js` | Fotos compartidas desde WhatsApp: a qué trabajos y fases pueden ir, aviso en Inicio y hoja para colocarlas (se añaden como de Galería) |
 | `js/app.js` | Arranque de la app (y `APP_VERSION`) |
 | `js/estado.js` | Estado compartido, navegación (`ir`/`render`), guardado del parte, sincronización y lista de la oficina |
 | `js/vista-acceso.js`, `vista-inicio.js`, `vista-parte.js`, `vista-maquinaria.js`, `vista-trabajo.js`, `vista-extras.js`, `vista-envio.js` | Pantallas: registro y PIN, inicio y menú, parte INFRA/SUPER y cierre, maquinaria (vía, locomotora, dresina), trabajo y fotos, horas extra, envío |

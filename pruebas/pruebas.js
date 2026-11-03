@@ -996,6 +996,98 @@ prueba('base de datos: sw.js y js/db.js abren la misma base (nombre, versión y 
   igual(enSW, tablas(dbJs), 'tablas, claves e índices');
 });
 
+// ---------- fotos compartidas desde WhatsApp (share target) ----------
+
+// El manifest dice a Android adónde mandar las fotos y con qué nombre; sw.js las recoge ahí. Si se
+// separan, «Partes LAV» sale en Compartir pero las fotos no llegan.
+prueba('compartir: el manifest y sw.js usan la misma dirección, el mismo campo y los mismos límites', async () => {
+  const leer = (url) => fetch(url, { cache: 'no-store' }).then((r) => r.text());
+  const [man, sw, js] = await Promise.all([leer('../manifest.webmanifest').then(JSON.parse), leer('../sw.js'), leer('../js/compartidas.js')]);
+  const st = man.share_target;
+  cierto(st, 'el manifest no tiene share_target');
+  igual([st.action, st.method, st.enctype], ['./compartir', 'POST', 'multipart/form-data'], 'share_target');
+  igual(st.params.files.map((f) => f.name), ['fotos'], 'campo de las fotos');
+  cierto(st.params.files[0].accept.includes('image/*'), 'debe aceptar fotos');
+  cierto(sw.includes("pathname.endsWith('/compartir')"), 'sw.js no atiende ./compartir');
+  cierto(sw.includes("getAll('fotos')"), 'sw.js no lee el campo «fotos»');
+  for (const k of ['MAX_COMPARTIDAS', 'MAX_MB_COMPARTIDA']) {
+    const v = (c) => (c.match(new RegExp(`const ${k} = (\\d+)`)) || [])[1];
+    cierto(v(sw) && v(sw) === v(js), `${k} distinto en sw.js (${v(sw)}) y js/compartidas.js (${v(js)})`);
+  }
+  for (const f of ['./js/compartidas.js', './js/vista-compartidas.js']) cierto(sw.includes(`'${f}'`), `falta ${f} en ARCHIVOS de sw.js`);
+});
+
+prueba('compartir: sw.js guarda solo las fotos, abre la app y no pasa del máximo', async () => {
+  const codigo = await fetch('../sw.js', { cache: 'no-store' }).then((r) => r.text());
+  const sw = new Function('self', `${codigo}\nreturn { recibirCompartidas, MAX_COMPARTIDAS };`)({ addEventListener() {}, clients: {}, skipWaiting() {} });
+  const antes = await db.kvGet('compartidas');
+  const fallosAntes = await db.kvGet('fallos');   // lo «raro» del final apunta un fallo: no debe quedarse
+  const descartadasAntes = await db.kvGet('compartidasDescartadas');
+  const descartadas = async () => Number(await db.kvGet('compartidasDescartadas')) || 0;
+  const enviar = async (archivos) => {
+    const fd = new FormData();
+    for (const a of archivos) fd.append('fotos', a);
+    return sw.recibirCompartidas(new Request(new URL('../compartir', location.href), { method: 'POST', body: fd }));
+  };
+  const foto = async (nombre) => new File([await jpeg()], nombre, { type: 'image/jpeg' });
+  try {
+    await db.kvSet('compartidas', null);
+    await db.kvSet('compartidasDescartadas', null);
+    const r = await enviar([await foto('IMG-20261103-WA0001.jpg'), new File(['hola'], 'nota.txt', { type: 'text/plain' }),
+      new File([], 'vacia.jpg', { type: 'image/jpeg' }), await foto('IMG-20261103-WA0002.jpg')]);
+    igual(r.status, 303, 'abre la app con una redirección');
+    igual(r.headers.get('Location'), new URL('../', location.href).href, 'a la portada');
+    let l = await db.kvGet('compartidas');
+    igual(l.map((x) => x.archivo.name), ['IMG-20261103-WA0001.jpg', 'IMG-20261103-WA0002.jpg'], 'solo las fotos con contenido');
+    cierto(l.every((x) => x.id && x.llegada && x.archivo.size > 0), 'cada una con id, hora de llegada y la foto');
+    igual(await descartadas(), 2, 'la nota y la vacía cuentan como descartadas');
+    await enviar([await foto('otra.jpg')]);
+    igual((await db.kvGet('compartidas')).length, 3, 'se suman a las que ya esperaban');
+    igual(await descartadas(), 2, 'si se guardan todas, no se suma nada');
+    await enviar(await Promise.all(Array.from({ length: sw.MAX_COMPARTIDAS }, (_, k) => foto(`m${k}.jpg`))));
+    l = await db.kvGet('compartidas');
+    igual(l.length, sw.MAX_COMPARTIDAS, 'como mucho el máximo');
+    igual(l[0].archivo.name, 'IMG-20261103-WA0001.jpg', 'se quedan las primeras que llegaron');
+    igual(await descartadas(), 5, 'las que no caben también cuentan');
+    const r2 = await sw.recibirCompartidas(new Request(new URL('../compartir', location.href), { method: 'POST', body: 'no es un formulario' }));
+    igual(r2.status, 303, 'aunque llegue algo raro, abre la app');
+    cierto(((await db.kvGet('fallos')) || []).some((f) => f.tipo === 'compartir'), 'lo raro queda apuntado como fallo');
+    igual((await db.kvGet('compartidas')).length, sw.MAX_COMPARTIDAS, 'y no estropea las que esperaban');
+    igual(await descartadas(), 6, 'y cuenta como una perdida');
+    const { tomarDescartadas } = await import('../js/compartidas.js');
+    igual([await tomarDescartadas(), await tomarDescartadas()], [6, 0], 'la app lo lee una vez y lo pone a cero');
+  } finally {
+    await db.kvSet('compartidas', antes ?? null);
+    await db.kvSet('fallos', fallosAntes || []);
+    await db.kvSet('compartidasDescartadas', descartadasAntes ?? null);
+  }
+});
+
+prueba('compartir: a qué trabajos y fases pueden ir las fotos', async () => {
+  const { destinosFotos, fasesFoto, referenciaDe, leerCompartidas } = await import('../js/compartidas.js');
+  const inf = { ...borrador(ej.parteInfra()), modificado: '2026-10-14T09:00:00+02:00' };
+  inf.trabajos[1].referencia = { tipo: 'SIOS', codigo: '  ', motivo: '' };
+  const sup = { ...borrador(ej.parteSuper()), modificado: '2026-10-14T11:00:00+02:00' };
+  const otros = [ej.parteSuper(), borrador(maqVia()), { ...borrador(ej.parteInfra()), sinTrabajos: true }];   // enviado/cerrado, maquinaria, sin trabajos
+  const d = destinosFotos([inf, ...otros, sup]);
+  igual(d.map((x) => [x.ref, x.ti, x.referencia]), [['SUP-9001', 0, 'Incidencia I-1'], ['INF-9001', 0, 'SIOS S-1'], ['INF-9001', 1, '']],
+    'solo borradores INFRA y SUPER con trabajos, el más reciente primero; sin código no hay referencia');
+  igual(d[0].fases.map((f) => f[0]), ['antes', 'durante', 'despues', 'telentrada', 'telsalida'], 'SUPER con vía: también telefonemas');
+  igual(d[1].fases.map((f) => f[0]), ['antes', 'durante', 'despues'], 'INFRA: sin telefonemas');
+  igual(fasesFoto(sup, { ...sup.trabajos[0], sinVia: true }).map((f) => f[0]), ['antes', 'durante', 'despues'], 'SUPER sin vía: sin telefonemas');
+  igual(referenciaDe({ referencia: { tipo: 'SIN_REF', codigo: '', motivo: ' Cuneta ' } }), 'Cuneta');
+  igual(referenciaDe({ referencia: { tipo: '', codigo: '', motivo: '' } }), '');
+  const antes = await db.kvGet('compartidas');
+  try {
+    await db.kvSet('compartidas', [{ id: 'a', archivo: 'no es una foto' }, null, { id: 'b', archivo: await jpeg() }]);
+    igual((await leerCompartidas()).map((x) => x.id), ['b'], 'se ignora lo que no es una foto');
+    await db.kvSet('compartidas', { roto: true });
+    igual(await leerCompartidas(), [], 'si lo guardado no es una lista, no hay fotos');
+  } finally {
+    await db.kvSet('compartidas', antes ?? null);
+  }
+});
+
 // El Datos_.txt lo leen el flujo de Power Automate, el portal de la UTE y (pronto) el Excel histórico.
 // Esta prueba guarda la «forma» del Datos_ de los 5 partes de ejemplo (qué campos hay y de qué tipo,
 // no sus valores) en pruebas/contrato-datos.json. Si un cambio añade, quita o renombra un campo,
@@ -1849,7 +1941,7 @@ async function pantalla(preparar, ...esperados) {
   Object.assign(estado, {
     vista: 'inicio', config: ej.config, perfil: perfilEjemplo(), reg: {}, otros: [], lista: [], parte: null, trabajoIdx: null,
     busqueda: '', otroAbierto: false, errores: [], menu: false, eligeMaquina: false, fotoVista: null, procesando: '',
-    envio: null, preguntaOtro: false, preguntaExtras: false, repetir: null, avisoCopia: '',
+    envio: null, preguntaOtro: false, preguntaExtras: false, repetir: null, avisoCopia: '', nCompartidas: 0, compartidas: null,
   });
   preparar(estado);
   render();
@@ -2301,6 +2393,72 @@ prueba('recorrido: cada tipo de parte se cierra, se envía y queda «enviado» (
     for (const it of await db.listarSalida()) await db.borrarSalida(it.id);
     for (const it of colaAntes) await db.putSalida(it);
     await db.kvSet('perfil', perfilAntes);
+  }
+});
+
+prueba('recorrido: las fotos compartidas desde WhatsApp se colocan en el trabajo y la fase elegidos', async () => {
+  const { m, errores } = await appEnMarco();
+  const antes = await db.kvGet('compartidas');
+  const p = borrador(ej.parteInfra());
+  const yaEnDespues = p.trabajos[0].fotos.filter((x) => x.fase === 'despues').length;
+  const llega = async (n) => ({ id: n, archivo: new File([await jpeg(320, 240)], n, { type: 'image/jpeg' }), llegada: '2026-11-03T10:00:00+01:00' });
+  try {
+    await abrirParteEnApp(p);
+    await db.kvSet('compartidas', [await llega('WA1.jpg'), await llega('WA2.jpg')]);
+    await pantalla((e) => { e.vista = 'inicio'; e.nCompartidas = 2; }, 'Tienes 2 fotos compartidas esperando');
+    toca('[data-action="compartidas-abrir"]');
+    await esperar(() => m.estado.compartidas, 'no se abre la hoja de las fotos compartidas');
+    cierto(m.app.textContent.includes('¿De qué trabajo son?'), 'con varios trabajos pregunta cuál');
+    const k = m.estado.compartidas.destinos.findIndex((d) => d.parteId === p.id && d.ti === 0);
+    cierto(k >= 0, 'el trabajo 1 del parte no sale en la lista');
+    toca(`[data-action="compartidas-trabajo"][data-k="${k}"]`);
+    cierto(m.app.textContent.includes('¿Dónde van?'), 'después pregunta la fase');
+    // Dos toques seguidos (pasa en móviles lentos): las fotos no deben entrar dos veces.
+    const boton = m.app.querySelector('[data-action="compartidas-fase"][data-fase="despues"]');
+    boton.click();
+    boton.click();
+    for (let i = 0; i < 200 && ((await db.kvGet('compartidas')) !== null || m.estado.procesando); i++) await new Promise((r) => setTimeout(r, 50));
+    igual(m.estado.vista, 'trabajo', 'acaba en el trabajo');
+    const g = await db.getParte(p.id);
+    const nuevas = g.trabajos[0].fotos.filter((x) => x.fase === 'despues').slice(yaEnDespues);
+    igual(nuevas.map((x) => [x.origen, x.fuenteFecha]), [['galeria', 'archivo'], ['galeria', 'archivo']], 'dos fotos más en Después, como de galería');
+    for (const x of nuevas) cierto(await db.getFoto(x.id), 'la foto está guardada en el móvil');
+    igual(g.trabajos[1].fotos.length, p.trabajos[1].fotos.length, 'el otro trabajo no cambia');
+    igual(await db.kvGet('compartidas'), null, 'ya no quedan esperando');
+    if (errores.length) throw new Error(`errores en la app: ${errores.splice(0).join(' | ')}`);
+  } finally {
+    await descartarDelMovil(p.id);
+    await db.kvSet('compartidas', antes ?? null);
+  }
+});
+
+// Tras compartir, la app se recarga y pide el PIN: al acertarlo tiene que salir la hoja sola y,
+// si alguna no se pudo guardar, decirlo.
+prueba('recorrido: tras el PIN se abre sola la hoja de las fotos compartidas y avisa de las descartadas', async () => {
+  const { m, errores } = await appEnMarco();
+  const acceso = await moduloDelMarco('./js/vista-acceso.js');
+  const guardado = { c: await db.kvGet('compartidas'), d: await db.kvGet('compartidasDescartadas'), i: await db.kvGet('intentosPin') };
+  const salt = btoa('sal-de-prueba-16');
+  const perfil = { capataz: 'Ana Prueba', token: '', pin: { salt, hash: await acceso.hashPin('1234', salt, 1), iter: 1 } };
+  try {
+    await db.kvSet('intentosPin', null);
+    await db.kvSet('compartidas', [{ id: 'wa', archivo: new File([await jpeg()], 'WA.jpg', { type: 'image/jpeg' }), llegada: '2026-11-03T10:00:00+01:00' }]);
+    await db.kvSet('compartidasDescartadas', 2);
+    await pantalla((e) => { e.vista = 'pin'; e.perfil = perfil; });
+    const form = m.app.querySelector('form[data-form="pin"]');
+    form.pin.value = '1234';
+    form.requestSubmit();
+    await esperar(() => m.estado.vista === 'inicio' && m.estado.compartidas, 'tras el PIN no se abre la hoja');
+    cierto(m.app.textContent.includes('1 foto compartida'), 'la hoja dice cuántas hay');
+    cierto(((m.app.ownerDocument.getElementById('toast') || {}).textContent || '').includes('2 fotos compartidas no se han podido guardar'), 'no avisa de las descartadas');
+    igual(await db.kvGet('compartidasDescartadas'), null, 'el aviso sale una sola vez');
+    toca('[data-action="compartidas-cerrar"]');
+    cierto(m.app.textContent.includes('Tienes 1 foto compartida esperando'), '«Ahora no» deja el aviso en Inicio');
+    if (errores.length) throw new Error(`errores en la app: ${errores.splice(0).join(' | ')}`);
+  } finally {
+    await db.kvSet('compartidas', guardado.c ?? null);
+    await db.kvSet('compartidasDescartadas', guardado.d ?? null);
+    await db.kvSet('intentosPin', guardado.i ?? null);
   }
 });
 

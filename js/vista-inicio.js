@@ -11,6 +11,7 @@ import { estado, ir, render, guardarYa, maquinasViaCfg, capatazComoPersona, medi
 import { inputConfig } from './vista-acceso.js';
 import { APP_VERSION } from './app.js';
 import { leerAspecto } from './aspecto.js';
+import { avisoCompartidas, vCompartidas } from './vista-compartidas.js';
 
 // ---------- Inicio ----------
 
@@ -84,6 +85,7 @@ export function vInicio() {
       la app lo comprueba sola cada vez que la abres.
       <button class="btn secundario" data-action="comprobar-cuenta">Comprobar ahora</button></div>` : ''}
     ${avisoSinEnviar(sinEnviar)}
+    ${avisoCompartidas()}
     ${pendiente ? '' : `<div class="tipos">
       <button class="btn-tipo infra" data-action="nuevo" data-tipo="INFRA"><span class="tipo-grande">INFRA</span><span>Infraestructura</span></button>
       <button class="btn-tipo super" data-action="nuevo" data-tipo="SUPER"><span class="tipo-grande">SUPER</span><span>Superestructura</span></button>
@@ -96,7 +98,8 @@ export function vInicio() {
   </main>
   ${estado.menu ? vMenu() : ''}
   ${estado.eligeMaquina ? vElegirMaquina() : ''}
-  ${estado.repetir ? vRepetir() : ''}`;
+  ${estado.repetir ? vRepetir() : ''}
+  ${estado.compartidas ? vCompartidas() : ''}`;
 }
 
 /** Una fila de botones para elegir (Tema, Letra). Cambia al tocar: ver `data-aspecto` en eventos.js. */

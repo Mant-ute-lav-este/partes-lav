@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.25.1';
+const VERSION = 'v0.26.0';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -17,6 +17,7 @@ const ARCHIVOS = [
   './js/aspecto.js',
   './js/aspecto-inicio.js',
   './js/campos.js',
+  './js/compartidas.js',
   './js/db.js',
   './js/drp.js',
   './js/envio.js',
@@ -32,6 +33,7 @@ const ARCHIVOS = [
   './js/util.js',
   './js/validaciones.js',
   './js/vista-acceso.js',
+  './js/vista-compartidas.js',
   './js/vista-drp.js',
   './js/vista-envio.js',
   './js/vista-extras.js',
@@ -71,6 +73,11 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
+  const destino = new URL(req.url);
+  if (req.method === 'POST' && destino.origin === self.location.origin && destino.pathname.endsWith('/compartir')) {
+    e.respondWith(recibirCompartidas(req));
+    return;
+  }
   if (req.method !== 'GET') return;
   const host = new URL(req.url).hostname;
   if (host.endsWith('google.com') || host.endsWith('googleusercontent.com')) return;   // servidor: siempre a la red
@@ -99,6 +106,45 @@ self.addEventListener('sync', (e) => {
     if (r.pendientes) throw new Error('Quedan partes pendientes de enviar');
   }));
 });
+
+// ---------- Fotos compartidas desde otra app ----------
+// WhatsApp → Compartir → Partes LAV («share_target» en manifest.webmanifest) llega aquí como un
+// formulario. Las fotos se guardan en el móvil (clave «compartidas») y se abre la app, que pregunta
+// a qué trabajo y fase van (js/compartidas.js). No toca la cola ni los partes.
+// Mismos límites que MAX_COMPARTIDAS y MAX_MB_COMPARTIDA de js/compartidas.js (una prueba lo vigila).
+const MAX_COMPARTIDAS = 30;
+const MAX_MB_COMPARTIDA = 25;
+
+async function recibirCompartidas(req) {
+  let recibidas = 1;   // si ni se puede leer el formulario, al menos una se ha perdido
+  let guardadas = 0;
+  try {
+    const todas = (await req.formData()).getAll('fotos');
+    recibidas = todas.length;
+    const nuevas = todas.filter((f) => f instanceof File && f.size > 0 &&
+      f.size <= MAX_MB_COMPARTIDA * 1024 * 1024 &&
+      (/^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)));
+    if (nuevas.length) {
+      const previas = await op('kv', 'readonly', (s) => s.get('compartidas'));
+      const antes = Array.isArray(previas) ? previas : [];
+      const lista = antes.concat(nuevas.map((archivo) => ({ id: crypto.randomUUID(), archivo, llegada: isoLocal() })))
+        .slice(0, MAX_COMPARTIDAS);
+      await op('kv', 'readwrite', (s) => s.put(lista, 'compartidas'));
+      guardadas = lista.length - antes.length;
+    }
+  } catch (err) {
+    await registrarFallo('compartir', err && err.message);
+  }
+  // Las que no se han guardado se cuentan para que la app lo diga (js/compartidas.js, tomarDescartadas).
+  if (recibidas > guardadas) {
+    try {
+      const n = Number(await op('kv', 'readonly', (s) => s.get('compartidasDescartadas'))) || 0;
+      await op('kv', 'readwrite', (s) => s.put(n + recibidas - guardadas, 'compartidasDescartadas'));
+    } catch { /* sin almacenamiento: nada que hacer */ }
+  }
+  // 303: el navegador abre la app con un GET normal (la portada sale de la caché, también sin cobertura).
+  return Response.redirect(new URL('./', req.url).href, 303);
+}
 
 // ---------- Cola de salida (misma lógica que js/salida.js) ----------
 
