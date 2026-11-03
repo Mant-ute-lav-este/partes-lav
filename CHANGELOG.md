@@ -2,6 +2,13 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v22 · 2026-11-03 (desplegado; seguridad)
+- **Las funciones de mantenimiento solo se ejecutan desde el editor o desde sus activadores** (`configurar`, `enlaceRevision`, `copiaSeguridad`, `archivarEnvios`, `reintentarPortal`, `resumenDiario`, `activarCopiaSemanal`, `activarResumenDiario`). Una prueba vigila que no aparezca ninguna función pública nueva sin esa comprobación.
+- `enlaceRevision` ya no devuelve los enlaces: salen solo en el registro de ejecución del editor, como antes.
+- Como mucho una copia de seguridad cada 6 horas.
+- Pide un permiso nuevo a Google (ver quién ejecuta la función): al pegarlo, ejecutar una vez `enlaceRevision` en el editor y aceptar **antes** de publicar la nueva versión.
+- Para los capataces y la app del almacén no cambia nada.
+
 ## 0.26.0 · 2026-11-03
 - **Fotos desde WhatsApp, primera parte.** «Partes LAV» aparece en la lista de **Compartir** de WhatsApp (y de otras apps), solo para fotos. Al compartir, la app se abre (con el PIN, como siempre) y pregunta **«¿De qué trabajo son?»** (borradores INFRA y SUPER; si solo hay uno, no pregunta) y **«¿Dónde van?»** (Antes, Durante, Después y, en SUPER con vía, los telefonemas). Se añaden igual que desde 🖼️ Galería: mismo sello y mismo aviso a la oficina si no traen fecha original. Hasta 30 fotos a la vez, de hasta 25 MB cada una.
 - Si no se colocan en ese momento, en Inicio sale «Tienes N fotos compartidas esperando · Colocarlas». También se pueden descartar (siguen en WhatsApp).

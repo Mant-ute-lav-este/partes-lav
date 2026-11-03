@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 21;
+const VERSION_SERVIDOR = 22;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -136,7 +136,23 @@ function doGet(e) {
 
 // ---------- Instalación ----------
 
+/**
+ * Toda función sin «_» al final la puede llamar desde el navegador cualquiera que abra la página del
+ * servidor (google.script.run), y se ejecuta como el dueño. Por eso las de mantenimiento empiezan por
+ * aquí: solo siguen si las lanza un activador de este proyecto hecho para esa misma función, o el dueño
+ * desde el editor. Una función pública nueva tiene que empezar por aquí (lo vigila una prueba).
+ */
+function soloDueno_(e, funcion) {
+  const uid = e && e.triggerUid ? String(e.triggerUid) : '';
+  if (uid && funcion && ScriptApp.getProjectTriggers().some((t) =>
+    String(t.getUniqueId()) === uid && t.getHandlerFunction() === funcion)) return;
+  const activo = Session.getActiveUser().getEmail();
+  if (activo && activo === Session.getEffectiveUser().getEmail()) return;
+  throw new Error('Esta función solo se puede ejecutar desde el editor de Apps Script.');
+}
+
 function configurar() {
+  soloDueno_();
   const p = props_();
   let libro;
   if (p.getProperty('HOJA_ID')) {
@@ -378,8 +394,14 @@ function otrasConNombre_(usuarios, u) {
  * Para dar de baja a alguien o cuando el enlace del correo ha caducado: ejecutarla a mano en el editor
  * («Ejecutar» no pasa argumentos: sin correo saca el enlace de todas las cuentas, con su nombre
  * y estado) y abrir el enlace que sale en el registro de ejecución. Cada enlace vale DIAS_ENLACE días.
+ * No devuelve nada: lo que devuelve una función pública le llega a quien la llame desde una página.
  */
 function enlaceRevision(email) {
+  soloDueno_();
+  enlaceRevision_(email);
+}
+
+function enlaceRevision_(email) {
   email = String(email || '').trim().toLowerCase();
   if (!email) {
     const lineas = tabla_('Usuarios').filas.map((u) =>
@@ -991,7 +1013,12 @@ function mandarAlPortal_(cuerpo) {
  * han entrado. Lo llama el resumen diario; también se puede ejecutar a mano. Devuelve cuántos quedan.
  * Los envíos nuevos se apuntan siempre al final, así que se quitan solo las filas de arriba.
  */
-function reintentarPortal() {
+function reintentarPortal(e) {
+  soloDueno_(e);
+  return reintentarPortal_();
+}
+
+function reintentarPortal_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(60000);
   try {
@@ -1019,13 +1046,27 @@ function reintentarPortal() {
 // ---------- Copia de seguridad ----------
 
 const COPIAS_A_GUARDAR = 8;   // semanas
+const HORAS_ENTRE_COPIAS = 6;
 
 /**
  * Copia la hoja de datos en la carpeta «Partes LAV · Copias» del Drive de la cuenta y deja solo
  * las últimas COPIAS_A_GUARDAR (las demás van a la papelera, de donde Google las borra a los 30 días).
  * La llama el activador semanal; también se puede ejecutar a mano.
+ * Como mucho una cada HORAS_ENTRE_COPIAS: repetida muchas veces seguidas mandaría a la papelera las
+ * copias buenas de las semanas anteriores.
  */
-function copiaSeguridad() {
+function copiaSeguridad(e) {
+  soloDueno_(e, 'copiaSeguridad');
+  copiaSeguridad_();
+}
+
+function copiaSeguridad_() {
+  const ultima = Number(props_().getProperty('ULTIMA_COPIA') || 0);
+  if (Date.now() - ultima < HORAS_ENTRE_COPIAS * 3600000) {
+    Logger.log('Ya hay una copia de hace menos de ' + HORAS_ENTRE_COPIAS + ' horas: no se hace otra.');
+    return;
+  }
+  props_().setProperty('ULTIMA_COPIA', String(Date.now()));
   const original = DriveApp.getFileById(props_().getProperty('HOJA_ID'));
   const carpetas = DriveApp.getFoldersByName('Partes LAV · Copias');
   const carpeta = carpetas.hasNext() ? carpetas.next() : DriveApp.createFolder('Partes LAV · Copias');
@@ -1039,7 +1080,7 @@ function copiaSeguridad() {
   Logger.log('Copia hecha: ' + fecha + ' (' + Math.min(copias.length, COPIAS_A_GUARDAR) + ' guardadas)');
   // Con la copia ya hecha, se archivan los envíos viejos. Si falla, la copia vale igual.
   try {
-    Logger.log('Envíos archivados: ' + archivarEnvios());
+    Logger.log('Envíos archivados: ' + archivarEnvios_());
   } catch (err) {
     apuntarError_('archivo', String((err && err.message) || err));
   }
@@ -1057,7 +1098,12 @@ const MESES_ENVIOS = 12;   // en la hoja Envios se quedan solo los envíos de es
  * reescribir la hoja: así no se pierde un envío que se esté apuntando a la vez (eso va sin bloqueo).
  * Devuelve cuántos ha archivado.
  */
-function archivarEnvios() {
+function archivarEnvios(e) {
+  soloDueno_(e);
+  return archivarEnvios_();
+}
+
+function archivarEnvios_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(60000);
   try {
@@ -1083,6 +1129,7 @@ function archivarEnvios() {
 
 /** Se ejecuta una vez a mano: crea el activador que hace la copia cada lunes a las 3 de la madrugada. */
 function activarCopiaSemanal() {
+  soloDueno_();
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'copiaSeguridad')
     .forEach((t) => ScriptApp.deleteTrigger(t));
@@ -1096,7 +1143,12 @@ function activarCopiaSemanal() {
  * por correo: no puede saber si Power Automate los ha guardado en Teams.
  * El asunto no lleva «PARTE LAV» a propósito, para que el flujo de Power Automate no lo coja.
  */
-function resumenDiario() {
+function resumenDiario(e) {
+  soloDueno_(e, 'resumenDiario');
+  resumenDiario_();
+}
+
+function resumenDiario_() {
   const aj = ajustes_();
   if (!aj.destinatario) throw new Error('Falta el correo de destino en los ajustes del servidor.');
   const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
@@ -1127,7 +1179,7 @@ function resumenDiario() {
   if (portal_()) {
     let pendientes;
     try {
-      pendientes = reintentarPortal();
+      pendientes = reintentarPortal_();
     } catch (err) {
       pendientes = 'no se ha podido comprobar (' + ((err && err.message) || err) + ')';
     }
@@ -1146,6 +1198,7 @@ function resumenDiario() {
 
 /** Se ejecuta una vez a mano: crea el activador que manda el resumen todos los días a las 16:00. */
 function activarResumenDiario() {
+  soloDueno_();
   ScriptApp.getProjectTriggers()
     .filter((t) => t.getHandlerFunction() === 'resumenDiario')
     .forEach((t) => ScriptApp.deleteTrigger(t));

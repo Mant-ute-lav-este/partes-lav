@@ -1449,7 +1449,7 @@ prueba('servidor: una cuenta pendiente recibe la lista vacía, y al aprobarla la
   igual([c.destinatario, c.cabecera.empresa, c.motivos.infra.length], ['', '', 0], 'sin datos de la oficina');
   cierto(!JSON.stringify(r).includes('HAB-777') && !JSON.stringify(r).includes('1234ABC'), 'ni habilitaciones ni matrículas');
 
-  const firma = new URL(E.s.enlaceRevision('pen@ejemplo.test')).searchParams.get('firma');
+  const firma = new URL(E.s.enlaceRevision_('pen@ejemplo.test')).searchParams.get('firma');
   E.s.revisarRegistro('pen@ejemplo.test', firma, 'activo');
   const a = E.post({ accion: 'config', token: tp, peticion: crypto.randomUUID() });
   igual(a.estado, 'activo');
@@ -1569,15 +1569,15 @@ prueba('servidor: un parte que pesa más de 24 MB no sale y se puede reintentar 
 prueba('servidor: dar de baja con el enlace firmado y volver a activar', async () => {
   const E = await servidorListo();
   igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
-  const url = E.s.enlaceRevision(' Ana@Ejemplo.test ');
+  const url = E.s.enlaceRevision_(' Ana@Ejemplo.test ');
   const firma = new URL(url).searchParams.get('firma');
   cierto(url.includes('accion=revisar') && firma, url);
   let error = '';
   try { E.s.revisarRegistro('ana@ejemplo.test', 'firma-falsa', 'rechazado'); } catch (e) { error = e.message; }
   igual(error, 'Enlace no válido.', 'firma falsa');
-  try { E.s.enlaceRevision('nadie@ejemplo.test'); error = ''; } catch (e) { error = e.message; }
+  try { E.s.enlaceRevision_('nadie@ejemplo.test'); error = ''; } catch (e) { error = e.message; }
   cierto(/No hay ninguna cuenta/.test(error), 'correo que no existe');
-  const todas = E.s.enlaceRevision();   // así la ejecuta el botón «Ejecutar» del editor
+  const todas = E.s.enlaceRevision_();   // sin correo, como el botón «Ejecutar» del editor
   cierto(todas.includes('Ana Prueba <ana@ejemplo.test> · activo') && todas.includes(firma), 'sin correo: todas las cuentas');
   cierto(todas.includes('Rechazado Prueba'), 'también las de baja');
 
@@ -1593,13 +1593,78 @@ prueba('servidor: dar de baja con el enlace firmado y volver a activar', async (
   igual(E.post(E.parte()).ok, true, 'reactivada: vuelve a enviar');
 });
 
+// Toda función sin «_» se puede llamar desde cualquier navegador con google.script.run (auditoría A1).
+prueba('servidor: solo estas funciones son públicas', async () => {
+  const E = await servidorListo();
+  const publicas = [...E.codigo.matchAll(/^function ([A-Za-z0-9]+)\s*\(/gm)].map((m) => m[1]).sort();
+  igual(publicas, ['activarCopiaSemanal', 'activarResumenDiario', 'archivarEnvios', 'configurar', 'copiaSeguridad',
+    'doGet', 'doPost', 'enlaceRevision', 'reintentarPortal', 'resumenDiario', 'revisarRegistro'],
+  'una función nueva sin «_» la puede ejecutar cualquiera: o lleva «_» o empieza por soloDueno_ y se añade aquí');
+  // Las de mantenimiento empiezan comprobando quién llama.
+  publicas.filter((f) => !['doGet', 'doPost', 'revisarRegistro'].includes(f)).forEach((f) => {
+    const cuerpo = new RegExp('^function ' + f + '\\s*\\([^)]*\\)\\s*\\{\\s*soloDueno_\\(', 'm');
+    cierto(cuerpo.test(E.codigo), f + ' no empieza por soloDueno_');
+  });
+});
+
+prueba('servidor: desde una página web nadie ejecuta las funciones de mantenimiento', async () => {
+  const E = await servidorListo();
+  E.hojas.Envios.appendRow(['x', 'ana@ejemplo.test', 'Ana Prueba', 'INF-1', 'a', '1', '2020-01-01T10:00:00+02:00']);
+  E.quien.activo = '';   // visitante anónimo, u otra cuenta de Gmail
+  const antes = JSON.stringify(E.hojas);
+  const lineas = E.registro.length;   // lo que escribió configurar() al preparar el servidor
+  for (const f of ['enlaceRevision', 'resumenDiario', 'copiaSeguridad', 'archivarEnvios', 'reintentarPortal',
+    'configurar', 'activarCopiaSemanal', 'activarResumenDiario']) {
+    let error = '';
+    try { E.s[f](); } catch (e) { error = e.message; }
+    cierto(/editor/.test(error), f + ': debería dar error y dio «' + error + '»');
+    // Con un activador inventado tampoco (la página puede mandar lo que quiera como argumento).
+    error = '';
+    try { E.s[f]({ triggerUid: '9999' }); } catch (e) { error = e.message; }
+    cierto(/editor/.test(error), f + ' con activador falso');
+  }
+  igual(JSON.stringify(E.hojas), antes, 'no ha cambiado ninguna hoja');
+  igual(E.correos.length, 0, 'ningún correo');
+  igual(E.copias.length, 0, 'ninguna copia');
+  igual(E.registro.length, lineas, 'nada nuevo en el registro');
+  E.quien.activo = 'otra@ejemplo.test';   // cuenta del mismo dominio que no es la dueña
+  await falla(() => E.s.enlaceRevision(), 'otra cuenta');
+});
+
+prueba('servidor: el editor y los activadores sí las ejecutan', async () => {
+  const E = await servidorListo();
+  // Editor: enlaceRevision escribe los enlaces en el registro y no devuelve nada.
+  igual(E.s.enlaceRevision(), undefined, 'no devuelve los enlaces');
+  cierto(E.registro.some((t) => t.includes('Ana Prueba <ana@ejemplo.test> · activo') && t.includes('accion=revisar')), 'los enlaces, en el registro');
+  igual(E.s.enlaceRevision('ana@ejemplo.test'), undefined);
+  cierto(E.registro.at(-1).includes('email=ana%40ejemplo.test'), 'un solo enlace, en el registro');
+  // Activador real: la página no muestra quién es («Session» vacío), pero el identificador es de este proyecto.
+  E.quien.activo = '';
+  E.s.resumenDiario({ triggerUid: '7001' });
+  igual(E.correos.length, 1, 'resumen enviado');
+  E.s.copiaSeguridad({ triggerUid: '7002' });
+  igual(E.copias.length, 1, 'copia hecha');
+  // Un activador de otra función no vale para esta.
+  await falla(() => E.s.copiaSeguridad({ triggerUid: '7001' }), 'activador de otra función');
+});
+
+prueba('servidor: como mucho una copia de seguridad cada 6 horas', async () => {
+  const E = await servidorListo();
+  for (let i = 0; i < 10; i++) E.s.copiaSeguridad();
+  igual(E.copias.length, 1, 'solo la primera');
+  igual(E.copias.filter((c) => c.papelera).length, 0, 'ninguna a la papelera');
+  E.props.ULTIMA_COPIA = String(Date.now() - 7 * 3600000);
+  E.s.copiaSeguridad();
+  igual(E.copias.length, 2, 'pasadas 6 horas, otra');
+});
+
 /** Registro completo como lo hace un capataz: código por correo, nombre y PIN. */
 function alta(E, email, nombre) {
   E.post({ accion: 'codigo', email, peticion: crypto.randomUUID() });
   const codigo = /(\d{6})/.exec(E.correos.at(-1).subject)[1];
   return E.post({ accion: 'registro', email, codigo, nombre, pin: '1234', peticion: crypto.randomUUID() });
 }
-const firmaDe = (E, email) => new URL(E.s.enlaceRevision(email)).searchParams.get('firma');
+const firmaDe = (E, email) => new URL(E.s.enlaceRevision_(email)).searchParams.get('firma');
 
 prueba('servidor: el enlace de revisión caduca a los 30 días y no se puede alargar', async () => {
   const E = await servidorListo();

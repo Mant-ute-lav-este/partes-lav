@@ -125,12 +125,45 @@ function crearEntorno(codigo) {
         return t;
       },
     },
-    ScriptApp: { getService: () => ({ getUrl: () => 'https://servidor.simulado/exec' }) },
-    Logger: { log: () => {} }, DriveApp: {},
+    ScriptApp: {
+      getService: () => ({ getUrl: () => 'https://servidor.simulado/exec' }),
+      getProjectTriggers: () => activadores.map((a) => ({ getUniqueId: () => a.id, getHandlerFunction: () => a.funcion })),
+      deleteTrigger: () => {},
+      newTrigger: () => { const t = { timeBased: () => t, onWeekDay: () => t, atHour: () => t, everyDays: () => t, inTimezone: () => t, create: () => t }; return t; },
+      WeekDay: {},
+    },
+    // Quién ejecuta: en el editor y en los activadores, el dueño; desde una página web, '' (anónimo u otra cuenta Gmail).
+    Session: {
+      getActiveUser: () => ({ getEmail: () => quien.activo }),
+      getEffectiveUser: () => ({ getEmail: () => 'dueno@ejemplo.test' }),
+    },
+    Logger: { log: (t) => { registro.push(String(t)); } },
+    DriveApp: {
+      getFileById: () => ({ makeCopy: (nombre) => { copias.push({ nombre, creada: Date.now() + copias.length, papelera: false }); } }),
+      getFoldersByName: () => ({ hasNext: () => true, next: () => carpeta }),
+      createFolder: () => carpeta,
+    },
   });
+  const quien = { activo: 'dueno@ejemplo.test' };
+  const activadores = [{ id: '7001', funcion: 'resumenDiario' }, { id: '7002', funcion: 'copiaSeguridad' }];
+  const registro = [];   // lo que sale en el registro de ejecución (Logger.log)
+  const copias = [];     // copias de seguridad en Drive
+  const carpeta = {
+    getFiles: () => {
+      const vivas = copias.filter((c) => !c.papelera);
+      let i = 0;
+      return {
+        hasNext: () => i < vivas.length,
+        next: () => { const c = vivas[i++]; return { getDateCreated: () => c.creada, setTrashed: (v) => { c.papelera = v; } }; },
+      };
+    },
+  };
   const nombres = Object.keys(g);
   const s = new Function(...nombres, `${codigo}
-    return { doPost, doGet, VERSION_SERVIDOR, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_, archivarEnvios, revisarRegistro, enlaceRevision, reintentarPortal, sha256_, firma_ };`)(...nombres.map((n) => g[n]));
+    return { doPost, doGet, VERSION_SERVIDOR, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_,
+      archivarEnvios, archivarEnvios_, revisarRegistro, enlaceRevision, enlaceRevision_, reintentarPortal, reintentarPortal_,
+      copiaSeguridad, activarCopiaSemanal, activarResumenDiario, sha256_, firma_ };`)(...nombres.map((n) => g[n]));
   const post = (o) => JSON.parse(s.doPost({ postData: { contents: JSON.stringify(o) } }));
-  return { s, post, g, hojas, props, cache, correos, portal, bloqueado: () => bloqueado, aperturas: () => aperturas };
+  return { s, post, g, hojas, props, cache, correos, portal, quien, activadores, registro, copias, codigo,
+    bloqueado: () => bloqueado, aperturas: () => aperturas };
 }
