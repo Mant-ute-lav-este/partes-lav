@@ -2,7 +2,7 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
-## Servidor v20 · 2026-11-03 (seguridad; desplegar después de publicar la 0.23.0)
+## Servidor v20 · 2026-11-03 (desplegado; seguridad)
 - **Cuenta pendiente de aprobar: la lista de la oficina llega vacía** (misma forma, sin trabajadores, máquinas, vehículos, aparatos, motivos ni cabecera). En cuanto la oficina la aprueba, la misma petición trae la lista completa.
 - **Sesiones con firma**: los tokens nuevos tienen 128 caracteres (64 al azar + 64 de firma). Un token que no puede ser bueno se rechaza antes de esperar turno y sin leer la hoja Sesiones. Los tokens de antes (64 caracteres) siguen valiendo: nadie tiene que volver a entrar.
 - **Adjuntos**: solo `.pdf`, `.txt`, `.json`, `.jpg`/`.jpeg` y `.drp`; el tipo lo pone el servidor según la extensión.
