@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.25.0 · 2026-11-03
+- **Política de seguridad (CSP) en `index.html`**: segunda barrera contra código inyectado. Solo se ejecuta código de la propia app y de `cdnjs.cloudflare.com` (jsPDF y heic2any); solo se habla con el servidor de Google; nada de estilos ni scripts en línea. `unsafe-eval` queda permitido solo por heic2any (conversión de fotos HEIC). Para el capataz no cambia nada.
+- El script del aspecto (tema y letra) pasa de `index.html` a `js/aspecto-inicio.js`, igual de rápido (sin parpadeo).
+
 ## 0.24.0 · 2026-11-03 (necesita el servidor v21)
 - **Cerrar sesión anula también la sesión en el servidor** (acción `salir`): quien copiara el token del móvil ya no puede usarlo. Sin cobertura se apunta en el móvil (`sesionesPorCerrar`) y se manda al abrir la app o al volver la señal. Para el capataz no cambia nada.
 

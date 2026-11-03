@@ -1815,16 +1815,15 @@ async function appEnMarco() {
     if (Date.now() - inicio > 10000) throw new Error('la app no arranca en el marco');
     await new Promise((r) => setTimeout(r, 100));
   }
-  // Un script del propio marco: así el módulo es el mismo que usa la app, no una copia.
-  const s = f.contentDocument.createElement('script');
-  s.type = 'module';
-  s.textContent = "import * as m from './js/estado.js'; import * as i from './js/vista-inicio.js'; window.moduloInicio = i; window.moduloEstado = m;";
-  f.contentDocument.head.append(s);
-  while (!f.contentWindow.moduloEstado) {
-    if (Date.now() - inicio > 10000) throw new Error('no se puede cargar js/estado.js en el marco');
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  marco = { f, m: f.contentWindow.moduloEstado, errores };
+  // Import desde el propio marco: así el módulo es el mismo que usa la app, no una copia. Sin script en línea
+  // (la política de seguridad de index.html no los admite): eval del marco, que ella sí permite por heic2any.
+  f.contentWindow.addEventListener('securitypolicyviolation', (e) => errores.push('CSP: ' + e.violatedDirective + ' ' + e.blockedURI));
+  const ruta = (r) => JSON.stringify(new URL(r, f.contentWindow.location.href).href);
+  const m = await f.contentWindow.eval(`import(${ruta('./js/estado.js')})`);
+  const i = await f.contentWindow.eval(`import(${ruta('./js/vista-inicio.js')})`);
+  f.contentWindow.moduloInicio = i;
+  f.contentWindow.moduloEstado = m;
+  marco = { f, m, errores };
   return marco;
 }
 
@@ -2163,20 +2162,10 @@ prueba('pantallas: textos con trampa (< > " \' &) no crean elementos ni atributo
   cierto(vistoLiteral > 0, 'ninguna pantalla enseñó la trampa como texto: la prueba no está comprobando nada');
 });
 
-/** Carga un módulo dentro del marco (el mismo que usa la app, no una copia). */
+/** Carga un módulo dentro del marco (el mismo que usa la app, no una copia). Sin script en línea: lo prohíbe la CSP. */
 async function moduloDelMarco(ruta) {
   const { f } = await appEnMarco();
-  const clave = '__modulo' + Math.random().toString(36).slice(2);
-  const s = f.contentDocument.createElement('script');
-  s.type = 'module';
-  s.textContent = `import * as m from '${ruta}'; window.${clave} = m;`;
-  f.contentDocument.head.append(s);
-  const inicio = Date.now();
-  while (!f.contentWindow[clave]) {
-    if (Date.now() - inicio > 10000) throw new Error(`no se puede cargar ${ruta} en el marco`);
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  return f.contentWindow[clave];
+  return f.contentWindow.eval(`import(${JSON.stringify(new URL(ruta, f.contentWindow.location.href).href)})`);
 }
 
 // Antes, los intentos de PIN y los fallos pendientes compartían clave: con fallos guardados el bloqueo
@@ -2383,6 +2372,24 @@ prueba('pantallas: envío', async () => {
     'sin fotos no se ofrece volver a mandarlo por Gmail, pero sí ver el PDF');
   marco.f.remove();
   marco = null;
+});
+
+// ---------- política de seguridad (CSP) ----------
+
+prueba('index.html: lleva la política de seguridad, sin scripts ni estilos en línea', async () => {
+  const html = await fetch('../index.html', { cache: 'no-store' }).then((r) => r.text());
+  const csp = (/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html) || [])[1] || '';
+  cierto(csp, 'falta la meta Content-Security-Policy');
+  cierto(html.indexOf('Content-Security-Policy') < html.indexOf('<script'), 'la política va antes que cualquier script');
+  const dir = (n) => (new RegExp(`(?:^|;\\s*)${n} ([^;]*)`).exec(csp) || [])[1] || '';
+  cierto(dir('default-src') === "'self'", 'default-src');
+  cierto(/^'self' https:\/\/cdnjs\.cloudflare\.com/.test(dir('script-src')) && !/'unsafe-inline'/.test(csp), 'script-src sin unsafe-inline');
+  cierto(dir('connect-src').includes(new URL(SERVIDOR_URL).origin), 'connect-src deja hablar con el servidor');
+  cierto(dir('base-uri') === "'self'" && dir('form-action') === "'none'", 'base-uri y form-action');
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
+  cierto(scripts.length >= 2, 'faltan scripts');
+  for (const [, atributos, cuerpo] of scripts) cierto(/\bsrc=/.test(atributos) && !cuerpo.trim(), 'script en línea: ' + cuerpo.trim().slice(0, 40));
+  cierto(!/\sstyle=|<style\b|\son[a-z]+=/i.test(html), 'estilo o evento en línea');
 });
 
 // ---------- la app arranca ----------
