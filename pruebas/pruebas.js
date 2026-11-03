@@ -683,6 +683,18 @@ prueba('fotos: detecta HEIC por tipo, nombre y firma', () => {
   cierto(!esHeic({ type: 'image/jpeg', name: 'a.jpg' }, new ArrayBuffer(16)), 'un JPEG no es HEIC');
 });
 
+prueba('fotos: el convertidor HEIC se carga con su huella (SRI) y el service worker lo guarda igual', async () => {
+  const fotos = await fetch('../js/fotos.js', { cache: 'no-store' }).then((r) => r.text());
+  const sw = await fetch('../sw.js', { cache: 'no-store' }).then((r) => r.text());
+  const sri = fotos.match(/HEIC2ANY_SRI\s*=\s*'(sha(?:384|512)-[A-Za-z0-9+/=]+)'/);
+  cierto(sri, 'fotos.js no define HEIC2ANY_SRI');
+  cierto(/s\.integrity\s*=\s*HEIC2ANY_SRI/.test(fotos), 'el script no lleva integrity');
+  cierto(/s\.crossOrigin\s*=\s*'anonymous'/.test(fotos), 'el script no pide CORS (sin eso la huella no se comprueba)');
+  cierto(/new Request\(HEIC2ANY,\s*\{[^}]*mode:\s*'cors'/.test(sw), 'sw.js debe guardar el convertidor en modo CORS, no opaco');
+  const url = fotos.match(/export const HEIC2ANY\s*=\s*'([^']+)'/)[1];
+  cierto(sw.includes(`'${url}'`), 'sw.js y fotos.js apuntan a archivos distintos');
+});
+
 prueba('fotos: procesa una foto de cámara (sello y tamaño)', async () => {
   const f = new File([await jpeg(800, 600)], 'prueba.jpg', { type: 'image/jpeg' });
   const r = await procesarFoto(f, { origen: 'camara', fase: 'antes', etiqueta: 'T1 · SIOS S-1', ref: 'INF-9001' });

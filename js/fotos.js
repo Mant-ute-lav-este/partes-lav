@@ -94,6 +94,8 @@ function textoFecha(iso) {
 // Si una foto HEIC no se abre, se convierte a JPG en el propio móvil con heic2any. La librería
 // solo se descarga si hace falta, y el service worker la deja guardada para usarla sin cobertura.
 export const HEIC2ANY = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+// Huella del archivo (la misma que da cdnjs): si cambiara, el navegador no lo ejecuta. Al subir de versión, cambiarla.
+const HEIC2ANY_SRI = 'sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL';
 let heicCargando = null;
 
 function cargarHeic2any() {
@@ -102,6 +104,8 @@ function cargarHeic2any() {
     heicCargando = new Promise((res, rej) => {
       const s = document.createElement('script');
       s.src = HEIC2ANY;
+      s.integrity = HEIC2ANY_SRI;
+      s.crossOrigin = 'anonymous';
       s.onload = () => (window.heic2any ? res(window.heic2any) : rej(new Error('Convertidor HEIC no disponible')));
       s.onerror = () => { heicCargando = null; s.remove(); rej(new Error('No se pudo cargar el convertidor HEIC')); };
       document.head.append(s);

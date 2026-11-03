@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.25.0';
+const VERSION = 'v0.25.1';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -57,7 +57,7 @@ const HEIC2ANY = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE)
     .then((c) => c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))
-      .then(() => c.add(new Request(HEIC2ANY, { cache: 'reload' })).catch(() => {})))
+      .then(() => c.add(new Request(HEIC2ANY, { cache: 'reload', mode: 'cors' })).catch(() => {})))
     .then(() => self.skipWaiting()));
 });
 
