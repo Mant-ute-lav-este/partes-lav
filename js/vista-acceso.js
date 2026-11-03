@@ -6,6 +6,7 @@ import { hayServidor } from './servidor.js';
 import { esc, toast } from './util.js';
 import { estado, ir, sincronizar, cargarConfigServidor } from './estado.js';
 import { barraSimple, conEspera } from './campos.js';
+import { apuntarSesionCerrada } from './fallos.js';
 
 export const ITER_PIN = 150000;
 
@@ -170,10 +171,12 @@ export async function terminarAcceso(r, email, pin) {
 }
 
 export async function cerrarSesion() {
+  const token = estado.perfil && estado.perfil.token;
   estado.perfil = null;
   await db.kvSet('perfil', null);
   await db.kvSet('intentosPin', null);
   ir(hayServidor() ? 'bienvenida' : 'setup-capataz');
+  if (token) apuntarSesionCerrada(token);   // sin esperar: sin cobertura se queda en cola
 }
 
 // ---------- Pantallas de configuración y PIN (sin registro / datos de ejemplo) ----------

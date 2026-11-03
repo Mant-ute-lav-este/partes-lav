@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 20;
+const VERSION_SERVIDOR = 21;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -43,6 +43,7 @@ const ACCIONES = {
   nuevoPin: nuevoPin_,
   cargarLista: cargarLista_,
   fallo: registrarFallos_,
+  salir: salir_,
 };
 
 // Acciones que se bloquean ellas mismas solo en los tramos cortos: enviar un parte con fotos
@@ -50,7 +51,7 @@ const ACCIONES = {
 const SIN_BLOQUEO = { enviar: true };
 
 // Acciones que llevan el token de sesión del móvil (las que llaman a usuarioDeSesion_).
-const CON_SESION = { estado: true, config: true, enviar: true, pin: true, fallo: true };
+const CON_SESION = { estado: true, config: true, enviar: true, pin: true, fallo: true, salir: true };
 
 // ---------- Entrada ----------
 
@@ -114,14 +115,20 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   if (p.accion === 'revisar') {
     const email = String(p.email || '').toLowerCase();
-    if (!p.firma || p.firma !== firma_('revisar:' + email)) return HtmlService.createHtmlOutput('<p>Enlace no válido.</p>');
-    const u = buscarUsuario_(email);
+    if (enlaceValido_(email, p.firma, 'pendiente') === 'no-valido') return HtmlService.createHtmlOutput('<p>Enlace no válido.</p>');
+    const usuarios = tabla_('Usuarios').filas;
+    const u = usuarios.find((f) => String(f.Email).toLowerCase() === email);
     if (!u) return HtmlService.createHtmlOutput('<p>Ese registro no existe.</p>');
+    if (enlaceValido_(email, p.firma, String(u.Estado)) !== 'ok') return HtmlService.createHtmlOutput('<p>' + ENLACE_CADUCADO + '</p>');
     const t = HtmlService.createTemplate(PAGINA_REVISION_);
     t.email = email;
     t.nombre = String(u.Nombre);
     t.estado = String(u.Estado);
     t.firma = p.firma;
+    t.caduca = fechaCaducidad_(p.firma);
+    const otras = otrasConNombre_(usuarios, u);
+    t.otras = otras.map((o) => o.Email + ' · ' + o.Estado);
+    t.hayPendientes = otras.some((o) => o.Estado === 'pendiente');
     return t.evaluate().setTitle('Partes LAV · Registro').addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
   return HtmlService.createHtmlOutput('<p>Partes LAV · servidor de envío · v' + VERSION_SERVIDOR + '</p>');
@@ -265,7 +272,8 @@ function buscarNombre_(d) {
   if (!encajan.length) throw new Error('No te encontramos. Escribe nombre y un apellido (por ejemplo Jose Bordetas) o habla con la oficina.');
   if (encajan.length > 1) throw new Error('Hay más de una persona con ese nombre: añade el otro apellido.');
   const nombre = encajan[0];
-  if (tabla_('Usuarios').filas.some((u) => String(u.Nombre) === nombre && u.Estado !== 'rechazado')) {
+  // Solo bloquea una cuenta ACTIVA: si alguien pide antes tu nombre, la oficina recibe las dos solicitudes y elige.
+  if (tabla_('Usuarios').filas.some((u) => String(u.Nombre) === nombre && u.Estado === 'activo')) {
     throw new Error('Ese nombre ya tiene una cuenta. Habla con la oficina.');
   }
   return { nombre: nombre };
@@ -279,7 +287,7 @@ function registrar_(d) {
   comprobarCodigo_(email, d.codigo, false);
   if (buscarUsuario_(email)) throw new Error('Este correo ya está registrado. Usa «Ya tengo cuenta».');
   if (!tabla_('Trabajadores').filas.some((t) => String(t.Nombre) === nombre)) throw new Error('Elige tu nombre de la lista.');
-  if (tabla_('Usuarios').filas.some((u) => String(u.Nombre) === nombre && u.Estado !== 'rechazado')) {
+  if (tabla_('Usuarios').filas.some((u) => String(u.Nombre) === nombre && u.Estado === 'activo')) {
     throw new Error('Ese nombre ya tiene una cuenta. Habla con la oficina.');
   }
   const sal = Utilities.getUuid();
@@ -293,26 +301,83 @@ function avisarRegistro_(email, nombre) {
   const aj = ajustes_();
   const admin = aj.admin || aj.destinatario;
   if (!admin) return;
+  const usuarios = tabla_('Usuarios').filas;
+  const u = usuarios.find((f) => String(f.Email).toLowerCase() === email);
+  const otras = u ? otrasConNombre_(usuarios, u) : [];
+  const caduca = caducaNueva_();
   enviarCorreo_({
     to: admin,
     name: 'Partes LAV',
     subject: 'Registro en la app de partes: ' + nombre,
     body: nombre + ' (' + email + ') se ha registrado en la app de partes.\n\n' +
-      'Para aprobarlo o rechazarlo, abre este enlace:\n' + urlRevision_(email) +
+      (otras.length
+        ? '⚠ Ya hay otra solicitud con este nombre: ' + otras.map((o) => o.Email + ' (' + o.Estado + ')').join(', ') +
+          '. Aprueba solo la buena: al aprobar una, las demás pendientes pasan a rechazadas.\n\n'
+        : '') +
+      'Para aprobarlo o rechazarlo, abre este enlace (vale ' + DIAS_ENLACE + ' días, hasta el ' + fechaEnlace_(caduca) + '):\n' + urlRevision_(email, caduca) +
       '\n\nHasta que lo apruebes no podrá enviar partes.' +
-      '\nGuarda este correo: con el mismo enlace podrás darlo de baja más adelante.',
+      '\nPara darlo de baja más adelante, pide un enlace nuevo a quien administra la app.',
   });
 }
 
-function urlRevision_(email) {
+const DIAS_ENLACE = 30;   // lo que vale el enlace de revisión desde que se crea
+const ENLACE_CADUCADO = 'Este enlace ha caducado. Pide uno nuevo a quien administra la app.';
+
+/**
+ * Firma del enlace de revisión (desde v21): «caducidad.firma», con la caducidad dentro de lo firmado:
+ * si se cambia la fecha a mano, deja de valer. La caducidad es una medianoche: el mismo día sale el mismo enlace.
+ */
+function firmaRevision_(email, caduca) {
+  return caduca + '.' + firma_('revisar:' + email + ':' + caduca);
+}
+
+/** Caducidad de un enlace creado ahora: la medianoche (UTC) de dentro de DIAS_ENLACE días. */
+function caducaNueva_() {
+  return Math.ceil((Date.now() + DIAS_ENLACE * 86400000) / 86400000) * 86400000;
+}
+
+function urlRevision_(email, caduca) {
+  caduca = caduca || caducaNueva_();
   return ScriptApp.getService().getUrl() + '?accion=revisar&email=' + encodeURIComponent(email) +
-    '&firma=' + firma_('revisar:' + email);
+    '&firma=' + firmaRevision_(email, caduca);
 }
 
 /**
- * Para dar de baja a alguien cuyo correo de registro ya no está: ejecutarla a mano en el editor
+ * 'ok', 'caducado' o 'no-valido'. Los enlaces de antes de la v21 (firma sin fecha) solo sirven
+ * mientras la cuenta está pendiente: así los correos de registro ya enviados no se quedan sin valer,
+ * pero no sirven para dar de baja ni para reactivar.
+ */
+function enlaceValido_(email, firma, estado) {
+  const f = String(firma || '');
+  const m = /^(\d{1,15})\.[0-9a-f]{64}$/.exec(f);
+  if (m) {
+    if (f !== firmaRevision_(email, m[1])) return 'no-valido';
+    return Date.now() < Number(m[1]) ? 'ok' : 'caducado';
+  }
+  if (f && f === firma_('revisar:' + email)) return estado === 'pendiente' ? 'ok' : 'caducado';
+  return 'no-valido';
+}
+
+/** «dd/mm/aaaa» en que caduca el enlace; '' en los de antes de la v21. */
+function fechaCaducidad_(firma) {
+  const m = /^(\d{1,15})\./.exec(String(firma || ''));
+  return m ? fechaEnlace_(Number(m[1])) : '';
+}
+
+/** Último día en que vale: la caducidad es una medianoche UTC, que en Madrid cae ya de madrugada del día siguiente. */
+function fechaEnlace_(caduca) {
+  return Utilities.formatDate(new Date(caduca - 3 * 3600000), ZONA, 'dd/MM/yyyy');
+}
+
+/** Las demás cuentas, no rechazadas, con el mismo nombre que u. */
+function otrasConNombre_(usuarios, u) {
+  return usuarios.filter((f) => f._fila !== u._fila && String(f.Nombre) === String(u.Nombre) && f.Estado !== 'rechazado');
+}
+
+/**
+ * Para dar de baja a alguien o cuando el enlace del correo ha caducado: ejecutarla a mano en el editor
  * («Ejecutar» no pasa argumentos: sin correo saca el enlace de todas las cuentas, con su nombre
- * y estado) y abrir el enlace que sale en el registro de ejecución.
+ * y estado) y abrir el enlace que sale en el registro de ejecución. Cada enlace vale DIAS_ENLACE días.
  */
 function enlaceRevision(email) {
   email = String(email || '').trim().toLowerCase();
@@ -328,10 +393,15 @@ function enlaceRevision(email) {
   return url;
 }
 
-/** Llamada desde la página de revisión (pública: sin guion bajo). */
+/**
+ * Llamada desde la página de revisión (pública: sin guion bajo). Al aprobar a alguien, las demás
+ * solicitudes pendientes con su nombre pasan a rechazadas; si ya hay otra cuenta activa con ese
+ * nombre, no deja (dos cuentas activas con el mismo nombre firmarían partes por la misma persona).
+ */
 function revisarRegistro(email, firma, decision) {
   email = String(email || '').toLowerCase();
-  if (!firma || firma !== firma_('revisar:' + email)) throw new Error('Enlace no válido.');
+  // Primero lo que se comprueba sin abrir la hoja; el estado de la cuenta, ya con el bloqueo.
+  if (enlaceValido_(email, firma, 'pendiente') === 'no-valido') throw new Error('Enlace no válido.');
   if (decision !== 'activo' && decision !== 'rechazado') throw new Error('Decisión no válida.');
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -339,6 +409,13 @@ function revisarRegistro(email, firma, decision) {
     const t = tabla_('Usuarios');
     const u = t.filas.find((f) => String(f.Email).toLowerCase() === email);
     if (!u) throw new Error('Ese registro no existe.');
+    if (enlaceValido_(email, firma, String(u.Estado)) !== 'ok') throw new Error(ENLACE_CADUCADO);
+    if (decision === 'activo') {
+      const otras = otrasConNombre_(t.filas, u);
+      const activa = otras.find((o) => o.Estado === 'activo');
+      if (activa) throw new Error('Ya hay una cuenta activa con este nombre (' + activa.Email + '). Dala de baja antes.');
+      otras.forEach((o) => escribir_(t, o._fila, { Estado: 'rechazado', Revisado: ahora_() }));
+    }
     escribir_(t, u._fila, { Estado: decision, Revisado: ahora_() });
   } finally {
     lock.releaseLock();
@@ -453,6 +530,18 @@ function usuarioDeSesion_(token, exigirActivo) {
   }
   escribir_(sesiones, s._fila, { UltimoUso: ahora_() });
   return u;
+}
+
+/**
+ * «Cerrar sesión» en el móvil: la sesión deja de valer también aquí. Si ya no estaba (repetición,
+ * limpieza de 180 días), contesta «ok» igual. Va con el bloqueo: quitar una fila mueve las demás.
+ */
+function salir_(d) {
+  const th = 'h' + sha256_(String(d.token || ''));
+  const t = tabla_('Sesiones');
+  const s = t.filas.find((f) => f.TokenHash === th);
+  if (s) t.h.deleteRows(s._fila, 1);
+  return {};
 }
 
 // ---------- Lista de la oficina ----------
@@ -1274,19 +1363,26 @@ const PAGINA_REVISION_ = `<!doctype html>
   button { font: inherit; font-size: 18px; padding: 12px 22px; margin: 8px 8px 0 0; border: 0; border-radius: 10px; color: #fff; cursor: pointer; }
   .si { background: #157a3a; } .no { background: #b42318; }
   .nota { color: #555; font-size: 14px; }
+  .aviso { background: #fff4e5; border-left: 4px solid #b54708; padding: 10px 12px; }
 </style></head><body>
 <h2>Registro en la app de partes</h2>
 <p><strong><?= nombre ?></strong><br><?= email ?></p>
 <p id="estado">Estado actual: <strong><?= estado === 'rechazado' ? 'de baja / rechazado' : estado ?></strong></p>
+<? if (otras.length) { ?>
+<p class="aviso">⚠ Hay otra solicitud con este nombre:<br>
+<? for (var i = 0; i < otras.length; i++) { ?><?= otras[i] ?><br><? } ?>
+Aprueba solo la buena: al aprobar una, las demás pendientes pasan a rechazadas.</p>
+<? } ?>
 <? if (estado === 'pendiente') { ?>
 <button class="si" onclick="decidir(this, 'activo')">Aprobar</button>
 <button class="no" onclick="decidir(this, 'rechazado')">Rechazar</button>
 <? } else if (estado === 'activo') { ?>
 <button class="no" onclick="decidir(this, 'rechazado')">Dar de baja</button>
-<p class="nota">Ya no podrá entrar ni enviar partes. Lo que ya envió se queda en la oficina. Se puede volver a activar con este mismo enlace.</p>
+<p class="nota">Ya no podrá entrar ni enviar partes. Lo que ya envió se queda en la oficina. Se puede volver a activar con este mismo enlace mientras no caduque.</p>
 <? } else { ?>
 <button class="si" onclick="decidir(this, 'activo')">Volver a activar</button>
 <? } ?>
+<? if (caduca) { ?><p class="nota">Este enlace vale hasta el <?= caduca ?>.</p><? } ?>
 <script>
   // Dos toques para decidir: un toque sin querer no cambia nada. El segundo solo cuenta si llega
   // medio segundo después: un solo toque puede llegar como dos clics seguidos (visto en la v14).
@@ -1302,7 +1398,8 @@ const PAGINA_REVISION_ = `<!doctype html>
     document.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
     google.script.run
       .withSuccessHandler(function (r) {
-        el.innerHTML = 'Hecho: <strong>' + (r === 'activo' ? 'activo (puede entrar y enviar)' : 'de baja / rechazado') + '</strong>.';
+        el.innerHTML = 'Hecho: <strong>' + (r === 'activo' ? 'activo (puede entrar y enviar)' : 'de baja / rechazado') + '</strong>.' +
+          (r === 'activo' && <?!= JSON.stringify(hayPendientes) ?> ? ' Las otras solicitudes pendientes con este nombre han pasado a rechazadas.' : '');
         document.querySelectorAll('button').forEach(function (b) { b.remove(); });
       })
       .withFailureHandler(function (e) {

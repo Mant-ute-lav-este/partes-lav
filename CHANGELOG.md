@@ -2,6 +2,15 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.24.0 · 2026-11-03 (necesita el servidor v21)
+- **Cerrar sesión anula también la sesión en el servidor** (acción `salir`): quien copiara el token del móvil ya no puede usarlo. Sin cobertura se apunta en el móvil (`sesionesPorCerrar`) y se manda al abrir la app o al volver la señal. Para el capataz no cambia nada.
+
+## Servidor v21 · 2026-11-03 (seguridad; cambia el enlace de aprobación)
+- **El enlace de aprobación caduca a los 30 días.** El correo de registro dice hasta qué día vale y la página de revisión también. Ya no sirve «guardar el correo» para dar de baja más adelante: quien administra la app saca un enlace nuevo con `enlaceRevision` en el editor (vale otros 30 días). La fecha va dentro de la firma: cambiarla a mano invalida el enlace.
+- Los enlaces de antes de la v21 siguen sirviendo solo para aprobar o rechazar una cuenta **pendiente**; para dar de baja o reactivar hay que sacar uno nuevo.
+- **Nombre de un compañero:** una solicitud pendiente ya no impide que otro se registre con ese nombre. La oficina recibe las dos (el correo y la página avisan «Ya hay otra solicitud con este nombre») y, al aprobar una, las demás pendientes pasan a rechazadas. No se puede tener dos cuentas activas con el mismo nombre: hay que dar de baja la otra antes.
+- Acción nueva **`salir`**: al cerrar sesión en el móvil, la sesión deja de valer también en el servidor. `login`, `estado` y `nuevoPin` no cambian (app del almacén).
+
 ## Servidor v20 · 2026-11-03 (desplegado; seguridad)
 - **Cuenta pendiente de aprobar: la lista de la oficina llega vacía** (misma forma, sin trabajadores, máquinas, vehículos, aparatos, motivos ni cabecera). En cuanto la oficina la aprueba, la misma petición trae la lista completa.
 - **Sesiones con firma**: los tokens nuevos tienen 128 caracteres (64 al azar + 64 de firma). Un token que no puede ser bueno se rechaza antes de esperar turno y sin leer la hoja Sesiones. Los tokens de antes (64 caracteres) siguen valiendo: nadie tiene que volver a entrar.

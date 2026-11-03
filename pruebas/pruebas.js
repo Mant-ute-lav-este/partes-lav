@@ -9,7 +9,7 @@ import { carpetaDestino, nombreBase, prepararEnvio, archivosParaServidor } from 
 import { esHeic, procesarFoto } from '../js/fotos.js';
 import { procesarSalida, descartarDelMovil } from '../js/salida.js';
 import { limpiarFotosAntiguas, textoEspacio } from '../js/espacio.js';
-import { iniciarFallos, registrarFallo } from '../js/fallos.js';
+import { iniciarFallos, registrarFallo, apuntarSesionCerrada, cerrarSesionesPendientes } from '../js/fallos.js';
 import { leerAspecto, guardarAspecto, aplicarAspecto } from '../js/aspecto.js';
 import { SERVIDOR_URL } from '../js/servidor.js';
 import * as val from '../js/validaciones.js';
@@ -1487,6 +1487,109 @@ prueba('servidor: dar de baja con el enlace firmado y volver a activar', async (
 
   igual(E.s.revisarRegistro('ana@ejemplo.test', firma, 'activo'), 'activo');
   igual(E.post(E.parte()).ok, true, 'reactivada: vuelve a enviar');
+});
+
+/** Registro completo como lo hace un capataz: código por correo, nombre y PIN. */
+function alta(E, email, nombre) {
+  E.post({ accion: 'codigo', email, peticion: crypto.randomUUID() });
+  const codigo = /(\d{6})/.exec(E.correos.at(-1).subject)[1];
+  return E.post({ accion: 'registro', email, codigo, nombre, pin: '1234', peticion: crypto.randomUUID() });
+}
+const firmaDe = (E, email) => new URL(E.s.enlaceRevision(email)).searchParams.get('firma');
+
+prueba('servidor: el enlace de revisión caduca a los 30 días y no se puede alargar', async () => {
+  const E = await servidorListo();
+  const firma = firmaDe(E, 'ana@ejemplo.test');
+  const [caduca, resto] = firma.split('.');
+  const dias = (Number(caduca) - Date.now()) / 86400000;
+  cierto(dias > 30 && dias <= 31, 'caduca en ' + dias + ' días');
+  const decidir = (f) => { try { return E.s.revisarRegistro('ana@ejemplo.test', f, 'rechazado'); } catch (e) { return e.message; } };
+  const pagina = () => E.s.doGet({ parameter: { accion: 'revisar', email: 'ana@ejemplo.test', firma } });
+  igual(decidir(Number(caduca) + 365 * 86400000 + '.' + resto), 'Enlace no válido.', 'fecha alargada a mano');
+  cierto(/^\d\d\/\d\d\/\d{4}$/.test(pagina().datos.caduca), 'la página dice hasta cuándo vale');
+  const ahora = Date.now;
+  Date.now = () => ahora() + 32 * 86400000;
+  try {
+    cierto(/ha caducado/.test(decidir(firma)), 'a los 32 días no da de baja');
+    cierto(/ha caducado/.test(pagina().html), 'a los 32 días la página dice que ha caducado');
+  } finally {
+    Date.now = ahora;
+  }
+  igual(decidir(firma), 'rechazado', 'dentro de plazo vale');
+});
+
+prueba('servidor: los enlaces de antes de la v21 solo sirven para aprobar o rechazar una cuenta pendiente', async () => {
+  const E = await servidorListo();
+  E.hojas.Usuarios.appendRow(['pen@ejemplo.test', 'Pendiente Prueba', 'pendiente', 's', 'h', '0', '0', '2026-01-01', '']);
+  const antiguo = (email) => E.s.firma_('revisar:' + email);
+  const decidir = (email, d) => { try { return E.s.revisarRegistro(email, antiguo(email), d); } catch (e) { return e.message; } };
+  cierto(/ha caducado/.test(decidir('ana@ejemplo.test', 'rechazado')), 'no sirve para dar de baja');
+  igual(decidir('pen@ejemplo.test', 'activo'), 'activo', 'aprueba la pendiente');
+  cierto(/ha caducado/.test(decidir('pen@ejemplo.test', 'rechazado')), 'ya aprobada, deja de valer');
+});
+
+prueba('servidor: dos solicitudes con el mismo nombre: la oficina recibe las dos y aprueba una', async () => {
+  const E = await servidorListo();
+  E.hojas.Trabajadores.appendRow(['Pedro Ruiz Sanz', 'UTE', '', '']);
+  igual(alta(E, 'otro@ejemplo.test', 'Pedro Ruiz Sanz').ok, true, 'el primero');
+  const r = alta(E, 'pedro@ejemplo.test', 'Pedro Ruiz Sanz');
+  igual(r.ok, true, 'el segundo no se queda fuera: ' + r.error);
+  cierto(E.correos.at(-1).body.includes('otra solicitud con este nombre: otro@ejemplo.test (pendiente)'), 'el correo a la oficina avisa');
+  const pagina = E.s.doGet({ parameter: { accion: 'revisar', email: 'pedro@ejemplo.test', firma: firmaDe(E, 'pedro@ejemplo.test') } });
+  igual([pagina.datos.otras, pagina.datos.hayPendientes], [['otro@ejemplo.test · pendiente'], true], 'la página avisa');
+
+  igual(E.s.revisarRegistro('pedro@ejemplo.test', firmaDe(E, 'pedro@ejemplo.test'), 'activo'), 'activo');
+  const estados = Object.fromEntries(E.hojas.Usuarios._d.map((f) => [f[0], f[2]]));
+  igual([estados['pedro@ejemplo.test'], estados['otro@ejemplo.test']], ['activo', 'rechazado'], 'la otra pasa a rechazada');
+  // Con una cuenta activa con ese nombre: ni registrarse ni activar otra.
+  cierto(/ya tiene una cuenta/.test(alta(E, 'tercero@ejemplo.test', 'Pedro Ruiz Sanz').error), 'registro con el nombre de una cuenta activa');
+  let error = '';
+  try { E.s.revisarRegistro('otro@ejemplo.test', firmaDe(E, 'otro@ejemplo.test'), 'activo'); } catch (e) { error = e.message; }
+  cierto(error.includes('Ya hay una cuenta activa con este nombre (pedro@ejemplo.test)'), 'reactivar la otra: ' + error);
+});
+
+prueba('servidor: salir anula esa sesión (repetirlo no da error; un token inventado no abre la hoja)', async () => {
+  const E = await servidorListo();
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
+  const otra = E.s.crearSesion_('ana@ejemplo.test');
+  igual(pedir({ accion: 'salir', token: E.token }).ok, true);
+  cierto(/Sesión no válida/.test(pedir({ accion: 'estado', token: E.token }).error), 'el token cerrado ya no vale');
+  igual(pedir({ accion: 'estado', token: otra }).estado, 'activo', 'la otra sesión de Ana sigue');
+  igual(pedir({ accion: 'salir', token: E.token }).ok, true, 'repetido: ok');
+  const antes = E.hojas.Sesiones._lecturas;
+  cierto(/Sesión no válida/.test(pedir({ accion: 'salir', token: 'inventado' }).error), 'token inventado');
+  igual(E.hojas.Sesiones._lecturas, antes, 'sin leer la hoja');
+  igual(E.bloqueado(), false, 'bloqueo al terminar');
+});
+
+prueba('cerrar sesión: se avisa al servidor; sin cobertura se queda en cola', async () => {
+  const antes = await db.kvGet('sesionesPorCerrar');
+  let conectado = false;
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => conectado });
+  try {
+    await db.kvSet('sesionesPorCerrar', []);
+    const enviados = [];
+    await conFetch(async (url, op) => { enviados.push(JSON.parse(op.body)); return respuesta({ ok: true }); }, async () => {
+      await apuntarSesionCerrada('token-a');
+      igual(await db.kvGet('sesionesPorCerrar'), ['token-a'], 'sin cobertura: en cola');
+      igual(enviados.length, 0, 'sin cobertura no se manda');
+      conectado = true;
+      await cerrarSesionesPendientes();
+      igual(enviados.map((e) => [e.accion, e.token]), [['salir', 'token-a']]);
+      igual(await db.kvGet('sesionesPorCerrar'), [], 'enviada: fuera de la cola');
+    });
+    await conFetch(async () => respuesta({ ok: false, error: 'Sesión no válida. Vuelve a entrar.' }), async () => {
+      await apuntarSesionCerrada('token-b');
+      igual(await db.kvGet('sesionesPorCerrar'), [], 'el servidor ya no la tenía: fuera de la cola');
+    });
+    await conFetch(async () => { throw new TypeError('sin red'); }, async () => {
+      await apuntarSesionCerrada('token-c');
+      igual(await db.kvGet('sesionesPorCerrar'), ['token-c'], 'error de red: se queda');
+    });
+  } finally {
+    delete navigator.onLine;
+    await db.kvSet('sesionesPorCerrar', antes || []);
+  }
 });
 
 prueba('servidor: registro de fallos sin nombre ni correo', async () => {

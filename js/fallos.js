@@ -1,6 +1,8 @@
 // Registro de fallos de campo: avisa a la oficina (hoja «Errores») de lo que falla en los móviles.
 // No lleva datos personales: se limpia el texto de correos y números largos, y el servidor
 // guarda solo un código del usuario, no su nombre ni su correo.
+// Aquí va también el aviso de «cerrar sesión» al servidor: es el mismo tipo de envío de apoyo,
+// que espera a la cobertura y nunca rompe nada.
 
 import * as db from './db.js';
 import { api } from './servidor.js';
@@ -54,5 +56,46 @@ export async function enviarFallos() {
     await db.kvSet('fallos', ahora.slice(pendientes.length));
   } catch { /* se reintenta en el próximo arranque o al volver la cobertura */ } finally {
     enCurso = false;
+  }
+}
+
+// ---------- Sesiones cerradas en el móvil ----------
+
+const MAX_SESIONES = 10;
+let cerrando = false;
+
+async function sesionesGuardadas() {
+  const v = await db.kvGet('sesionesPorCerrar');
+  return Array.isArray(v) ? v : [];
+}
+
+/** Al cerrar sesión: el token se apunta y se avisa al servidor para que deje de valer. Nunca lanza error. */
+export async function apuntarSesionCerrada(token) {
+  try {
+    const lista = await sesionesGuardadas();
+    if (!lista.includes(token)) await db.kvSet('sesionesPorCerrar', [...lista, token].slice(-MAX_SESIONES));
+    await cerrarSesionesPendientes();
+  } catch { /* sin almacenamiento: la sesión caducará sola en el servidor */ }
+}
+
+/**
+ * Manda `salir` por cada sesión apuntada. Sale de la lista cuando el servidor contesta, también si
+ * dice que ya no valía; sin cobertura se queda para el próximo arranque o al volver la señal.
+ */
+export async function cerrarSesionesPendientes() {
+  if (cerrando) return;
+  cerrando = true;
+  try {
+    for (const token of await sesionesGuardadas()) {
+      if (!navigator.onLine) return;
+      try {
+        await api('salir', { token }, { intentos: 1, timeout: 15000 });
+      } catch (e) {
+        if (e.red) return;
+      }
+      await db.kvSet('sesionesPorCerrar', (await sesionesGuardadas()).filter((t) => t !== token));
+    }
+  } catch { /* se reintenta más tarde */ } finally {
+    cerrando = false;
   }
 }

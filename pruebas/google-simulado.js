@@ -117,12 +117,20 @@ function crearEntorno(codigo) {
       },
     },
     ContentService: { createTextOutput: (t) => ({ setMimeType: () => t }), MimeType: {} },
-    HtmlService: { createHtmlOutput: (html) => ({ html }) }, ScriptApp: { getService: () => ({ getUrl: () => 'https://servidor.simulado/exec' }) },
+    HtmlService: {
+      createHtmlOutput: (html) => ({ html }),
+      // La plantilla no se pinta: la página devuelve los datos que se le han pasado, para mirarlos.
+      createTemplate: () => {
+        const t = { evaluate: () => { const o = { datos: { ...t }, setTitle: () => o, addMetaTag: () => o }; return o; } };
+        return t;
+      },
+    },
+    ScriptApp: { getService: () => ({ getUrl: () => 'https://servidor.simulado/exec' }) },
     Logger: { log: () => {} }, DriveApp: {},
   });
   const nombres = Object.keys(g);
   const s = new Function(...nombres, `${codigo}
-    return { doPost, doGet, VERSION_SERVIDOR, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_, archivarEnvios, revisarRegistro, enlaceRevision, reintentarPortal, sha256_ };`)(...nombres.map((n) => g[n]));
+    return { doPost, doGet, VERSION_SERVIDOR, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_, archivarEnvios, revisarRegistro, enlaceRevision, reintentarPortal, sha256_, firma_ };`)(...nombres.map((n) => g[n]));
   const post = (o) => JSON.parse(s.doPost({ postData: { contents: JSON.stringify(o) } }));
   return { s, post, g, hojas, props, cache, correos, portal, bloqueado: () => bloqueado, aperturas: () => aperturas };
 }
