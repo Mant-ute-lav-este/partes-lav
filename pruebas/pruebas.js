@@ -1312,6 +1312,93 @@ prueba('servidor: rechaza sesión no válida, parte sin archivos y cuenta no act
   igual(E.correos.length, 0);
 });
 
+// Un token inventado no debe coger el bloqueo ni leer la hoja Sesiones: un bucle así frenaba a todos.
+prueba('servidor: un token inventado se rechaza sin leer la hoja de sesiones', async () => {
+  const E = await servidorListo();
+  cierto(/^[0-9a-f]{128}$/.test(E.token), 'el token nuevo lleva firma: ' + E.token.length);
+  const retocado = E.token.slice(0, -1) + (E.token.endsWith('0') ? '1' : '0');
+  const falsos = ['nada', 'x'.repeat(128), retocado, E.token.slice(0, 64) + 'f'.repeat(64), undefined];
+  const antes = E.hojas.Sesiones._lecturas;
+  for (const token of falsos) {
+    for (const accion of ['estado', 'config', 'pin', 'fallo']) {
+      igual(E.post({ accion, token, peticion: crypto.randomUUID() }).error, 'Sesión no válida. Vuelve a entrar.', accion);
+    }
+    igual(E.post(E.parte({ token })).error, 'Sesión no válida. Vuelve a entrar.', 'enviar');
+  }
+  igual(E.hojas.Sesiones._lecturas - antes, 0, 'lecturas de la hoja Sesiones');
+  igual(E.post({ accion: 'config', token: E.token, peticion: crypto.randomUUID() }).ok, true, 'el token bueno sigue entrando');
+});
+
+prueba('servidor: una cuenta pendiente recibe la lista vacía, y al aprobarla la completa', async () => {
+  const E = await servidorListo();
+  E.hojas.Trabajadores.appendRow(['Juan Garcia Lopez', 'EmpresaA', 'HAB-777', 'Capataz']);
+  E.hojas.Vehiculos.appendRow(['Furgoneta blanca', '1234ABC']);
+  E.hojas.Usuarios.appendRow(['pen@ejemplo.test', 'Pendiente Prueba', 'pendiente', 's', 'h', '0', '0', '2026-01-01', '']);
+  const tp = E.s.crearSesion_('pen@ejemplo.test');
+  const r = E.post({ accion: 'config', token: tp, peticion: crypto.randomUUID() });
+  igual([r.ok, r.estado, r.nombre], [true, 'pendiente', 'Pendiente Prueba'], r.error);
+  const c = r.config;
+  igual(c.formato, 'config-partes-lav', 'misma forma que la lista de verdad');
+  for (const [k, v] of Object.entries(c)) {
+    if (Array.isArray(v)) igual(v.length, 0, k + ' vacía');
+  }
+  igual([c.destinatario, c.cabecera.empresa, c.motivos.infra.length], ['', '', 0], 'sin datos de la oficina');
+  cierto(!JSON.stringify(r).includes('HAB-777') && !JSON.stringify(r).includes('1234ABC'), 'ni habilitaciones ni matrículas');
+
+  const firma = new URL(E.s.enlaceRevision('pen@ejemplo.test')).searchParams.get('firma');
+  E.s.revisarRegistro('pen@ejemplo.test', firma, 'activo');
+  const a = E.post({ accion: 'config', token: tp, peticion: crypto.randomUUID() });
+  igual(a.estado, 'activo');
+  igual(a.config.trabajadores, [{ nombre: 'Juan Garcia Lopez', empresa: 'EmpresaA', habilitacion: 'HAB-777', categoria: 'Capataz' }]);
+  igual(a.config.vehiculos, [{ descripcion: 'Furgoneta blanca', matricula: '1234ABC' }]);
+});
+
+prueba('servidor: solo admite adjuntos PDF, TXT, JSON, JPG y DRP, con el tipo que pone él', async () => {
+  const E = await servidorListo();
+  for (const nombre of ['programa.exe', 'pagina.html', 'codigo.js', 'orden.bat', 'macro.xlsm', 'sin-extension']) {
+    const r = E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{}' }, { nombre, tipo: 'application/pdf', base64: btoa('x') }] }));
+    igual(r.ok, false, nombre);
+    cierto(/no se admite/.test(r.error), nombre + ': ' + r.error);
+  }
+  igual(E.correos.length, 0, 'no sale ningún correo');
+  const r = E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{}' }, { nombre: 'Parte_x.PDF', tipo: 'text/html', base64: btoa('x') }] }));
+  igual(r.ok, true, r.error);
+  igual(E.correos.at(-1).attachments.map((a) => a.getContentType()), ['text/plain', 'application/pdf'], 'tipo según la extensión');
+});
+
+prueba('servidor: los textos del móvil que empiezan por = + - @ no quedan como fórmula en la hoja', async () => {
+  const E = await servidorListo();
+  const formula = '=HYPERLINK("http://ejemplo.test","x")';
+  E.post({ accion: 'fallo', token: E.token, fallos: [{ fecha: '+1', version: '-1', tipo: '@a', mensaje: formula }] });
+  igual(E.post(E.parte({ ref: formula })).ok, true);
+  cierto(!E.hojas.Errores._d.at(-1).some((v) => /^[=+\-@]/.test(String(v))), 'hoja Errores: ' + E.hojas.Errores._d.at(-1));
+  igual(E.hojas.Envios._d.at(-1)[3], "'" + formula, 'Ref en la hoja Envios');
+});
+
+prueba('servidor: rechaza acciones con nombres internos de JavaScript y no enseña errores técnicos', async () => {
+  const E = await servidorListo();
+  for (const accion of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+    igual(E.post({ accion }), { ok: false, error: 'Acción desconocida.' }, accion);
+  }
+  igual(JSON.parse(E.s.doPost({ postData: { contents: '{' } })), { ok: false, error: 'Petición no válida.' });
+});
+
+prueba('servidor: las sesiones de antes de la v20 (sin firma) siguen valiendo', async () => {
+  const E = await servidorListo();
+  const antiguo = E.s.sha256_('sesion-antigua-de-ana');   // 64 cifras, como los tokens de la v19
+  E.hojas.Sesiones.appendRow(['h' + E.s.sha256_(antiguo), 'ana@ejemplo.test', '2026-10-01T10:00:00+02:00', '']);
+  const r = E.post({ accion: 'config', token: antiguo, peticion: crypto.randomUUID() });
+  igual(r.ok, true, r.error);
+  igual(E.post(E.parte({ token: antiguo })).ok, true, 'envía un parte con el token antiguo');
+  // La lista de tokens antiguos ya está en la caché: uno inventado con la misma forma no lee la hoja.
+  const antes = E.hojas.Sesiones._lecturas;
+  for (let i = 0; i < 10; i++) {
+    const falso = E.s.sha256_('inventado-' + i);
+    igual(E.post({ accion: 'estado', token: falso, peticion: crypto.randomUUID() }).error, 'Sesión no válida. Vuelve a entrar.');
+  }
+  igual(E.hojas.Sesiones._lecturas - antes, 0, 'lecturas de la hoja Sesiones');
+});
+
 prueba('servidor: PIN mal: a los 5 fallos se bloquea, y ya ni el PIN bueno entra', async () => {
   const E = await servidorListo();
   igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
@@ -1676,7 +1763,10 @@ prueba('pantallas: inicio, menú y elegir máquina', async () => {
   await pantalla((e) => { e.lista = lista; e.menu = true; e.config = { ...ej.config, versionServidor: 17 }; }, 'Servidor: v17');
   await pantalla((e) => { e.lista = lista; e.menu = true; e.espacio = { poco: true, texto: 'Espacio usado: 900 MB. Queda poco sitio' }; }, 'Queda poco sitio');
   await pantalla((e) => { e.eligeMaquina = true; }, '¿Con qué máquina?', 'Bateadora 08-475-4S', 'Dresina');
-  await pantalla((e) => { e.perfil.cuenta = 'pendiente'; }, 'pendiente de que lo apruebe');
+  cierto(marco.m.app.querySelector('[data-action="nuevo"]'), 'con la cuenta activa se pueden empezar partes');
+  // Sin aprobar no llega la lista de la oficina: no se ofrece empezar partes, pero se ven los que haya.
+  await pantalla((e) => { e.lista = lista; e.perfil.cuenta = 'pendiente'; }, 'aún no ha aprobado tu registro', 'Comprobar ahora', 'INF-9001');
+  cierto(!marco.m.app.querySelector('[data-action="nuevo"]'), 'con la cuenta pendiente no salen INFRA, SUPER ni MAQUINARIA');
 });
 
 prueba('pantallas: parte INFRA y SUPER', async () => {

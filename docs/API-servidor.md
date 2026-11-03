@@ -44,13 +44,13 @@ Google a veces pierde la respuesta aunque haya hecho la acción (llega una pági
 
 `estado` puede ser `pendiente`, `activo` o `rechazado`.
 
-El `token` es un secreto de sesión: guárdalo solo en el dispositivo y mándalo en cada petición que lo pida.
+El `token` es un secreto de sesión: guárdalo solo en el dispositivo y mándalo en cada petición que lo pida. Trátalo como un texto opaco, sin comprobar su forma ni su longitud: desde el servidor v20 los tokens nuevos tienen 128 caracteres (antes, 64; los antiguos siguen valiendo).
 
 ## Acciones propias de Partes LAV
 
 `config`, `enviar`, `pin`, `fallo` y `cargarLista` pertenecen a Partes LAV (lista de la oficina, envío de partes, cambio de PIN, registro de fallos de los móviles y carga de listas). **Otra app no debe usarlas.** `cargarLista` además exige una clave de administración que no se comparte.
 
-`enviar` lleva `token`, `envioId` (UUID del envío, para no mandar un parte dos veces), `asunto`, `ref`, `cuerpo` y `archivos` (de 1 a 6; PDF en `base64`, el resto en `texto`). Los adjuntos no pueden pasar de 24 MB en total (Gmail admite 25). Responde `recibido` (fecha) y, si el parte ya había llegado, `repetido: true`.
+`enviar` lleva `token`, `envioId` (UUID del envío, para no mandar un parte dos veces), `asunto`, `ref`, `cuerpo` y `archivos` (de 1 a 12; PDF y DRP en `base64`, el resto en `texto`; solo se admiten `.pdf`, `.txt`, `.json`, `.jpg`/`.jpeg` y `.drp`, y el tipo lo pone el servidor según la extensión). Los adjuntos no pueden pasar de 24 MB en total (Gmail admite 25). Responde `recibido` (fecha) y, si el parte ya había llegado, `repetido: true`.
 
 ## Pendiente (aún no existe)
 

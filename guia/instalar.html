@@ -848,9 +848,7 @@ const pcWin=st=>{
 const reg=(title,back,body)=>`<div class="ap">${sbA('navy')}<div class="ap-h">${back?'<span class="bk">‹</span>':''}${title}</div><div class="ap-c">${body}</div>${hb()}</div>`;
 const fld=(label,o={})=>`<div class="fld${o.focus?' focus':''}">${label}<b class="${o.pin?'pin':''}">${o.type?`<span data-type="${o.type}"></span><span class="caret g"></span>`:(o.val||'')}</b></div>`;
 const inicio=()=>`<div class="ap">${sbA('navy')}<div class="ap-h"><div>Partes LAV<span class="sub">Juan García</span></div><span class="mdots">⋮</span></div><div class="ap-c">
-  <div class="aviso">Tu registro está pendiente de que lo apruebe la oficina. Puedes ir haciendo partes: se enviarán solos en cuanto te aprueben.</div>
-  <div class="tipos"><div class="tipo" style="background:#C2410C"><b>INFRA</b><span>Infraestructura</span></div><div class="tipo" style="background:#1D4ED8"><b>SUPER</b><span>Superestructura</span></div><div class="tipo" style="background:#4D7C0F"><b>MAQUINARIA</b><span>Maquinaria de vía</span></div></div>
-  <p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p></div>${hb()}</div>`;
+  <div class="aviso">La oficina aún no ha aprobado tu registro. En cuanto lo haga podrás hacer partes: la app lo comprueba sola cada vez que la abres.</div></div>${hb()}</div>`;
 
 /* ---------- Guías ---------- */
 const C=`<code>${URL_APP}</code>`;
@@ -892,7 +890,7 @@ const GI={
       s:()=>reg('Registro · 3 de 4',1,`<div class="card"><h3>¿Quién eres?</h3>${fld('Tu nombre y apellidos',{focus:1,type:'Juan García'})}<div class="abtn hit">Buscarme</div><p>Escribe tu nombre y al menos un apellido, como los tiene la empresa. Si no te encuentra, habla con la oficina.</p></div>`)},
     {t:'Crea tu PIN',d:'Comprueba que sale tu nombre. Elige un PIN de 4 a 6 cifras y repítelo. Es tu contraseña: no se lo digas a nadie.',
       s:()=>reg('Registro · 4 de 4',1,`<div class="card"><h3>Juan García</h3><p>Crea tu PIN de 4 a 6 cifras. Es tu contraseña: te lo pedirá la app al abrirla y para entrar desde otro móvil.</p>${fld('PIN',{pin:1,val:'••••'})}${fld('Repite el PIN',{pin:1,val:'••••'})}<div class="abtn hit">Terminar el registro</div></div>`)},
-    {t:'¡Ya estás dentro!',d:'Verás un aviso amarillo hasta que la oficina apruebe tu registro, pero <b>ya puedes hacer partes</b>: se enviarán solos en cuanto te aprueben.',s:inicio,dur:6400},
+    {t:'¡Ya estás dentro!',d:'Verás un aviso amarillo hasta que la oficina apruebe tu registro. <b>Cuando lo apruebe</b> salen los botones INFRA, SUPER y MAQUINARIA y ya puedes hacer partes. Si tarda, avisa a la oficina.',s:inicio,dur:6400},
   ]},
 };
 /* ---------- Piezas de la app ----------

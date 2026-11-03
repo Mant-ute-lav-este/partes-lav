@@ -51,21 +51,27 @@ export async function entrarApp() {
   if (estado.perfil && estado.perfil.token) sincronizar();
 }
 
-/** Actualiza la lista de la oficina y el estado de la cuenta, y envía lo que esté en cola. */
+/**
+ * Actualiza la lista de la oficina y el estado de la cuenta, y envía lo que esté en cola.
+ * Devuelve true si se ha descargado la lista.
+ */
 export async function sincronizar({ avisar = false, lista = true } = {}) {
-  if (!estado.perfil || !estado.perfil.token) return;
+  if (!estado.perfil || !estado.perfil.token) return false;
+  let listaOk = false;
   if (lista) {
     try {
       await cargarConfigServidor();
+      listaOk = true;
     } catch (e) {
       if (avisar || !e.red) toast(e.message, 5000);
-      if (e.red) return;
+      if (e.red) return false;
     }
   }
   const r = await procesarSalida();
   enviarFallos();
   if (r.enviados) toast(r.enviados === 1 ? 'Parte recibido en la oficina ✓' : `${r.enviados} partes recibidos en la oficina ✓`, 4000);
   refrescarVista();
+  return listaOk;
 }
 
 /** Descarga la lista de la oficina; la respuesta trae también el estado de la cuenta. */

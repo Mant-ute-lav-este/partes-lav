@@ -20,10 +20,15 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 19;
+const VERSION_SERVIDOR = 20;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
+// Adjuntos que se admiten en un parte (por extensión) y el tipo con el que salen en el correo.
+const TIPOS_ADJUNTO = {
+  pdf: 'application/pdf', txt: 'text/plain', json: 'application/json',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', drp: 'application/octet-stream',
+};
 
 const ACCIONES = {
   codigo: pedirCodigo_,
@@ -44,15 +49,26 @@ const ACCIONES = {
 // tarda segundos y, con el bloqueo puesto, dejaba esperando a todos los demás móviles.
 const SIN_BLOQUEO = { enviar: true };
 
+// Acciones que llevan el token de sesión del móvil (las que llaman a usuarioDeSesion_).
+const CON_SESION = { estado: true, config: true, enviar: true, pin: true, fallo: true };
+
 // ---------- Entrada ----------
 
 function doPost(e) {
   let texto;
   const lock = LockService.getScriptLock();
   try {
-    const datos = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const accion = ACCIONES[datos.accion];
+    let datos;
+    try {
+      datos = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    } catch (x) {
+      throw new Error('Petición no válida.');   // sin el detalle técnico del error de lectura
+    }
+    // Solo las acciones propias: «constructor» o «toString» también existen en cualquier objeto.
+    const accion = Object.prototype.hasOwnProperty.call(ACCIONES, datos.accion) ? ACCIONES[datos.accion] : null;
     if (!accion) throw new Error('Acción desconocida.');
+    // Un token inventado se descarta aquí, antes de coger el bloqueo y sin leer la hoja Sesiones.
+    if (CON_SESION[datos.accion] && !tokenPosible_(datos.token)) throw new Error(SESION_NO_VALIDA);
     if (SIN_BLOQUEO[datos.accion]) texto = responder_(datos, accion);
     else texto = lock.tryLock(30000)
       ? responder_(datos, accion)
@@ -381,20 +397,55 @@ function nuevoPin_(d) {
   return { token: crearSesion_(email), estado: String(u.Estado), nombre: String(u.Nombre) };
 }
 
+const SESION_NO_VALIDA = 'Sesión no válida. Vuelve a entrar.';
+
+/**
+ * Token de sesión (desde v20): 64 cifras al azar + 64 de firma con la PIMIENTA. Para el móvil y
+ * para el almacén sigue siendo un texto opaco. En la hoja solo se guarda su hash, como siempre.
+ */
 function crearSesion_(email) {
-  const token = sha256_(Utilities.getUuid() + ':' + Utilities.getUuid() + ':' + Date.now());
+  const azar = sha256_(Utilities.getUuid() + ':' + Utilities.getUuid() + ':' + Date.now());
+  const token = azar + firma_('sesion:' + azar);
   hoja_('Sesiones').appendRow(['h' + sha256_(token), email, ahora_(), '']);
   return token;
 }
 
+/**
+ * ¿Puede ser un token que dio este servidor? Sin bloqueo y sin leer la hoja Sesiones (salvo para
+ * rehacer, como mucho cada 6 horas, la lista de tokens antiguos). Si dice que sí, usuarioDeSesion_
+ * lo comprueba de verdad en la hoja.
+ * Los tokens de antes de la v20 (64 cifras, sin firma) siguen valiendo: ya no se crean, así que su
+ * lista solo encoge, y la limpieza de 180 días acabará borrándolos todos.
+ */
+function tokenPosible_(token) {
+  const t = String(token || '');
+  if (/^[0-9a-f]{128}$/.test(t)) return t.slice(64) === firma_('sesion:' + t.slice(0, 64));
+  if (/^[0-9a-f]{64}$/.test(t)) {
+    const lista = sesionesAntiguas_();
+    return lista === null || lista.indexOf('|' + sha256_(t).slice(0, 16) + '|') >= 0;
+  }
+  return false;
+}
+
+/** Principio del hash de cada sesión de la hoja, como «|abc…|def…|». null = no cabe en la caché. */
+function sesionesAntiguas_() {
+  const cache = CacheService.getScriptCache();
+  const guardada = cache.get('sesiones-antiguas');
+  if (guardada) return guardada;
+  const lista = '|' + tabla_('Sesiones').filas
+    .map((f) => String(f.TokenHash).slice(1, 17)).filter(Boolean).join('|') + '|';
+  try { cache.put('sesiones-antiguas', lista, 21600); } catch (x) { return null; }   // sin caché: se mira la hoja, como antes
+  return lista;
+}
+
 function usuarioDeSesion_(token, exigirActivo) {
-  if (!token) throw new Error('Sesión no válida. Vuelve a entrar.');
+  if (!token) throw new Error(SESION_NO_VALIDA);
   const th = 'h' + sha256_(String(token));
   const sesiones = tabla_('Sesiones');
   const s = sesiones.filas.find((f) => f.TokenHash === th);
-  if (!s) throw new Error('Sesión no válida. Vuelve a entrar.');
+  if (!s) throw new Error(SESION_NO_VALIDA);
   const u = buscarUsuario_(String(s.Email).toLowerCase());
-  if (!u) throw new Error('Sesión no válida. Vuelve a entrar.');
+  if (!u) throw new Error(SESION_NO_VALIDA);
   if (exigirActivo && u.Estado !== 'activo') {
     throw new Error(u.Estado === 'pendiente'
       ? 'Tu registro aún no está aprobado por la oficina.'
@@ -407,9 +458,12 @@ function usuarioDeSesion_(token, exigirActivo) {
 // ---------- Lista de la oficina ----------
 
 function config_(d) {
-  // También para registros pendientes: pueden ir haciendo partes, que se enviarán al aprobarlos.
   const u = usuarioDeSesion_(d.token, false);
   if (u.Estado === 'rechazado') throw new Error('Tu cuenta no está activa. Habla con la oficina.');
+  // Pendiente de aprobar: la lista va vacía (nada de habilitaciones, empresas ni matrículas a quien
+  // la oficina aún no conoce). Vacía y no null: las apps de antes de la 0.23.0 leen sus campos.
+  // En cuanto la aprueban, la misma petición trae la lista completa.
+  if (u.Estado !== 'activo') return { estado: String(u.Estado), nombre: String(u.Nombre), config: configVacia_() };
   const aj = ajustes_();
   const motivos = { infra: [], super: [] };
   tabla_('Motivos').filas.forEach((m) => {
@@ -456,6 +510,17 @@ function config_(d) {
       })),
       motivos: motivos,
     },
+  };
+}
+
+/** La misma forma que la lista de config_, sin ningún dato de la oficina. */
+function configVacia_() {
+  return {
+    formato: 'config-partes-lav', version: 1, versionServidor: VERSION_SERVIDOR,
+    nombre: 'Lista de la oficina', fecha: '', destinatario: '',
+    cabecera: { jefatura: '', ambito: '', empresa: '', lineaInfra: '', lineaSuper: '' },
+    capataces: [], trabajadores: [], maquinas: [], aparatos: [], antiincendios: [],
+    maquinasVia: [], personalMaquinaria: [], vehiculos: [], motivos: { infra: [], super: [] },
   };
 }
 
@@ -609,7 +674,7 @@ function enviar_(d) {
   }
   // A partir de aquí el correo YA ha salido: nada puede devolver error, o la app lo reenviaría.
   try { cache.put(hecho, r.fecha, 21600); } catch (x) { /* sin caché: queda la reserva y Envios */ }
-  const fila = [envioId, String(u.Email), String(u.Nombre), String(d.ref || ''), r.asunto, String(r.bytes), r.fecha];
+  const fila = [envioId, String(u.Email), String(u.Nombre), celda_(d.ref), celda_(r.asunto), String(r.bytes), r.fecha];
   let apuntado = false;
   for (let i = 0; i < 3 && !apuntado; i++) {
     try {
@@ -665,8 +730,13 @@ function mandarParte_(d, u, aj) {
   let bytes = 0;
   const adjuntos = archivos.map((a) => {
     const nombre = String(a.nombre || 'archivo').replace(/[^\w.\-]/g, '_');
+    // Solo los tipos que manda la app, y con el tipo que pone el servidor (no el que diga el móvil):
+    // este correo llega a la oficina y Power Automate lo sube a Teams.
+    const ext = (/\.([a-z0-9]+)$/i.exec(nombre) || [])[1];
+    const tipo = ext && Object.prototype.hasOwnProperty.call(TIPOS_ADJUNTO, ext.toLowerCase()) ? TIPOS_ADJUNTO[ext.toLowerCase()] : '';
+    if (!tipo) throw new Error('El parte trae un archivo que no se admite: ' + nombre);
     const blob = a.base64 != null
-      ? Utilities.newBlob(Utilities.base64Decode(String(a.base64)), String(a.tipo || 'application/octet-stream'), nombre)
+      ? Utilities.newBlob(Utilities.base64Decode(String(a.base64)), tipo, nombre)
       : Utilities.newBlob(String(a.texto || ''), 'text/plain', nombre);
     bytes += blob.getBytes().length;
     return blob;
@@ -758,7 +828,7 @@ function apuntarError_(tipo, mensaje) {
   try {
     const cab = ['Recibido', 'Fecha', 'Usuario', 'Version', 'Tipo', 'Mensaje'];
     const h = hoja_('Errores') || crearHoja_(libro_(), 'Errores', cab);
-    h.appendRow([ahora_(), ahora_(), 'servidor', '', tipo, String(mensaje).slice(0, 200)]);
+    h.appendRow([ahora_(), ahora_(), 'servidor', '', tipo, celda_(String(mensaje).slice(0, 200))]);
   } catch (e) { /* sin hoja: nada más que hacer */ }
 }
 
@@ -792,7 +862,7 @@ function enviarAlPortal_(d, u, recibido) {
       if (texto.length > MAX_CELDA) {
         apuntarError_('portal', ref + ': ' + motivo + ' · no cabe en PortalPendientes: mandarlo con los atrasados');
       } else {
-        asegurarHoja_('PortalPendientes', ['Recibido', 'Ref', 'Datos']).appendRow([recibido, ref, texto]);
+        asegurarHoja_('PortalPendientes', ['Recibido', 'Ref', 'Datos']).appendRow([recibido, celda_(ref), texto]);
         apuntarError_('portal', ref + ': ' + motivo + ' · queda en PortalPendientes');
       }
     }
@@ -1052,8 +1122,8 @@ function registrarFallos_(d) {
   lista.forEach((f) => {
     if (hoy >= MAX_FALLOS_DIA) return;
     hoy += 1;
-    filas.push([recibido, String(f.fecha || '').slice(0, 25), usuario, String(f.version || '').slice(0, 10),
-      String(f.tipo || '').slice(0, 20), String(f.mensaje || '').slice(0, 200)]);
+    filas.push([recibido, celda_(String(f.fecha || '').slice(0, 25)), usuario, celda_(String(f.version || '').slice(0, 10)),
+      celda_(String(f.tipo || '').slice(0, 20)), celda_(String(f.mensaje || '').slice(0, 200))]);
   });
   if (filas.length) {
     // Si la hoja aún no existe (servidor sin reconfigurar), se crea aquí.
@@ -1129,6 +1199,15 @@ function correosValidos_(s) {
     .join(',');
 }
 
+/**
+ * Texto que viene del móvil, listo para una celda: si empieza por = + - o @, Sheets lo tomaría por
+ * una fórmula al abrir la hoja; con el apóstrofo delante queda como texto.
+ */
+function celda_(v) {
+  const s = String(v == null ? '' : v);
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
 function props_() { return PropertiesService.getScriptProperties(); }
 
 // La hoja se abre una sola vez por petición (abrirla es lo más lento de Google). No se queda vieja:
@@ -1146,7 +1225,8 @@ function firma_(s) { return hex_(Utilities.computeHmacSha256Signature(s, props_(
 
 function email_(s) {
   const e = String(s || '').trim().toLowerCase();
-  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(e)) throw new Error('Ese correo no es válido.');
+  // Empieza por letra o número: un correo que empiece por + o - se tomaría por fórmula en la hoja Usuarios.
+  if (!/^[a-z0-9][a-z0-9._%+-]*@[a-z0-9.-]+\.[a-z]{2,}$/.test(e)) throw new Error('Ese correo no es válido.');
   return e;
 }
 

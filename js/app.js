@@ -16,7 +16,7 @@ import { esc } from './util.js';
 import { app, estado, sincronizar, refrescarVista, ir, guardarYa } from './estado.js';
 import { onInput, onChange, onSubmit, onClick } from './eventos.js';
 
-export const APP_VERSION = '0.22.2';
+export const APP_VERSION = '0.23.0';
 
 // ---------- Arranque ----------
 
@@ -45,6 +45,11 @@ async function iniciar() {
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   window.addEventListener('online', () => { if (estado.perfil && estado.perfil.token && estado.vista !== 'pin') sincronizar(); });
+  // Registro sin aprobar: al volver a la app se mira si ya lo han aprobado (y entonces baja la lista).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && estado.vista === 'inicio' && estado.perfil && estado.perfil.token &&
+      estado.perfil.cuenta === 'pendiente') sincronizar();
+  });
   app.addEventListener('click', onClick);
   app.addEventListener('input', onInput);
   app.addEventListener('change', onChange);

@@ -363,7 +363,11 @@ export async function onClick(e) {
       if (ok) toast('Te hemos enviado otro código', 3500);
       break;
     }
-    case 'comprobar-cuenta': await conEspera('Comprobando…', () => sincronizar({ avisar: true })); break;
+    case 'comprobar-cuenta': {
+      const ok = await conEspera('Comprobando…', () => sincronizar({ avisar: true }));
+      if (ok && estado.perfil.cuenta === 'pendiente') toast('La oficina aún no ha aprobado tu registro. Prueba más tarde.', 4000);
+      break;
+    }
     case 'enviar-pendientes':
       await conEspera('Enviando…', async () => {
         const r = await procesarSalida();
@@ -379,7 +383,8 @@ export async function onClick(e) {
       estado.menu = false;
       render();
       const ok = await conEspera('Descargando la lista…', () => cargarConfigServidor().then(() => true));
-      if (ok) toast(`Lista actualizada: ${estado.config.trabajadores.length} trabajadores`);
+      if (ok && estado.perfil.cuenta === 'pendiente') toast('La oficina aún no ha aprobado tu registro: la lista llegará cuando lo haga.', 5000);
+      else if (ok) toast(`Lista actualizada: ${estado.config.trabajadores.length} trabajadores`);
       break;
     }
     case 'cerrar-sesion': {

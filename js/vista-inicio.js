@@ -71,26 +71,28 @@ export function avisoSinEnviar(pendientes) {
 export function vInicio() {
   const ps = estado.lista.slice().sort((a, b) => (b.modificado || '').localeCompare(a.modificado || ''));
   const sinEnviar = ps.filter((p) => p.estado === 'cerrado' || p.estado === 'en-cola');
+  // Sin aprobar, el servidor no manda la lista de la oficina: no se pueden empezar partes.
+  const pendiente = Boolean(estado.perfil.token && estado.perfil.cuenta === 'pendiente');
   return `
   <header class="barra">
     <div><div class="barra-titulo">Partes LAV</div><div class="barra-sub">${esc(estado.perfil.capataz)}</div></div>
     <button class="btn-icono" data-action="menu" aria-label="Menú">⋮</button>
   </header>
   <main class="contenido">
-    ${estado.perfil.token && estado.perfil.cuenta === 'pendiente' ? `
-    <div class="aviso">Tu registro está pendiente de que lo apruebe la oficina. Puedes ir haciendo partes:
-      se enviarán solos en cuanto te aprueben.
+    ${pendiente ? `
+    <div class="aviso">La oficina aún no ha aprobado tu registro. En cuanto lo haga podrás hacer partes:
+      la app lo comprueba sola cada vez que la abres.
       <button class="btn secundario" data-action="comprobar-cuenta">Comprobar ahora</button></div>` : ''}
     ${avisoSinEnviar(sinEnviar)}
-    <div class="tipos">
+    ${pendiente ? '' : `<div class="tipos">
       <button class="btn-tipo infra" data-action="nuevo" data-tipo="INFRA"><span class="tipo-grande">INFRA</span><span>Infraestructura</span></button>
       <button class="btn-tipo super" data-action="nuevo" data-tipo="SUPER"><span class="tipo-grande">SUPER</span><span>Superestructura</span></button>
       <button class="btn-tipo maquinaria" data-action="nuevo" data-tipo="MAQUINARIA"><span class="tipo-grande">MAQUINARIA</span><span>Maquinaria de vía</span></button>
-    </div>
+    </div>`}
     ${grupo('Pendientes de enviar', sinEnviar)}
     ${grupo('Borradores', ps.filter((p) => p.estado === 'borrador'))}
     ${grupo('Enviados', ps.filter((p) => p.estado === 'enviado').slice(0, 30))}
-    ${ps.length ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p>'}
+    ${ps.length || pendiente ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p>'}
   </main>
   ${estado.menu ? vMenu() : ''}
   ${estado.eligeMaquina ? vElegirMaquina() : ''}

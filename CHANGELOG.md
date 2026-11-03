@@ -2,6 +2,18 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v20 · 2026-11-03 (seguridad; desplegar después de publicar la 0.23.0)
+- **Cuenta pendiente de aprobar: la lista de la oficina llega vacía** (misma forma, sin trabajadores, máquinas, vehículos, aparatos, motivos ni cabecera). En cuanto la oficina la aprueba, la misma petición trae la lista completa.
+- **Sesiones con firma**: los tokens nuevos tienen 128 caracteres (64 al azar + 64 de firma). Un token que no puede ser bueno se rechaza antes de esperar turno y sin leer la hoja Sesiones. Los tokens de antes (64 caracteres) siguen valiendo: nadie tiene que volver a entrar.
+- **Adjuntos**: solo `.pdf`, `.txt`, `.json`, `.jpg`/`.jpeg` y `.drp`; el tipo lo pone el servidor según la extensión.
+- Los textos que vienen del móvil y empiezan por `=`, `+`, `-` o `@` se guardan en la hoja como texto, no como fórmula (Errores, Envios, PortalPendientes).
+- Solo se aceptan las acciones propias del servidor, y una petición que no se puede leer responde «Petición no válida.».
+
+## 0.23.0 · 2026-11-03
+- **Registro pendiente de aprobar: no se pueden empezar partes.** En vez de INFRA / SUPER / MAQUINARIA sale el aviso «La oficina aún no ha aprobado tu registro» con «Comprobar ahora». Los partes que ya hubiera siguen a la vista y salen solos al aprobarlo.
+- Mientras está pendiente, al volver a la app comprueba sola si ya la han aprobado; entonces baja la lista y salen los botones. «Comprobar ahora» y «Actualizar la lista» dicen si aún no está aprobada.
+- Guía de instalación y guía de capataces al día con este cambio.
+
 ## 0.22.2 · 2026-11-02
 - Foto del telefonema: la de entrada y la de salida van una debajo de otra (con Cámara y Galería lado a lado ya no cabían en dos columnas y la de salida se salía de la pantalla).
 
