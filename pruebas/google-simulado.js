@@ -102,6 +102,7 @@ function crearEntorno(codigo) {
       newBlob: (bytes, tipo, nombre) => ({
         getBytes: () => (typeof bytes === 'string' ? Array.from(bytes) : bytes),
         getName: () => nombre, getContentType: () => tipo,
+        getDataAsString: () => (typeof bytes === 'string' ? bytes : new TextDecoder().decode(new Uint8Array(bytes.map((b) => b & 0xff)))),
       }),
       DigestAlgorithm: {}, Charset: {},
     },

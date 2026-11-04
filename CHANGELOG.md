@@ -2,6 +2,10 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v26 · 2026-11-04 (desplegado; seguridad menor)
+- Antes de mandar un parte a la oficina, el servidor comprueba la carpeta del `Datos_` (`AAAA-MM-DD/Infra|Super|Maquinaria/REF_Nombre`) y el nombre de cada foto del `Fotos_` (`T1_antes_1.jpg`, `Formato1_1.jpg`, `…_v2.jpg`). Power Automate los usa tal cual para guardar en SharePoint: así nadie puede guardar fuera de su carpeta con `../`. Si no cuadran, el parte no sale y el móvil ve «El parte trae una carpeta o un nombre de foto que no se admite. Avisa a la oficina.»
+- Los partes que hace la app siempre cumplen la regla (probado con los 5 tipos, rectificaciones, tildes y jornadas sin trabajos). Para los capataces no cambia nada.
+
 ## Servidor v25 · 2026-11-04 (desplegado; seguridad menor)
 - El tope de 40 códigos al día va en las propiedades del script (`CODIGOS`), no en la caché: la caché de Google puede borrar entradas si se llena, y con ello el tope. Antes, además, se reiniciaba a las 6 horas.
 - **Los últimos correos del día son para los partes:** a partir de 70 correos en el día (Gmail gratuito admite unos 100) ya no se mandan códigos de registro ni de «He olvidado el PIN».

@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 25;
+const VERSION_SERVIDOR = 26;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -938,6 +938,7 @@ function mandarParte_(d, u, aj) {
     return blob;
   });
   if (bytes > MAX_ADJUNTOS_BYTES) throw new Error('El parte pesa demasiado (' + Math.round(bytes / 1048576) + ' MB). Quita alguna foto.');
+  comprobarRutas_(adjuntos);
   const recibido = ahora_();
   const cuerpo = String(d.cuerpo || '') + '\n\nRecibido en el servidor: ' + recibido +
     '\nEnviado por: ' + u.Nombre + ' <' + u.Email + '>';
@@ -962,6 +963,29 @@ function mandarParte_(d, u, aj) {
     }
   }
   return { fecha: recibido, asunto: asunto, bytes: bytes };
+}
+
+// Power Automate guarda en SharePoint en '/Documentos compartidos/General/Partes/' + Datos_.carpeta, y cada
+// foto con el nombre Fotos_.fotos[].archivo, tal cual (A7). La app siempre los hace con esta forma
+// (envio.js: carpetaDestino y los nombres T1_antes_1.jpg, Formato1_1.jpg, …_v2.jpg): nada de '..' ni '/' de más.
+const CARPETA_PARTE = /^\d{4}-\d{2}-\d{2}\/(Infra|Super|Maquinaria)\/[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const NOMBRE_FOTO = /^(T\d+_[a-z]+_\d+|Formato1_\d+)(_v\d+)?\.jpg$/;
+
+/** Comprueba la carpeta del Datos_ y los nombres de foto del Fotos_ antes de que el correo salga. */
+function comprobarRutas_(adjuntos) {
+  const mal = 'El parte trae una carpeta o un nombre de foto que no se admite. Avisa a la oficina.';
+  const leer = (b) => { try { return JSON.parse(b.getDataAsString('UTF-8')); } catch (x) { throw new Error(mal); } };
+  adjuntos.forEach((b) => {
+    const nombre = b.getName();
+    if (nombre.indexOf('Datos_') === 0) {
+      const d = leer(b);
+      if (!d || typeof d.carpeta !== 'string' || !CARPETA_PARTE.test(d.carpeta)) throw new Error(mal);
+    } else if (nombre.indexOf('Fotos_') === 0) {
+      const f = leer(b);
+      if (!f || !Array.isArray(f.fotos)) throw new Error(mal);
+      f.fotos.forEach((x) => { if (!x || typeof x.archivo !== 'string' || !NOMBRE_FOTO.test(x.archivo)) throw new Error(mal); });
+    }
+  });
 }
 
 /**

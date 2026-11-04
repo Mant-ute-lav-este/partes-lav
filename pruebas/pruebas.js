@@ -1213,11 +1213,14 @@ prueba('servidor: envía un parte sin tener bloqueado al resto', async () => {
   cierto(E.correos[0].subject.startsWith('PARTE LAV'), 'asunto del correo');
 });
 
+// Un Datos_ con lo mínimo que mira el servidor (la carpeta de SharePoint, A7).
+const DATOS_MINIMO = JSON.stringify({ carpeta: '2026-10-14/Infra/INF-9001_Ana_Prueba' });
+
 /** Los 3 adjuntos que manda la app (PDF, Datos y Fotos), con 3 fotos y un formato 1. */
 function adjuntosConFotos() {
   const b64 = btoa('foto');
   const datos = {
-    ref: 'SUP-0007', rev: 1, fecha: '2026-10-15',
+    ref: 'SUP-0007', rev: 1, fecha: '2026-10-15', carpeta: '2026-10-15/Super/SUP-0007_Ana_Prueba',
     trabajos: [
       { referencia: { tipo: 'SIOS', codigo: '12345' } },
       { referencia: { tipo: 'SIN_REF', motivo: 'Limpieza cuneta Ñ' } },
@@ -1457,15 +1460,57 @@ prueba('servidor: una cuenta pendiente recibe la lista vacía, y al aprobarla la
   igual(a.config.vehiculos, [{ descripcion: 'Furgoneta blanca', matricula: '1234ABC' }]);
 });
 
+// A7 de privado/AUDITORIA-SERVIDOR.md: Power Automate guarda en '.../Partes/' + Datos_.carpeta y cada foto con
+// Fotos_.fotos[].archivo, tal cual. El servidor solo deja salir los que tienen la forma que hace la app.
+prueba('servidor: los partes de la app (5 tipos, rev., tildes, sin trabajos) pasan la comprobación de carpeta y fotos', async () => {
+  const E = await servidorListo();
+  const foto = await jpeg();
+  const casos = [ej.parteInfra(), ej.parteSuper(), ej.parteMaqVia(), ej.parteLoco('locomotora'), ej.parteLoco('dresina')];
+  const r3 = ej.parteSuper(); r3.rev = 3; r3.rectificaA = { id: 'x', ref: r3.ref }; casos.push(r3);
+  const t = ej.parteInfra(); t.capataz = "José Ñúñez O'Brien-Gil (2º)"; casos.push(t);
+  const s = ej.parteInfra(); s.sinTrabajos = true; s.motivoSinTrabajos = 'Lluvia'; casos.push(s);
+  for (const p of casos) {
+    const archivos = await archivosParaServidor(await prepararEnvio(p, ej.config, async () => foto, 'prueba'));
+    const r = E.post(E.parte({ ref: p.ref, archivos }));
+    igual(r.ok, true, `${p.ref} rev. ${p.rev} (${p.capataz}): ${r.error}`);
+  }
+  igual(E.correos.length, casos.length, 'han salido todos');
+});
+
+prueba('servidor: no deja salir un parte con una carpeta o un nombre de foto que la app no hace', async () => {
+  const E = await servidorListo();
+  const conDatos = (d) => E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: JSON.stringify(d) }] }));
+  const conFotos = (fotos) => E.post(E.parte({ archivos: [
+    { nombre: 'Datos_x.txt', texto: DATOS_MINIMO },
+    { nombre: 'Fotos_x.txt', texto: JSON.stringify({ formato: 'fotos-parte-lav', fotos }) }] }));
+  const mal = /carpeta o un nombre de foto que no se admite/;
+  for (const carpeta of ['../2026-10-14/Infra/x', '2026-10-14/Infra/../../Otra', '2026-10-14/Otro/INF-0001_Ana',
+    '2026-10-14/Infra/INF-0001_Ana/sub', '2026-10-14/Infra/.oculta', '2026-10-14/Infra/INF 0001', '', 7]) {
+    cierto(mal.test(conDatos({ carpeta }).error), 'carpeta ' + JSON.stringify(carpeta));
+  }
+  cierto(mal.test(conDatos({}).error), 'Datos_ sin carpeta');
+  cierto(mal.test(E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{rota' }] })).error), 'Datos_ que no se puede leer');
+  for (const archivo of ['../x.jpg', 'T1_antes_1.jpg/..', 'T1_antes_1.php', 'T1_ANTES_1.jpg', '/T1_antes_1.jpg', 'a/b.jpg', null]) {
+    cierto(mal.test(conFotos([{ archivo: 'T1_antes_1.jpg', base64: 'eA==' }, { archivo, base64: 'eA==' }]).error), 'foto ' + JSON.stringify(archivo));
+  }
+  cierto(mal.test(E.post(E.parte({ archivos: [{ nombre: 'Fotos_x.txt', texto: '{"fotos":5}' }] })).error), 'Fotos_ sin lista');
+  igual(E.correos.length, 0, 'no ha salido ningún correo');
+  igual(conFotos([{ archivo: 'T2_telsalida_1_v2.jpg', base64: 'eA==' }, { archivo: 'Formato1_3.jpg', base64: 'eA==' }]).ok, true, 'los buenos sí salen');
+  // El rechazo no deja la reserva puesta: se puede corregir y reenviar con el mismo envioId.
+  const p = E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{}' }] });
+  cierto(mal.test(E.post(p).error), 'primero, mal');
+  igual(E.post({ ...p, peticion: crypto.randomUUID(), archivos: [{ nombre: 'Datos_x.txt', texto: DATOS_MINIMO }] }).ok, true, 'después, bien');
+});
+
 prueba('servidor: solo admite adjuntos PDF, TXT, JSON, JPG y DRP, con el tipo que pone él', async () => {
   const E = await servidorListo();
   for (const nombre of ['programa.exe', 'pagina.html', 'codigo.js', 'orden.bat', 'macro.xlsm', 'sin-extension']) {
-    const r = E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{}' }, { nombre, tipo: 'application/pdf', base64: btoa('x') }] }));
+    const r = E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: DATOS_MINIMO }, { nombre, tipo: 'application/pdf', base64: btoa('x') }] }));
     igual(r.ok, false, nombre);
     cierto(/no se admite/.test(r.error), nombre + ': ' + r.error);
   }
   igual(E.correos.length, 0, 'no sale ningún correo');
-  const r = E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{}' }, { nombre: 'Parte_x.PDF', tipo: 'text/html', base64: btoa('x') }] }));
+  const r = E.post(E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: DATOS_MINIMO }, { nombre: 'Parte_x.PDF', tipo: 'text/html', base64: btoa('x') }] }));
   igual(r.ok, true, r.error);
   igual(E.correos.at(-1).attachments.map((a) => a.getContentType()), ['text/plain', 'application/pdf'], 'tipo según la extensión');
 });
