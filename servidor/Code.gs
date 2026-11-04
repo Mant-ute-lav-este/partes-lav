@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 24;
+const VERSION_SERVIDOR = 25;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -119,7 +119,10 @@ function responder_(datos, accion) {
   }
   const texto = JSON.stringify(respuesta);
   // «Ocupado» no se guarda: el reintento con el mismo identificador tiene que volver a probar.
-  if (clave && !respuesta.reintentar) {
+  // Los errores de las acciones sin sesión tampoco (A4): cualquiera los provoca con un correo inventado, y
+  // guardarlos a miles podría hacer que la caché borrase los topes por correo. Repetirlas da el mismo error.
+  const sinGuardar = respuesta.reintentar || (!respuesta.ok && CON_CORREO[datos.accion]);
+  if (clave && !sinGuardar) {
     try { cache.put(clave, texto, 1800); } catch (x) { /* demasiado grande para la caché: no se guarda */ }
   }
   return texto;
@@ -210,6 +213,17 @@ function crearHoja_(libro, nombre, cabeceras) {
 
 const SEGUNDOS_CODIGO = 1800;   // el código por correo vale 30 minutos
 
+const MAX_CODIGOS_DIA = 40;
+
+/** Códigos pedidos hoy (propiedad CODIGOS = {dia, n}), como correosHoy_. */
+function codigosHoy_() {
+  const dia = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  let o = null;
+  try { o = JSON.parse(props_().getProperty('CODIGOS') || 'null'); } catch (e) { o = null; }
+  if (!o || o.dia !== dia || typeof o.n !== 'number') o = { dia: dia, n: 0 };
+  return o;
+}
+
 /** Código por correo para registrarse o, con para: 'pin', para crear un PIN nuevo. */
 function pedirCodigo_(d) {
   const email = email_(d.email);
@@ -223,18 +237,21 @@ function pedirCodigo_(d) {
   }
   const cache = CacheService.getScriptCache();
   const kn = 'n:' + email;
-  const kg = 'g:' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd');
   const n = Number(cache.get(kn) || 0);
-  const g = Number(cache.get(kg) || 0);
   if (n >= 5) throw new Error('Has pedido demasiados códigos. Espera una hora y vuelve a intentarlo.');
-  if (g >= 40) throw new Error('Hoy se han pedido demasiados códigos. Inténtalo mañana o avisa a la oficina.');
+  // Los topes del día van en propiedades, no en la caché: la caché puede borrar entradas si se llena (A4).
+  const g = codigosHoy_();
+  if (g.n >= MAX_CODIGOS_DIA) throw new Error('Hoy se han pedido demasiados códigos. Inténtalo mañana o avisa a la oficina.');
+  // Los últimos correos del día (Gmail gratuito: unos 100) quedan para los partes.
+  if (correosHoy_().n >= AVISO_CORREOS) throw new Error('Hoy el servidor ha enviado muchos correos y guarda los que quedan para los partes. Inténtalo mañana o avisa a la oficina.');
   // Si ya hay un código vigente se reenvía el mismo (así el correo anterior sigue valiendo); los fallos se conservan.
   let previo = null;
   try { previo = JSON.parse(cache.get('c:' + email) || 'null'); } catch (e) { previo = null; }
   const codigo = previo && previo.codigo ? String(previo.codigo) : String(100000 + parseInt(sha256_(Utilities.getUuid()).slice(0, 12), 16) % 900000);
   cache.put('c:' + email, JSON.stringify({ codigo: codigo, fallos: previo && previo.fallos ? previo.fallos : 0 }), SEGUNDOS_CODIGO);
   cache.put(kn, String(n + 1), 3600);
-  cache.put(kg, String(g + 1), 21600);
+  g.n += 1;
+  props_().setProperty('CODIGOS', JSON.stringify(g));   // pedirCodigo_ va con el bloqueo: sin carreras
   enviarCorreo_({
     to: email,
     name: 'Partes LAV',

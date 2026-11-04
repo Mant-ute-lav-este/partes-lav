@@ -2030,6 +2030,39 @@ prueba('servidor: códigos por correo (5 por hora; mientras uno vale se reenvía
   cierto(/demasiados códigos/.test(pide().error), 'la sexta se corta');
 });
 
+// A4 de privado/AUDITORIA-SERVIDOR.md: la caché puede borrar entradas si se llena; los topes del día no
+// pueden depender de ella, y los últimos correos del día quedan para los partes.
+prueba('servidor: el tope diario de códigos aguanta aunque se vacíe la caché, y los últimos correos son para los partes', async () => {
+  const E = await servidorListo();
+  const pide = (email) => E.post({ accion: 'codigo', email, peticion: crypto.randomUUID() });
+  const vaciarCache = () => Object.keys(E.cache).forEach((k) => delete E.cache[k]);
+  igual(pide('uno@ejemplo.test').ok, true);
+  const g = JSON.parse(E.props.CODIGOS);
+  igual(g.n, 1, 'se cuenta en las propiedades');
+  E.props.CODIGOS = JSON.stringify({ dia: g.dia, n: 40 });
+  vaciarCache();
+  const correos = E.correos.length;
+  cierto(/Hoy se han pedido demasiados códigos/.test(pide('dos@ejemplo.test').error), 'tope de 40 con la caché vacía');
+  E.props.CODIGOS = JSON.stringify({ dia: '2000-01-01', n: 40 });
+  igual(pide('dos@ejemplo.test').ok, true, 'otro día vuelve a empezar');
+  E.props.CORREOS = JSON.stringify({ dia: g.dia, n: 70, avisado: true });
+  cierto(/guarda los que quedan para los partes/.test(pide('tres@ejemplo.test').error), 'a los 70 correos no salen códigos');
+  igual(E.correos.length, correos + 1, 'solo ha salido el código del otro día');
+  igual(E.post(E.parte()).ok, true, 'el parte sí sale');
+});
+
+prueba('servidor: los errores de las peticiones sin sesión no se guardan en la caché; los aciertos sí', async () => {
+  const E = await servidorListo();
+  const respuestas = () => Object.keys(E.cache).filter((k) => k.startsWith('p:')).length;
+  const antes = respuestas();
+  for (let i = 0; i < 20; i++) {
+    igual(E.post({ accion: 'login', email: `inventado${i}@ejemplo.test`, pin: '7391', peticion: crypto.randomUUID() }).ok, false);
+  }
+  igual(respuestas(), antes, 'errores de login sin guardar');
+  igual(E.post({ accion: 'codigo', email: 'nuevo@ejemplo.test', peticion: crypto.randomUUID() }).ok, true);
+  igual(respuestas(), antes + 1, 'un código enviado sí se guarda (su repetición no manda otro correo)');
+});
+
 prueba('servidor: archivo anual de Envios (sin perder números ni duplicar partes)', async () => {
   const E = await servidorListo();
   const viejo = (id, ref, fecha) => E.hojas.Envios.appendRow([id, 'ana@ejemplo.test', 'Ana', ref, 'a', '1', fecha]);

@@ -2,6 +2,12 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v25 · 2026-11-04 (desplegado; seguridad menor)
+- El tope de 40 códigos al día va en las propiedades del script (`CODIGOS`), no en la caché: la caché de Google puede borrar entradas si se llena, y con ello el tope. Antes, además, se reiniciaba a las 6 horas.
+- **Los últimos correos del día son para los partes:** a partir de 70 correos en el día (Gmail gratuito admite unos 100) ya no se mandan códigos de registro ni de «He olvidado el PIN».
+- Las respuestas de error de las peticiones sin sesión (`login` con un correo inventado, por ejemplo) ya no se guardan en la caché, para que no se pueda llenar a base de peticiones inventadas.
+- Para los capataces no cambia nada, salvo que un día con más de 70 correos quien se registre tendrá que esperar al día siguiente.
+
 ## Servidor v24 · 2026-11-04 (desplegado; seguridad menor)
 - El código de 6 cifras del correo sale de un azar seguro (`Utilities.getUuid`), no de `Math.random()`.
 - Las peticiones sin sesión (`codigo`, `verificar`, `buscarNombre`, `registro`, `login`, `nuevoPin`) con un correo o un PIN mal formados se contestan antes de coger el bloqueo y sin abrir la hoja: una ráfaga de peticiones inventadas ya no deja «ocupado» a los demás móviles. Los errores son los mismos de siempre; un PIN de forma imposible en `login` («PIN incorrecto.») ya no cuenta como fallo.
