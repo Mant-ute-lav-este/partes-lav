@@ -2,6 +2,17 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.26.1 · 2026-11-04 (sin publicar; va con el servidor v23, pero funciona también con la v22)
+- Al crear o cambiar el PIN, la app avisa al momento si es muy fácil de adivinar (0000, 1234, 1212, un año…), con la misma regla que el servidor v23. Los PIN que ya existen siguen valiendo.
+- «Cambiar PIN»: si el servidor no acepta el PIN nuevo, ahora se ve el motivo. Antes siempre decía «hace falta cobertura».
+
+## Servidor v23 · 2026-11-04 (desplegado; seguridad)
+- **Cambiar el PIN echa a las demás sesiones de esa cuenta**: si alguien entró con un PIN adivinado o un móvil prestado, deja de estar dentro (antes seguía hasta 180 días sin uso). El móvil que cambia el PIN sigue dentro.
+- **«He olvidado el PIN» cierra todas las sesiones de esa cuenta** y abre solo la nueva. Si el capataz tiene la app en dos móviles (o la del almacén con la misma cuenta), en el otro le saldrá «Sesión no válida. Vuelve a entrar.» y tendrá que entrar otra vez; los partes en cola no se pierden.
+- **No deja crear PIN fáciles** (al registrarse, al cambiarlo y en «He olvidado el PIN»): cifras repetidas (0000), seguidas (1234, 4321), parejas (1212, 1122), años (1940-2039) y unos pocos típicos (2580…). Sigue siendo de 4 a 6 cifras. **Los PIN que ya existen siguen valiendo**: no se obliga a nadie a cambiarlo.
+- **El bloqueo por PIN mal crece**: 15 min del 5.º al 9.º fallo seguido, 1 hora del 10.º al 14.º y 1 día desde el 15.º (antes, siempre 15 min: unos 96 intentos al día). Acertar o «He olvidado el PIN» lo quita. Solo afecta a entrar en un móvil nuevo: las sesiones abiertas siguen funcionando. El aviso dice «Espera N minutos/horas o usa «He olvidado el PIN»».
+- Lo que devuelven `login`, `estado` y `nuevoPin` no cambia (app del almacén); `nuevoPin` y `registro` pueden dar un error nuevo («Ese PIN es muy fácil de adivinar…»): avisar al compañero del almacén.
+
 ## Servidor v22 · 2026-11-03 (desplegado; seguridad)
 - **Las funciones de mantenimiento solo se ejecutan desde el editor o desde sus activadores** (`configurar`, `enlaceRevision`, `copiaSeguridad`, `archivarEnvios`, `reintentarPortal`, `resumenDiario`, `activarCopiaSemanal`, `activarResumenDiario`). Una prueba vigila que no aparezca ninguna función pública nueva sin esa comprobación.
 - `enlaceRevision` ya no devuelve los enlaces: salen solo en el registro de ejecución del editor, como antes.

@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 22;
+const VERSION_SERVIDOR = 23;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -299,7 +299,7 @@ function registrar_(d) {
   const email = email_(d.email);
   const nombre = String(d.nombre || '').trim();
   const pin = String(d.pin || '');
-  if (!/^\d{4,6}$/.test(pin)) throw new Error('El PIN tiene que tener de 4 a 6 cifras.');
+  comprobarPinNuevo_(pin);
   comprobarCodigo_(email, d.codigo, false);
   if (buscarUsuario_(email)) throw new Error('Este correo ya está registrado. Usa «Ya tengo cuenta».');
   if (!tabla_('Trabajadores').filas.some((t) => String(t.Nombre) === nombre)) throw new Error('Elige tu nombre de la lista.');
@@ -461,21 +461,38 @@ function entrar_(d) {
   if (!u) throw new Error('No hay ninguna cuenta con ese correo. Regístrate primero.');
   if (u.Estado === 'rechazado') throw new Error('Esta cuenta no está activa. Habla con la oficina.');
   const bloqueo = Number(u.BloqueadoHasta || 0);
-  if (Date.now() < bloqueo) throw new Error('Demasiados intentos. Espera ' + Math.ceil((bloqueo - Date.now()) / 60000) + ' minutos.');
+  if (Date.now() < bloqueo) throw new Error('Demasiados intentos. Espera ' + esperaTexto_(bloqueo - Date.now()) + ' o usa «He olvidado el PIN».');
   if ('h' + firma_(u.Sal + ':' + String(d.pin || '')) !== String(u.PinHash)) {
     const fallos = Number(u.Intentos || 0) + 1;
-    escribir_(t, u._fila, { Intentos: String(fallos), BloqueadoHasta: String(fallos >= 5 ? Date.now() + 15 * 60000 : 0) });
+    escribir_(t, u._fila, { Intentos: String(fallos), BloqueadoHasta: String(fallos >= 5 ? Date.now() + minutosBloqueo_(fallos) * 60000 : 0) });
     throw new Error('PIN incorrecto.');
   }
   escribir_(t, u._fila, { Intentos: '0', BloqueadoHasta: '0' });
   return { token: crearSesion_(email), estado: String(u.Estado), nombre: String(u.Nombre) };
 }
 
+/**
+ * Bloqueo tras fallar el PIN al entrar: del 5.º al 9.º fallo seguido, 15 min; del 10.º al 14.º, 1 h; desde
+ * el 15.º, 1 día. Así son unos 25 intentos el primer día y luego uno al día (antes, 96 cada día). Acertar o
+ * «He olvidado el PIN» lo pone a cero. Las sesiones ya abiertas siguen funcionando mientras tanto.
+ */
+function minutosBloqueo_(fallos) {
+  return fallos < 10 ? 15 : fallos < 15 ? 60 : 1440;
+}
+
+function esperaTexto_(ms) {
+  const min = Math.ceil(ms / 60000);
+  if (min <= 90) return min + (min === 1 ? ' minuto' : ' minutos');
+  const horas = Math.ceil(min / 60);
+  return horas + ' horas';
+}
+
 function cambiarPin_(d) {
   const u = usuarioDeSesion_(d.token, false);
   const pin = String(d.pin || '');
-  if (!/^\d{4,6}$/.test(pin)) throw new Error('El PIN tiene que tener de 4 a 6 cifras.');
+  comprobarPinNuevo_(pin);
   escribir_(tabla_('Usuarios'), u._fila, { PinHash: 'h' + firma_(u.Sal + ':' + pin), Intentos: '0', BloqueadoHasta: '0' });
+  cerrarOtrasSesiones_(String(u.Email).toLowerCase(), 'h' + sha256_(String(d.token)));   // este móvil sigue dentro
   return {};
 }
 
@@ -485,7 +502,7 @@ function cambiarPin_(d) {
 function nuevoPin_(d) {
   const email = email_(d.email);
   const pin = String(d.pin || '');
-  if (!/^\d{4,6}$/.test(pin)) throw new Error('El PIN tiene que tener de 4 a 6 cifras.');
+  comprobarPinNuevo_(pin);
   comprobarCodigo_(email, d.codigo, false);
   const t = tabla_('Usuarios');
   const u = t.filas.find((f) => String(f.Email).toLowerCase() === email);
@@ -493,7 +510,44 @@ function nuevoPin_(d) {
   if (u.Estado === 'rechazado') throw new Error('Esta cuenta no está activa. Habla con la oficina.');
   escribir_(t, u._fila, { PinHash: 'h' + firma_(u.Sal + ':' + pin), Intentos: '0', BloqueadoHasta: '0' });
   comprobarCodigo_(email, d.codigo, true);
+  cerrarOtrasSesiones_(email, '');   // todas: también las de otro móvil del mismo capataz
   return { token: crearSesion_(email), estado: String(u.Estado), nombre: String(u.Nombre) };
+}
+
+/**
+ * Al cambiar o crear el PIN, las demás sesiones de ese correo dejan de valer: si alguien entró
+ * con un PIN adivinado o un móvil prestado, cambiar el PIN lo echa (antes seguía dentro hasta 180
+ * días sin uso). `queda` es el TokenHash que se conserva ('' = ninguno). Va con el bloqueo de
+ * doPost (pin y nuevoPin no están en SIN_BLOQUEO): quitar una fila mueve las demás.
+ */
+function cerrarOtrasSesiones_(email, queda) {
+  const t = tabla_('Sesiones');
+  const borrar = t.filas.filter((s) => s.TokenHash && s.TokenHash !== queda && String(s.Email).toLowerCase() === email);
+  borrar.reverse().forEach((s) => t.h.deleteRows(s._fila, 1));   // de abajo arriba: las de encima no se mueven
+  return borrar.length;
+}
+
+/**
+ * PIN nuevo (registro, cambiar PIN y «He olvidado el PIN»): de 4 a 6 cifras y que no sea de los que
+ * se prueban primero. Solo al crearlo: los PIN que ya existen siguen valiendo, aunque sean fáciles.
+ */
+function comprobarPinNuevo_(pin) {
+  if (!/^\d{4,6}$/.test(pin)) throw new Error('El PIN tiene que tener de 4 a 6 cifras.');
+  if (pinFacil_(pin)) throw new Error('Ese PIN es muy fácil de adivinar (cifras repetidas, seguidas o muy usadas). Elige otro.');
+}
+
+// PIN muy usados que no salen por las reglas de pinFacil_ (columna del teclado, fechas…).
+const PIN_TIPICOS = { '2580': 1, '0852': 1, '1004': 1, '6969': 1, '147258': 1, '159753': 1, '258036': 1, '696969': 1 };
+
+function pinFacil_(pin) {
+  if (/^(\d)\1+$/.test(pin)) return true;                       // 0000, 111111
+  if (/^(\d\d)\1+$/.test(pin) || /^(\d{3})\1$/.test(pin)) return true;   // 1212, 121212, 123123
+  if (/^(\d)\1(\d)\2(\d)\3$/.test(pin) || /^(\d)\1(\d)\2$/.test(pin)) return true;   // 1122, 112233
+  const pasos = [];
+  for (let i = 1; i < pin.length; i++) pasos.push((Number(pin[i]) - Number(pin[i - 1]) + 10) % 10);
+  if (pasos.every((p) => p === 1) || pasos.every((p) => p === 9)) return true;   // 1234, 7890, 4321, 9876
+  if (pin.length === 4 && /^(19[4-9]\d|20[0-3]\d)$/.test(pin)) return true;    // años: 1940-2039
+  return Boolean(PIN_TIPICOS[pin]);
 }
 
 const SESION_NO_VALIDA = 'Sesión no válida. Vuelve a entrar.';

@@ -1505,12 +1505,12 @@ prueba('servidor: las sesiones de antes de la v20 (sin firma) siguen valiendo', 
 
 prueba('servidor: PIN mal: a los 5 fallos se bloquea, y ya ni el PIN bueno entra', async () => {
   const E = await servidorListo();
-  igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
+  igual(E.post({ accion: 'pin', token: E.token, pin: '7391', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
   const entrar = (pin) => E.post({ accion: 'login', email: 'ana@ejemplo.test', pin, peticion: crypto.randomUUID() });
   for (let i = 0; i < 5; i++) igual(entrar('0000').error, 'PIN incorrecto.', `fallo ${i + 1}`);
-  cierto(/Demasiados intentos/.test(entrar('1234').error), 'bloqueado aunque el PIN sea el bueno');
+  cierto(/Demasiados intentos/.test(entrar('7391').error), 'bloqueado aunque el PIN sea el bueno');
   E.hojas.Usuarios._d[1][6] = '0';   // pasa el tiempo de bloqueo (la fila 1 es Ana)
-  const r = entrar('1234');
+  const r = entrar('7391');
   igual(r.ok, true, r.error);
   cierto(Boolean(r.token), 'entra con el PIN bueno');
 });
@@ -1521,16 +1521,16 @@ prueba('servidor: contrato con la app del almacén (login, estado y nuevoPin)', 
   const E = await servidorListo();
   const id = () => crypto.randomUUID();
   const claves = (o) => Object.keys(o).sort();
-  igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: id() }).ok, true, 'PIN de Ana');
+  igual(E.post({ accion: 'pin', token: E.token, pin: '7391', peticion: id() }).ok, true, 'PIN de Ana');
 
-  const l = E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234', peticion: id() });
+  const l = E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '7391', peticion: id() });
   igual(claves(l), ['estado', 'nombre', 'ok', 'token'], 'login');
   igual([l.ok, l.estado, l.nombre], [true, 'activo', 'Ana Prueba']);
   cierto(typeof l.token === 'string' && l.token.length > 20, 'token de sesión');
   igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '0000', peticion: id() }), { ok: false, error: 'PIN incorrecto.' });
-  igual(E.post({ accion: 'login', email: 'nadie@ejemplo.test', pin: '1234', peticion: id() }),
+  igual(E.post({ accion: 'login', email: 'nadie@ejemplo.test', pin: '7391', peticion: id() }),
     { ok: false, error: 'No hay ninguna cuenta con ese correo. Regístrate primero.' });
-  igual(E.post({ accion: 'login', email: 'rec@ejemplo.test', pin: '1234', peticion: id() }),
+  igual(E.post({ accion: 'login', email: 'rec@ejemplo.test', pin: '7391', peticion: id() }),
     { ok: false, error: 'Esta cuenta no está activa. Habla con la oficina.' });
 
   const e = E.post({ accion: 'estado', token: l.token, peticion: id() });
@@ -1544,12 +1544,12 @@ prueba('servidor: contrato con la app del almacén (login, estado y nuevoPin)', 
   cierto(/Sesión no válida/.test(mal.error), 'sesión no válida');
 
   E.cache['c:ana@ejemplo.test'] = JSON.stringify({ codigo: '123456', fallos: 0 });
-  const n = E.post({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '4321', peticion: id() });
+  const n = E.post({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '5826', peticion: id() });
   igual(claves(n), ['estado', 'nombre', 'ok', 'token'], 'nuevoPin');
   igual([n.ok, n.estado, n.nombre], [true, 'activo', 'Ana Prueba']);
-  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234', peticion: id() }).error, 'PIN incorrecto.', 'el PIN viejo ya no vale');
-  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '4321', peticion: id() }).ok, true, 'el PIN nuevo entra');
-  const otra = E.post({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '9999', peticion: id() });
+  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '7391', peticion: id() }).error, 'PIN incorrecto.', 'el PIN viejo ya no vale');
+  igual(E.post({ accion: 'login', email: 'ana@ejemplo.test', pin: '5826', peticion: id() }).ok, true, 'el PIN nuevo entra');
+  const otra = E.post({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '6047', peticion: id() });
   igual(otra.ok, false, 'el código solo vale una vez');
   cierto(/caducado/.test(otra.error), 'código gastado: ' + otra.error);
 });
@@ -1568,7 +1568,7 @@ prueba('servidor: un parte que pesa más de 24 MB no sale y se puede reintentar 
 
 prueba('servidor: dar de baja con el enlace firmado y volver a activar', async () => {
   const E = await servidorListo();
-  igual(E.post({ accion: 'pin', token: E.token, pin: '1234', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
+  igual(E.post({ accion: 'pin', token: E.token, pin: '7391', peticion: crypto.randomUUID() }).ok, true, 'PIN de Ana');
   const url = E.s.enlaceRevision_(' Ana@Ejemplo.test ');
   const firma = new URL(url).searchParams.get('firma');
   cierto(url.includes('accion=revisar') && firma, url);
@@ -1585,7 +1585,7 @@ prueba('servidor: dar de baja con el enlace firmado y volver a activar', async (
   const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
   cierto(/no está activa/.test(E.post(E.parte()).error), 'no puede enviar');
   cierto(/no está activa/.test(pedir({ accion: 'config', token: E.token }).error), 'no recibe la lista');
-  cierto(/no está activa/.test(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234' }).error), 'no puede entrar');
+  cierto(/no está activa/.test(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '7391' }).error), 'no puede entrar');
   igual(pedir({ accion: 'estado', token: E.token }).estado, 'rechazado', 'la app ve que está de baja');
   igual(E.correos.length, 0);
 
@@ -1662,7 +1662,7 @@ prueba('servidor: como mucho una copia de seguridad cada 6 horas', async () => {
 function alta(E, email, nombre) {
   E.post({ accion: 'codigo', email, peticion: crypto.randomUUID() });
   const codigo = /(\d{6})/.exec(E.correos.at(-1).subject)[1];
-  return E.post({ accion: 'registro', email, codigo, nombre, pin: '1234', peticion: crypto.randomUUID() });
+  return E.post({ accion: 'registro', email, codigo, nombre, pin: '7391', peticion: crypto.randomUUID() });
 }
 const firmaDe = (E, email) => new URL(E.s.enlaceRevision_(email)).searchParams.get('firma');
 
@@ -1729,6 +1729,83 @@ prueba('servidor: salir anula esa sesión (repetirlo no da error; un token inven
   cierto(/Sesión no válida/.test(pedir({ accion: 'salir', token: 'inventado' }).error), 'token inventado');
   igual(E.hojas.Sesiones._lecturas, antes, 'sin leer la hoja');
   igual(E.bloqueado(), false, 'bloqueo al terminar');
+});
+
+// A2 de privado/AUDITORIA-SERVIDOR.md: quien entró con un PIN adivinado o un móvil prestado no
+// puede seguir dentro después de que el capataz cambie el PIN.
+prueba('servidor: cambiar el PIN cierra las demás sesiones de esa cuenta; «He olvidado el PIN», todas', async () => {
+  const E = await servidorListo();
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
+  const vale = (token) => pedir({ accion: 'estado', token: token }).ok === true;
+  E.hojas.Usuarios.appendRow(['luis@ejemplo.test', 'Luis Prueba', 'activo', 's', 'h', '0', '0', '2026-01-01', '']);
+  const intruso = E.s.crearSesion_('ana@ejemplo.test');
+  const otroMovil = E.s.crearSesion_('ana@ejemplo.test');
+  const luis = E.s.crearSesion_('luis@ejemplo.test');
+
+  igual(pedir({ accion: 'pin', token: E.token, pin: '2468' }).ok, true, 'cambiar PIN');
+  cierto(vale(E.token), 'el móvil que cambia el PIN sigue dentro');
+  cierto(!vale(intruso) && !vale(otroMovil), 'las otras sesiones de Ana ya no valen');
+  cierto(vale(luis), 'las de otra cuenta no se tocan');
+  igual(E.bloqueado(), false, 'bloqueo al terminar');
+
+  E.cache['c:ana@ejemplo.test'] = JSON.stringify({ codigo: '123456', fallos: 0 });
+  const n = pedir({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '1357' });
+  igual(n.ok, true, n.error);
+  cierto(!vale(E.token), 'tras «He olvidado el PIN» la sesión anterior tampoco vale');
+  cierto(vale(n.token), 'la sesión nueva entra');
+  cierto(vale(luis), 'Luis sigue dentro');
+  igual(E.s.tabla_('Sesiones').filas.filter((s) => s.TokenHash && s.Email === 'ana@ejemplo.test').length, 1, 'a Ana le queda una sola sesión');
+});
+
+// A3 de privado/AUDITORIA-SERVIDOR.md: PIN nuevos difíciles de adivinar y bloqueo que crece.
+prueba('servidor: qué PIN se consideran fáciles', async () => {
+  const E = await servidorListo();
+  const faciles = ['0000', '111111', '1212', '121212', '123123', '1122', '112233', '1234', '7890', '4321',
+    '9876', '567890', '1987', '2015', '2580', '147258'];
+  const buenos = ['7391', '5826', '2468', '1357', '482915', '1939', '2040', '1290'];
+  igual(faciles.filter((p) => !E.s.pinFacil_(p)), [], 'fáciles que se aceptan');
+  igual(buenos.filter((p) => E.s.pinFacil_(p)), [], 'buenos que se rechazan');
+});
+
+prueba('servidor: no deja crear un PIN fácil (registro, cambiar y «He olvidado el PIN»); los que ya existen siguen valiendo', async () => {
+  const E = await servidorListo();
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
+  const facil = /muy fácil de adivinar/;
+  cierto(facil.test(pedir({ accion: 'pin', token: E.token, pin: '1234' }).error), 'cambiar PIN');
+  E.cache['c:ana@ejemplo.test'] = JSON.stringify({ codigo: '123456', fallos: 0 });
+  cierto(facil.test(pedir({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '0000' }).error), 'nuevoPin');
+  igual(JSON.parse(E.cache['c:ana@ejemplo.test']).codigo, '123456', 'el código no se gasta con un PIN rechazado');
+  E.cache['c:nuevo@ejemplo.test'] = JSON.stringify({ codigo: '654321', fallos: 0 });
+  cierto(facil.test(pedir({ accion: 'registro', email: 'nuevo@ejemplo.test', codigo: '654321', nombre: 'Ana Prueba', pin: '1990' }).error), 'registro');
+  igual(E.s.buscarUsuario_('nuevo@ejemplo.test'), undefined, 'no se crea la cuenta');
+  // Un PIN fácil de antes de la v23 sigue entrando: no se obliga a nadie a cambiarlo.
+  const ana = E.hojas.Usuarios._d[1];
+  ana[4] = 'h' + E.s.firma_(ana[3] + ':1234');
+  igual(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '1234' }).ok, true, 'PIN antiguo fácil');
+});
+
+prueba('servidor: el bloqueo por PIN mal crece (15 min, 1 h, 1 día) y «He olvidado el PIN» lo quita', async () => {
+  const E = await servidorListo();
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), ...o });
+  igual(pedir({ accion: 'pin', token: E.token, pin: '7391' }).ok, true, 'PIN de Ana');
+  const ana = E.hojas.Usuarios._d[1];   // Intentos [5], BloqueadoHasta [6]
+  const fallar = (previos) => {
+    ana[5] = String(previos); ana[6] = '0';   // fallos de antes, y el bloqueo anterior ya pasado
+    igual(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '0000' }).error, 'PIN incorrecto.');
+    return ana[6] === '0' ? 0 : Math.round((Number(ana[6]) - Date.now()) / 60000);
+  };
+  igual(fallar(3), 0, '4.º fallo: sin bloqueo');
+  igual(fallar(4), 15, '5.º fallo');
+  igual(fallar(8), 15, '9.º fallo');
+  igual(fallar(9), 60, '10.º fallo');
+  igual(fallar(14), 1440, '15.º fallo');
+  const r = pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '7391' });
+  igual(r.error, 'Demasiados intentos. Espera 24 horas o usa «He olvidado el PIN».');
+  E.cache['c:ana@ejemplo.test'] = JSON.stringify({ codigo: '123456', fallos: 0 });
+  igual(pedir({ accion: 'nuevoPin', email: 'ana@ejemplo.test', codigo: '123456', pin: '5826' }).ok, true, 'He olvidado el PIN');
+  igual([ana[5], ana[6]], ['0', '0'], 'fallos y bloqueo a cero');
+  igual(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '5826' }).ok, true, 'entra con el PIN nuevo');
+  igual([E.s.esperaTexto_(60000), E.s.esperaTexto_(14 * 60000 + 1), E.s.esperaTexto_(60 * 60000)], ['1 minuto', '15 minutos', '60 minutos']);
 });
 
 prueba('cerrar sesión: se avisa al servidor; sin cobertura se queda en cola', async () => {
@@ -1860,7 +1937,7 @@ prueba('servidor: buscar el nombre al registrarse (tildes, orden, ambiguos, ya r
   cierto(/ya tiene una cuenta/.test(buscar('Ana Prueba').error), 'Ana ya está registrada');
   cierto(/código/.test(E.post({ accion: 'buscarNombre', email: 'nuevo@ejemplo.test', codigo: '000000', texto: 'jose perez', peticion: crypto.randomUUID() }).error), 'código malo');
   // Con el nombre encontrado, el registro termina como siempre.
-  const r = E.post({ accion: 'registro', email: 'nuevo@ejemplo.test', codigo, nombre: 'José Pérez Gil', pin: '1234', peticion: crypto.randomUUID() });
+  const r = E.post({ accion: 'registro', email: 'nuevo@ejemplo.test', codigo, nombre: 'José Pérez Gil', pin: '7391', peticion: crypto.randomUUID() });
   igual(r.ok, true, r.error);
   igual(r.estado, 'pendiente');
 });
@@ -2405,6 +2482,56 @@ async function conServidorFalso(fn) {
   try { return await fn(llamadas); } finally { f.contentWindow.fetch = real; }
 }
 const perfilConToken = () => ({ ...perfilEjemplo(), token: 'token-prueba' });
+
+prueba('pantallas: Cambiar PIN avisa de un PIN fácil sin preguntar al servidor y, si el servidor lo rechaza, dice por qué', async () => {
+  const { f, m } = await appEnMarco();
+  const real = f.contentWindow.fetch;
+  const llamadas = [];
+  f.contentWindow.fetch = async (url, op) => {
+    if (!String(url).startsWith(SERVIDOR_URL)) return real.call(f.contentWindow, url, op);
+    llamadas.push(JSON.parse(op.body));
+    return respuesta({ ok: false, error: 'Rechazado por el servidor de prueba.' });
+  };
+  const aviso = () => (m.app.ownerDocument.getElementById('toast') || {}).textContent || '';
+  const probar = async (pin) => {
+    const form = m.app.querySelector('form[data-form="crear-pin"]');
+    form.pin1.value = pin;
+    form.pin2.value = pin;
+    form.requestSubmit();
+    await new Promise((r) => setTimeout(r, 300));
+  };
+  try {
+    await pantalla((e) => { e.vista = 'setup-pin'; e.cambiandoPin = true; e.perfil = perfilConToken(); }, 'Cambiar PIN');
+    const antes = JSON.stringify(m.estado.perfil.pin);
+    await probar('1234');
+    cierto(aviso().includes('muy fácil de adivinar'), 'aviso: ' + aviso());
+    igual(llamadas.length, 0, 'un PIN fácil no llega al servidor');
+    await probar('7391');
+    igual(llamadas.map((l) => [l.accion, l.pin]), [['pin', '7391']]);
+    igual(aviso(), 'Rechazado por el servidor de prueba.', 'se ve el motivo del servidor, no «hace falta cobertura»');
+    igual(m.estado.vista, 'setup-pin', 'sigue en la pantalla');
+    igual(JSON.stringify(m.estado.perfil.pin), antes, 'el PIN del móvil no cambia si el servidor no lo acepta');
+  } finally {
+    f.contentWindow.fetch = real;
+    m.estado.cambiandoPin = false;
+  }
+});
+
+// La app comprueba el PIN nuevo antes de mandarlo; si su regla y la del servidor no coinciden, o la
+// app deja pasar uno que el servidor rechaza, o rechaza uno bueno.
+prueba('PIN nuevo: la app y el servidor dan por fácil exactamente los mismos', async () => {
+  const E = await servidorListo();
+  const distintos = [];
+  for (const largo of [4, 5, 6]) {
+    for (let n = 0; n < 10 ** largo; n++) {
+      const pin = String(n).padStart(largo, '0');
+      if (val.pinFacil(pin) !== E.s.pinFacil_(pin)) distintos.push(pin);
+    }
+  }
+  igual(distintos.slice(0, 10), [], 'PIN en los que no coinciden');
+  igual(val.errorPinNuevo('12a4'), 'El PIN tiene que tener de 4 a 6 cifras.');
+  igual(val.errorPinNuevo('7391'), '');
+});
 /** Guarda el parte con sus fotos en el móvil y lo abre en la app. */
 async function abrirParteEnApp(p) {
   const fotos = [...(p.trabajos || []).flatMap((t) => t.fotos), ...(p.formato1 || [])];

@@ -37,13 +37,15 @@ Google a veces pierde la respuesta aunque haya hecho la acción (llega una pági
 | `codigo` | `email`; `para: 'pin'` si es para recuperar el PIN | `{}` | Envía un código de 6 cifras al correo (caduca en 30 min; si el anterior aún vale, se reenvía el mismo). Máximo 5 por correo y hora. |
 | `verificar` | `email`, `codigo` | `nombres: []` | Solo comprueba el código. **Desde el servidor v13 ya no devuelve la lista de trabajadores** (la lista va siempre vacía); usa `buscarNombre`. |
 | `buscarNombre` | `email`, `codigo`, `texto` | `nombre` | (v13) La persona escribe su nombre y al menos un apellido; da igual el orden, las tildes y las mayúsculas, pero van palabras enteras; una inicial suelta (escrita o en la lista) encaja con la palabra que empieza por esa letra (v19). Solo contesta si encaja con **una** persona de la lista que aún no tiene una cuenta **activa** (v21: una solicitud pendiente con ese nombre ya no bloquea), y devuelve el nombre tal como está en la lista (es el que se pasa a `registro`). Máximo 15 intentos por correo y hora; una sola palabra no gasta intento (v19). |
-| `registro` | `email`, `codigo`, `nombre`, `pin` (4–6 cifras) | `token`, `estado: 'pendiente'`, `nombre` | Crea la cuenta como **pendiente**; la oficina la aprueba desde un enlace que le llega por correo (v21: vale 30 días). Si hay otra solicitud pendiente con el mismo nombre, la oficina recibe las dos y, al aprobar una, las demás pasan a `rechazado`. |
-| `login` | `email`, `pin` | `token`, `estado`, `nombre` | 5 PIN erróneos bloquean 15 minutos. |
+| `registro` | `email`, `codigo`, `nombre`, `pin` (4–6 cifras, no fácil: ver nota) | `token`, `estado: 'pendiente'`, `nombre` | Crea la cuenta como **pendiente**; la oficina la aprueba desde un enlace que le llega por correo (v21: vale 30 días). Si hay otra solicitud pendiente con el mismo nombre, la oficina recibe las dos y, al aprobar una, las demás pasan a `rechazado`. |
+| `login` | `email`, `pin` | `token`, `estado`, `nombre` | 5 PIN erróneos seguidos bloquean 15 minutos; desde el 10.º, 1 hora; desde el 15.º, 1 día (v23). Acertar o `nuevoPin` lo pone a cero. |
 | `estado` | `token` | `estado`, `nombre` | Para saber si ya la han aprobado. |
 | `salir` | `token` | `{}` | (v21) Cierra esa sesión: el token deja de valer. Si ya no existía, también responde `ok`. Llamarla al cerrar sesión en el dispositivo. |
-| `nuevoPin` | `email`, `codigo`, `pin` | `token`, `estado`, `nombre` | «He olvidado el PIN». Antes hay que pedir `codigo` con `para: 'pin'`. |
+| `nuevoPin` | `email`, `codigo`, `pin` | `token`, `estado`, `nombre` | «He olvidado el PIN». Antes hay que pedir `codigo` con `para: 'pin'`. Cierra **todas** las sesiones de esa cuenta y abre la nueva (v23). |
 
 `estado` puede ser `pendiente`, `activo` o `rechazado`.
+
+**PIN nuevo (v23):** en `registro`, `nuevoPin` y `pin` el servidor rechaza los PIN fáciles (cifras repetidas como 0000, seguidas como 1234 o 4321, parejas como 1212 o 1122, años de 1940 a 2039 y unos pocos típicos como 2580) con el error `Ese PIN es muy fácil de adivinar (cifras repetidas, seguidas o muy usadas). Elige otro.` Basta con enseñar el error y dejar elegir otro; el código del correo no se gasta. Los PIN que ya existen siguen valiendo para `login`, aunque sean fáciles. Cambiar el PIN con `pin` cierra las demás sesiones de esa cuenta (la de ese token sigue).
 
 El `token` es un secreto de sesión: guárdalo solo en el dispositivo y mándalo en cada petición que lo pida. Trátalo como un texto opaco, sin comprobar su forma ni su longitud: desde el servidor v20 los tokens nuevos tienen 128 caracteres (antes, 64; los antiguos siguen valiendo).
 

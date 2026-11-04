@@ -1,7 +1,29 @@
 // Validaciones de los partes y comprobaciones de los campos. Son funciones puras, sin pantalla
 // ni estado, para poder probarlas solas (pruebas/pruebas.js).
 
-export const horaValida = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(s || ''));
+// PIN nuevo: la misma regla que pinFacil_ del servidor (v23; hay una prueba que compara los dos).
+// Solo al crear o cambiar el PIN: los que ya existen siguen valiendo.
+const PIN_TIPICOS = ['2580', '0852', '1004', '6969', '147258', '159753', '258036', '696969'];
+
+export function pinFacil(pin) {
+  if (/^(\d)\1+$/.test(pin)) return true;                                 // 0000, 111111
+  if (/^(\d\d)\1+$/.test(pin) || /^(\d{3})\1$/.test(pin)) return true;    // 1212, 121212, 123123
+  if (/^(\d)\1(\d)\2(\d)\3$/.test(pin) || /^(\d)\1(\d)\2$/.test(pin)) return true;   // 1122, 112233
+  const pasos = [];
+  for (let i = 1; i < pin.length; i++) pasos.push((Number(pin[i]) - Number(pin[i - 1]) + 10) % 10);
+  if (pasos.every((p) => p === 1) || pasos.every((p) => p === 9)) return true;   // 1234, 7890, 4321
+  if (pin.length === 4 && /^(19[4-9]\d|20[0-3]\d)$/.test(pin)) return true;      // años: 1940-2039
+  return PIN_TIPICOS.includes(pin);
+}
+
+/** Qué le pasa a un PIN nuevo ('' si vale). Los textos son los mismos que da el servidor. */
+export function errorPinNuevo(pin) {
+  if (!/^\d{4,6}$/.test(pin)) return 'El PIN tiene que tener de 4 a 6 cifras.';
+  if (pinFacil(pin)) return 'Ese PIN es muy fácil de adivinar (cifras repetidas, seguidas o muy usadas). Elige otro.';
+  return '';
+}
+
+export const horaValida =(s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(s || ''));
 
 export const pkValido = (s) => /^\s*\d+\s*[+.,/]\s*\d+\s*$/.test(String(s || ''));
 

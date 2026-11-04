@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { api, hayServidor } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import { setPath, toast, MAX_FORMATO1 } from './util.js';
-import { nombrePuesto, unirVias } from './validaciones.js';
+import { nombrePuesto, unirVias, errorPinNuevo } from './validaciones.js';
 import { nuevaMaquinaVia, nuevoTajo, nuevoRealizado, persona, EQUIPOS, textoMedidas } from './modelo.js';
 import {
   app, estado, entrarApp, sincronizar, cargarConfigServidor, refrescarVista, registrarSync, ir, render,
@@ -255,7 +255,7 @@ export async function onSubmit(e) {
   } else if (tipo === 'crear-pin') {
     const pin1 = f.pin1.value.trim();
     const pin2 = f.pin2.value.trim();
-    if (!/^\d{4,6}$/.test(pin1)) return toast('El PIN tiene que tener de 4 a 6 cifras');
+    if (errorPinNuevo(pin1)) return toast(errorPinNuevo(pin1), 5000);
     if (pin1 !== pin2) return toast('Los dos PIN no coinciden');
     const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
     const hash = await hashPin(pin1, salt, ITER_PIN);
@@ -264,7 +264,7 @@ export async function onSubmit(e) {
       if (estado.perfil.token) {
         // Con registro, el PIN también es la contraseña del servidor: se cambia en los dos sitios.
         const ok = await conEspera('Guardando el PIN…', () => api('pin', { token: estado.perfil.token, pin: pin1 }));
-        if (!ok) return toast('No se ha podido cambiar el PIN: hace falta cobertura.', 5000);
+        if (!ok) return;   // conEspera ya ha dicho por qué (sin conexión, PIN fácil…)
       }
       estado.perfil = { ...estado.perfil, pin: nuevoPin };
     } else {
@@ -292,7 +292,7 @@ export async function onSubmit(e) {
   } else if (tipo === 'reg-pin') {
     const pin1 = f.pin1.value.trim();
     const pin2 = f.pin2.value.trim();
-    if (!/^\d{4,6}$/.test(pin1)) return toast('El PIN tiene que tener de 4 a 6 cifras');
+    if (errorPinNuevo(pin1)) return toast(errorPinNuevo(pin1), 5000);
     if (pin1 !== pin2) return toast('Los dos PIN no coinciden');
     const { email, codigo, nombre } = estado.reg;
     const r = await conEspera('Registrando…', () => api('registro', { email, codigo, nombre, pin: pin1 }));
@@ -310,7 +310,7 @@ export async function onSubmit(e) {
     const codigo = f.codigo.value.trim();
     const pin1 = f.pin1.value.trim();
     const pin2 = f.pin2.value.trim();
-    if (!/^\d{4,6}$/.test(pin1)) return toast('El PIN tiene que tener de 4 a 6 cifras');
+    if (errorPinNuevo(pin1)) return toast(errorPinNuevo(pin1), 5000);
     if (pin1 !== pin2) return toast('Los dos PIN no coinciden');
     const { email } = estado.reg;
     const r = await conEspera('Guardando el PIN…', () => api('nuevoPin', { email, codigo, pin: pin1 }));
