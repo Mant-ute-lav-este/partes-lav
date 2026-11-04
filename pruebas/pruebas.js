@@ -1808,6 +1808,46 @@ prueba('servidor: el bloqueo por PIN mal crece (15 min, 1 h, 1 día) y «He olvi
   igual([E.s.esperaTexto_(60000), E.s.esperaTexto_(14 * 60000 + 1), E.s.esperaTexto_(60 * 60000)], ['1 minuto', '15 minutos', '60 minutos']);
 });
 
+// A6 de privado/AUDITORIA-SERVIDOR.md: con el bloqueo cogido por otra petición, las que llegan con un correo
+// o un PIN mal formados se contestan igual (sin esperar ni leer la hoja Usuarios).
+prueba('servidor: correo o PIN con mala forma se contestan sin bloqueo ni hoja; los demás esperan su turno', async () => {
+  const E = await servidorListo();
+  const lock = E.g.LockService.getScriptLock();
+  // El simulado suelta el bloqueo con cualquier releaseLock (el de Google no): se vuelve a coger antes de cada una.
+  const pedir = (o) => { lock.tryLock(30000); return E.post({ peticion: crypto.randomUUID(), ...o }); };
+  igual(lock.tryLock(30000), true, 'otra petición coge el bloqueo');
+  try {
+    const antes = E.hojas.Usuarios._lecturas;
+    for (const accion of ['codigo', 'verificar', 'buscarNombre', 'registro', 'login', 'nuevoPin']) {
+      igual(pedir({ accion, email: 'no es un correo', pin: '7391' }).error, 'Ese correo no es válido.', accion);
+    }
+    igual(pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '12' }).error, 'PIN incorrecto.', 'login: PIN corto');
+    igual(pedir({ accion: 'registro', email: 'x@ejemplo.test', pin: 'abcd' }).error, 'El PIN tiene que tener de 4 a 6 cifras.', 'registro');
+    igual(pedir({ accion: 'nuevoPin', email: 'ana@ejemplo.test', pin: '1234567' }).error, 'El PIN tiene que tener de 4 a 6 cifras.', 'nuevoPin');
+    igual(E.hojas.Usuarios._lecturas, antes, 'sin leer la hoja Usuarios');
+    const bien = pedir({ accion: 'login', email: 'ana@ejemplo.test', pin: '7391' });
+    igual(bien.reintentar, true, 'una petición bien formada espera al bloqueo: ' + JSON.stringify(bien));
+  } finally {
+    lock.releaseLock();
+  }
+  igual(E.hojas.Usuarios._d[1][5], '0', 'el PIN corto no cuenta como fallo');
+});
+
+// A5: el código del correo sale de getUuid (azar seguro), siempre con 6 cifras.
+prueba('servidor: el código del correo tiene 6 cifras y no se repite', async () => {
+  const E = await servidorListo();
+  const vistos = new Set();
+  for (let i = 0; i < 30; i++) {
+    const email = `c${i}@ejemplo.test`;
+    igual(E.post({ accion: 'codigo', email, peticion: crypto.randomUUID() }).ok, true, email);
+    const c = JSON.parse(E.cache['c:' + email]).codigo;
+    cierto(/^[1-9]\d{5}$/.test(c), 'código: ' + c);
+    vistos.add(c);
+  }
+  cierto(vistos.size >= 29, 'códigos distintos: ' + vistos.size);
+  cierto(!/Math\.random/.test(await (await fetch('../servidor/Code.gs')).text()), 'el servidor no usa Math.random');
+});
+
 prueba('cerrar sesión: se avisa al servidor; sin cobertura se queda en cola', async () => {
   const antes = await db.kvGet('sesionesPorCerrar');
   let conectado = false;

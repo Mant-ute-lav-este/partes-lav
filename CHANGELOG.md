@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v24 · 2026-11-04 (desplegado; seguridad menor)
+- El código de 6 cifras del correo sale de un azar seguro (`Utilities.getUuid`), no de `Math.random()`.
+- Las peticiones sin sesión (`codigo`, `verificar`, `buscarNombre`, `registro`, `login`, `nuevoPin`) con un correo o un PIN mal formados se contestan antes de coger el bloqueo y sin abrir la hoja: una ráfaga de peticiones inventadas ya no deja «ocupado» a los demás móviles. Los errores son los mismos de siempre; un PIN de forma imposible en `login` («PIN incorrecto.») ya no cuenta como fallo.
+- Para los capataces y la app del almacén no cambia nada.
+
 ## 0.26.1 · 2026-11-04 (sin publicar; va con el servidor v23, pero funciona también con la v22)
 - Al crear o cambiar el PIN, la app avisa al momento si es muy fácil de adivinar (0000, 1234, 1212, un año…), con la misma regla que el servidor v23. Los PIN que ya existen siguen valiendo.
 - «Cambiar PIN»: si el servidor no acepta el PIN nuevo, ahora se ve el motivo. Antes siempre decía «hace falta cobertura».

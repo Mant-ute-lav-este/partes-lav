@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 23;
+const VERSION_SERVIDOR = 24;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -53,6 +53,18 @@ const SIN_BLOQUEO = { enviar: true };
 // Acciones que llevan el token de sesión del móvil (las que llaman a usuarioDeSesion_).
 const CON_SESION = { estado: true, config: true, enviar: true, pin: true, fallo: true, salir: true };
 
+// Acciones sin sesión que llevan el correo (y algunas el PIN). Su forma se mira antes del bloqueo: una
+// ráfaga de peticiones con correos o PIN inventados al azar ya no deja «ocupado» a los demás móviles.
+const CON_CORREO = { codigo: true, verificar: true, buscarNombre: true, registro: true, login: true, nuevoPin: true };
+
+/** Los mismos errores que darían las acciones, pero sin bloqueo y sin abrir la hoja. */
+function formaPrevia_(d) {
+  email_(d.email);
+  const pinMal = !/^\d{4,6}$/.test(String(d.pin || ''));
+  if (d.accion === 'login' && pinMal) throw new Error('PIN incorrecto.');   // nunca acertaría: no cuenta como fallo
+  if ((d.accion === 'registro' || d.accion === 'nuevoPin') && pinMal) throw new Error('El PIN tiene que tener de 4 a 6 cifras.');
+}
+
 // ---------- Entrada ----------
 
 function doPost(e) {
@@ -70,6 +82,8 @@ function doPost(e) {
     if (!accion) throw new Error('Acción desconocida.');
     // Un token inventado se descarta aquí, antes de coger el bloqueo y sin leer la hoja Sesiones.
     if (CON_SESION[datos.accion] && !tokenPosible_(datos.token)) throw new Error(SESION_NO_VALIDA);
+    // Igual con las que van sin sesión: un correo o un PIN con mala forma no coge el bloqueo ni lee la hoja.
+    if (CON_CORREO[datos.accion]) formaPrevia_(datos);
     if (SIN_BLOQUEO[datos.accion]) texto = responder_(datos, accion);
     else texto = lock.tryLock(30000)
       ? responder_(datos, accion)
@@ -217,7 +231,7 @@ function pedirCodigo_(d) {
   // Si ya hay un código vigente se reenvía el mismo (así el correo anterior sigue valiendo); los fallos se conservan.
   let previo = null;
   try { previo = JSON.parse(cache.get('c:' + email) || 'null'); } catch (e) { previo = null; }
-  const codigo = previo && previo.codigo ? String(previo.codigo) : String(Math.floor(100000 + Math.random() * 900000));
+  const codigo = previo && previo.codigo ? String(previo.codigo) : String(100000 + parseInt(sha256_(Utilities.getUuid()).slice(0, 12), 16) % 900000);
   cache.put('c:' + email, JSON.stringify({ codigo: codigo, fallos: previo && previo.fallos ? previo.fallos : 0 }), SEGUNDOS_CODIGO);
   cache.put(kn, String(n + 1), 3600);
   cache.put(kg, String(g + 1), 21600);
