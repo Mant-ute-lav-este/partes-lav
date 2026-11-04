@@ -13,6 +13,7 @@ Por eso los nombres de los campos son un contrato: no se renombran ni se quitan 
 - `formato`: siempre `"parte-lav"`.
 - `version`: número entero, hoy `1`. Se **sube** cuando se quita o renombra un campo, o cambia su significado. Añadir campos nuevos **no** sube la versión: quien lee tiene que ignorar los campos que no conoce. Quien lea `version` mayor de la que conoce, debe avisar en lugar de rellenar a ciegas.
 - Una versión más de la app (0.20.x) **no** cambia `version`; esa es solo del formato de los datos. La versión de la app va en `app.version`.
+- En el móvil, el parte lleva además `esquema` (desde la 0.27.0), el número que usa `migrarParte` (`js/modelo.js`) para poner al día los borradores antiguos. Es solo del móvil: `envio.js` lo quita y **no** sale en el Datos_.
 
 ## La prueba que lo vigila
 
@@ -21,7 +22,7 @@ Por eso los nombres de los campos son un contrato: no se renombran ni se quitan 
 Si falla, hay que decidir:
 
 1. **Era un error** → corregir el código.
-2. **Es a propósito** → (a) avisar a Juan (portal) y a quien lea el Excel; (b) apuntarlo en este archivo y en el `CHANGELOG`; (c) si se quita o renombra algo, subir `version` (en `vista-inicio.js`, `crearParte`) y escribir el paso de migración; (d) copiar `privado/herramientas/salida/contrato-datos-actual.json` (lo deja la prueba al fallar) sobre `pruebas/contrato-datos.json`.
+2. **Es a propósito** → (a) avisar a Juan (portal) y a quien lea el Excel; (b) apuntarlo en este archivo y en el `CHANGELOG`; (c) si se quita o renombra algo, subir `version` (en `vista-inicio.js`, `crearParte`); y si cambia lo que se guarda en el móvil, subir `ESQUEMA` y escribir su paso en `migrarParte` (`js/modelo.js`), con su fósil en `pruebas/fosiles.js`; (d) copiar `privado/herramientas/salida/contrato-datos-actual.json` (lo deja la prueba al fallar) sobre `pruebas/contrato-datos.json`.
 
 Limitación: la prueba solo ve los campos que tienen los partes de `pruebas/ejemplos.js`. Los campos que solo aparecen en casos concretos (abajo, «Campos opcionales») no están vigilados: si se añade uno, añadirlo también a un ejemplo.
 

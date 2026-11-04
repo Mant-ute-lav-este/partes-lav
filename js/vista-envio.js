@@ -4,7 +4,7 @@
 import * as db from './db.js';
 import { prepararEnvio, compartir, archivosParaServidor } from './envio.js';
 import { generarPDF } from './pdf.js';
-import { quitarFotosQueFaltan, colaAtascada, HORAS_EMERGENCIA } from './modelo.js';
+import { quitarFotosQueFaltan, colaAtascada, HORAS_EMERGENCIA, migrarParte } from './modelo.js';
 import { procesarSalida, descartarDelMovil } from './salida.js';
 import { esc, uuid, isoLocal, fmtFecha, fmtFechaHora, toast, FORMATO1 } from './util.js';
 import { estado, ir, render, guardarYa, registrarSync } from './estado.js';
@@ -235,6 +235,8 @@ export async function corregir() {
   delete nuevo.errorEnvio;
   delete nuevo.enCola;
   delete nuevo.porGmail;
+  // La revisión es un borrador: si el original es de una versión antigua, se pone al día.
+  migrarParte(nuevo);
   // Las fotos que sigan en el móvil se copian; las borradas por antiguas se quitan del parte nuevo
   // y la app pedirá fotos nuevas al cerrarlo.
   const existe = new Set();

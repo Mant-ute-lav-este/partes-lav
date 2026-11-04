@@ -113,31 +113,67 @@ export function textoMedidas(p) {
   return [...p.medidas, otras && `Otras: ${otras}`].filter(Boolean).join('; ');
 }
 
-/**
- * Borradores de antes de separar maquinaria y vehículos (v0.5.0 y anteriores): lo apuntado
- * queda como vehículos y se vuelve a preguntar por la maquinaria. Los partes ya cerrados no se
- * tocan: su PDF sale con la tabla única de antes.
- */
-export function normalizarParte(p) {
-  if (!p || p.estado !== 'borrador') return p;
+// ---------- Partes guardados por versiones antiguas ----------
+// Los capataces no desinstalan: en el móvil conviven partes de muchas versiones. Todo parte que se
+// lee de la base de datos pasa por migrarParte (db.js), que pone los BORRADORES al día paso a paso.
+// Los cerrados y enviados no se tocan: su PDF y su Datos_ tienen que salir como cuando se cerraron
+// (por ejemplo, un INFRA de la 0.5 sin «maquinas» sale con la tabla única de vehículos de antes).
+// Al corregir uno, la revisión nueva es un borrador y se migra entonces.
+//
+// REGLA: quien añada o cambie un campo del parte (o de un trabajo) sube ESQUEMA y añade su paso
+// abajo. Los pasos no borran nada y se pueden repetir sin cambiar el resultado.
+// `esquema` es solo del móvil: no va en el Datos_ (envio.js lo quita). No confundir con `version`,
+// que es la versión del formato del Datos_ (docs/DATOS-PARTE.md).
+
+/** Esquema de los partes de esta versión de la app. 1 = cualquier parte de antes de la 0.27.0. */
+export const ESQUEMA = 2;
+
+/** Pone al día un borrador guardado por una versión anterior (lo cambia y lo devuelve). */
+export function migrarParte(p) {
+  if (!p || typeof p !== 'object' || p.estado !== 'borrador') return p;
+  if ((p.esquema || 1) >= ESQUEMA) return p;
+  // 1 → 2: todo lo que fue llegando de la 0.6 a la 0.26.
+  // 0.6.0: maquinaria y vehículos por separado; lo apuntado antes queda como vehículos y se
+  // vuelve a preguntar por la maquinaria.
   if (!p.maquinas) {
     p.maquinas = [];
     p.usaVehiculos = p.usaMaquinaria;
     p.usaMaquinaria = null;
   }
-  if (!p.extras) {
-    p.extras = [];
-    p.usaExtras = null;
-  }
-  if (!p.formato1) p.formato1 = [];
-  // Antes de v0.7.0 las medidas antiincendios eran texto libre: pasa a «Otras».
+  if (!p.vehiculos) p.vehiculos = [];
+  // 0.7.0: las medidas antiincendios eran texto libre: pasa a «Otras».
   if (!p.medidas) {
     p.medidas = [];
     p.medidasOtras = p.antiincendios || '';
     p.medidasOtrasSi = Boolean(p.medidasOtras.trim());
   }
+  // 0.8.0: horas extra. 0.9.8: formato 1.
+  if (!p.extras) {
+    p.extras = [];
+    p.usaExtras = null;
+  }
+  if (!p.formato1) p.formato1 = [];
+  if (!p.trabajos) p.trabajos = [];
+  for (const t of p.trabajos) {
+    const faltan = {
+      aparato: '',                 // 0.6.0
+      horaInicio: '', horaFin: '', // 0.8.3
+      tipoCoste: '',               // 0.9.4
+      noRealizado: false, motivoNoRealizado: '', sinFotos: false, motivoSinFotos: '',   // 0.13.0
+      fotos: [],
+    };
+    for (const [k, v] of Object.entries(faltan)) if (!(k in t)) t[k] = v;
+    // 0.9.1: el telefonema pasa de { numero, hora } a { numero, salida } (nº de entrada y de salida).
+    // La hora antigua se conserva: el PDF la sigue enseñando.
+    if (!t.telefonema) t.telefonema = { numero: '', salida: '' };
+    else if (!('salida' in t.telefonema)) t.telefonema.salida = '';
+  }
+  p.esquema = ESQUEMA;
   return p;
 }
+
+/** Nombre antiguo de migrarParte (lo usan las pantallas del parte). */
+export const normalizarParte = migrarParte;
 
 // ---------- Repetir el parte anterior ----------
 // Al crear un INFRA o un SUPER se ofrece empezar igual que el último del mismo tipo: personal,

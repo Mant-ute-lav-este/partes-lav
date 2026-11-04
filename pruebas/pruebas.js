@@ -16,6 +16,7 @@ import * as val from '../js/validaciones.js';
 import * as modelo from '../js/modelo.js';
 import * as drp from '../js/drp.js';
 import * as ej from './ejemplos.js';
+import * as fosiles from './fosiles.js';
 import { cargarServidor } from './google-simulado.js';
 
 const resultados = [];
@@ -434,13 +435,13 @@ prueba('modelo: borradores de versiones antiguas', () => {
   modelo.normalizarParte(viejo);
   igual(viejo, {
     estado: 'borrador', usaMaquinaria: null, vehiculos: [{ descripcion: 'Furgoneta' }], antiincendios: 'Extintor',
-    maquinas: [], usaVehiculos: true, extras: [], usaExtras: null, formato1: [],
-    medidas: [], medidasOtras: 'Extintor', medidasOtrasSi: true,
+    maquinas: [], usaVehiculos: true, medidas: [], medidasOtras: 'Extintor', medidasOtrasSi: true,
+    extras: [], usaExtras: null, formato1: [], trabajos: [], esquema: modelo.ESQUEMA,
   });
   const cerrado = { estado: 'cerrado', usaMaquinaria: true };
   modelo.normalizarParte(cerrado);
   igual(cerrado, { estado: 'cerrado', usaMaquinaria: true }, 'un parte cerrado no se toca');
-  const actual = { ...ej.parteInfra(), estado: 'borrador' };
+  const actual = { ...ej.parteInfra(), estado: 'borrador', esquema: modelo.ESQUEMA };
   const antes = JSON.stringify(actual);
   igual(JSON.stringify(modelo.normalizarParte(actual)), antes, 'un borrador actual no cambia');
 });
@@ -2838,6 +2839,143 @@ prueba('recorrido: Descartar un parte cerrado lo quita del móvil con sus fotos,
     await descartarDelMovil(cerrado.id);
     await descartarDelMovil(otro.id);
   }
+});
+
+// ---------- partes fósiles (guardados por versiones antiguas, ver fosiles.js) ----------
+// Cada caso se prueba aparte y se apuntan todos los que fallan, para ver de una vez qué versión rompe qué.
+
+async function cadaFosil(fn) {
+  const malos = [];
+  for (const x of fosiles.todos()) {
+    try { await fn(x); } catch (e) { malos.push(`${x.nombre} de la ${x.v}: ${e.message}`); }
+  }
+  if (malos.length) throw new Error(`${malos.length} fallo(s):\n  ${malos.join('\n  ')}`);
+}
+const validarCualquiera = (p) => (p.tipo !== 'MAQUINARIA' ? val.validar(p) : p.subtipo === 'via' ? val.validarMaq(p) : val.validarLD(p));
+
+prueba('fósiles: PDF y Datos_ de los partes cerrados de cada versión', async () => {
+  const foto = await jpeg();
+  const leer = async () => foto;
+  await cadaFosil(async ({ p }) => {
+    const pdf = await generarPDF(p, ej.config, 'prueba', leer);
+    igual(await pdf.slice(0, 5).text(), '%PDF-', 'cabecera del PDF');
+    const r = await prepararEnvio(p, ej.config, leer, 'prueba');
+    const datos = JSON.parse(await r.archivos[1].text());
+    igual([datos.ref, datos.carpeta], [p.ref, carpetaDestino(p)], 'Datos_');
+    cierto(r.asunto.startsWith('PARTE LAV · '), 'asunto');
+  });
+});
+
+prueba('fósiles: los borradores de cada versión se validan y se repiten sin error', async () => {
+  const lista = modelo.MEDIDAS_PROVISIONALES;
+  await cadaFosil(async ({ p }) => {
+    const b = modelo.migrarParte(borrador(p));
+    cierto(Array.isArray(validarCualquiera(b)), 'validar');
+    if (p.tipo === 'MAQUINARIA') return;
+    const copiables = modelo.apartadosCopiables(p, 'Ana Prueba', lista);
+    const nuevo = {
+      ...ej.parteSuper(), tipo: p.tipo, ref: 'X-1', estado: 'borrador', personal: [], trabajos: [], formato1: [],
+      usaMaquinaria: null, maquinas: [], usaVehiculos: null, vehiculos: [], usaExtras: null, extras: [],
+      medidas: [], medidasOtrasSi: false, medidasOtras: '', antiincendios: '', observaciones: '',
+    };
+    const q = modelo.repetirParte(nuevo, p, copiables.map((c) => c.clave), lista);
+    cierto(Array.isArray(q.maquinas) && Array.isArray(q.vehiculos) && Array.isArray(q.medidas), 'repetir deja un parte completo');
+  });
+});
+
+prueba('fósiles: migrarParte pone al día los borradores y no cambia lo que se ve de los cerrados', async () => {
+  // Un borrador de la 0.5.0: los vehículos estaban en «usaMaquinaria» y las medidas eran texto.
+  const b = modelo.migrarParte(borrador(fosiles.fosil(ej.parteInfra(), '0.5.0')));
+  igual([b.esquema, b.version, b.usaMaquinaria, b.usaVehiculos, b.maquinas, b.vehiculos.length], [modelo.ESQUEMA, 1, null, true, [], 1], 'maquinaria y vehículos (y «version», la del Datos_, no cambia)');
+  igual([b.medidas, b.medidasOtrasSi, b.medidasOtras], [[], true, 'Extintor en el vehículo'], 'medidas');
+  igual([b.usaExtras, b.extras, b.formato1], [null, [], []], 'horas extra y formato 1');
+  const t = b.trabajos[0];
+  igual([t.aparato, t.horaInicio, t.horaFin, t.tipoCoste, t.noRealizado, t.motivoNoRealizado, t.sinFotos, t.motivoSinFotos],
+    ['', '', '', '', false, '', false, ''], 'campos nuevos del trabajo');
+  igual(t.telefonema, { numero: '11', hora: '08:05', salida: '' }, 'el telefonema antiguo { numero, hora } gana «salida» y conserva la hora');
+  // Dos veces da lo mismo que una.
+  const otra = JSON.stringify(b);
+  igual(JSON.stringify(modelo.migrarParte(b)), otra, 'migrar dos veces no cambia nada');
+  // Un borrador actual no cambia.
+  const actual = borrador(ej.parteInfra());
+  actual.esquema = modelo.ESQUEMA;
+  const antesActual = JSON.stringify(actual);
+  igual(JSON.stringify(modelo.migrarParte(actual)), antesActual, 'un borrador actual no cambia');
+  // Cerrado de la 0.5.0: no se le añade «maquinas» (su PDF sale con la tabla única de antes) ni nada que cambie el PDF.
+  const c = fosiles.fosil(ej.parteInfra(), '0.5.0');
+  const antesC = structuredClone(c);
+  const mc = modelo.migrarParte(c);
+  cierto(!('maquinas' in mc) && !('medidas' in mc) && mc.usaMaquinaria === antesC.usaMaquinaria, 'un cerrado antiguo conserva su forma');
+  igual(mc.trabajos[0].telefonema, antesC.trabajos[0].telefonema, 'ni su telefonema');
+  igual(JSON.stringify(mc), JSON.stringify(antesC), 'un cerrado no cambia en nada');
+  // Un borrador de hoy sin «esquema» (creado antes de la 0.27.0) se queda igual, solo con el número.
+  const sinNumero = borrador(ej.parteSuper());
+  for (const x of sinNumero.trabajos) Object.assign(x, { noRealizado: false, motivoNoRealizado: '', sinFotos: false, motivoSinFotos: '' });
+  const sinNumeroAntes = JSON.stringify({ ...sinNumero, esquema: modelo.ESQUEMA });
+  igual(JSON.stringify(modelo.migrarParte(sinNumero)), sinNumeroAntes, 'un borrador de la 0.26 solo gana «esquema»');
+  // «esquema» no sale en el Datos_ (es solo del móvil); «version» sí, como siempre.
+  const foto = await jpeg();
+  const r = await prepararEnvio({ ...ej.parteInfra(), esquema: modelo.ESQUEMA }, ej.config, async () => foto, 'prueba');
+  const datos = JSON.parse(await r.archivos[1].text());
+  cierto(!('esquema' in datos) && datos.version === 1, 'Datos_ sin «esquema» y con version 1');
+  // Lo que no es un parte se devuelve tal cual.
+  igual([modelo.migrarParte(null), modelo.migrarParte(undefined)], [null, undefined]);
+});
+
+prueba('fósiles: la base de datos entrega los borradores ya migrados', async () => {
+  const p = borrador(fosiles.fosil(ej.parteSuper(), '0.5.0'));
+  await db.putParte(p);
+  try {
+    const g = await db.getParte(p.id);
+    igual([g.esquema, Array.isArray(g.maquinas), Array.isArray(g.medidas)], [modelo.ESQUEMA, true, true], 'getParte');
+    const l = (await db.listarPartes()).find((x) => x.id === p.id);
+    igual([l.esquema, Array.isArray(l.maquinas)], [modelo.ESQUEMA, true], 'listarPartes');
+  } finally {
+    await db.borrarParte(p.id);
+  }
+});
+
+prueba('fósiles: pantallas de inicio, parte, trabajos y envío de cada versión', async () => {
+  await pantalla((e) => { e.lista = fosiles.todos().map((x) => x.p); }, 'Partes LAV');
+  await cadaFosil(async ({ p }) => {
+    // Lo que hace la app al leerlo de la base de datos.
+    const b = modelo.migrarParte(borrador(structuredClone(p)));
+    await pantalla((e) => { e.vista = 'parte'; e.parte = b; }, p.ref);
+    for (let i = 0; i < (b.trabajos || []).length; i++) {
+      await pantalla((e) => { e.vista = 'trabajo'; e.parte = b; e.trabajoIdx = i; }, `Trabajo ${i + 1}`);
+    }
+    if (b.tipo !== 'MAQUINARIA') await pantalla((e) => { e.vista = 'parte'; e.parte = b; e.preguntaExtras = true; });
+    await pantalla((e) => { e.vista = 'envio'; e.parte = modelo.migrarParte(structuredClone(p)); }, 'Cerrado · falta enviarlo');
+    const enviado = { ...structuredClone(p), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00' };
+    await pantalla((e) => { e.vista = 'envio'; e.parte = modelo.migrarParte(enviado); }, 'Recibido en la oficina', 'Corregir el parte');
+  });
+});
+
+prueba('fósiles: Corregir un parte enviado de cada versión abre un borrador que se puede rellenar', async () => {
+  const { f, m, errores } = await appEnMarco();
+  f.contentWindow.confirm = () => true;
+  await cadaFosil(async ({ p }) => {
+    const original = { ...p, estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00', envios: [{ fecha: '2026-10-14T10:04:00+02:00', recibido: '2026-10-14T10:05:00+02:00' }] };
+    // Como abrirParteEnApp, pero sin pintarlo como borrador: un enviado se abre en la pantalla de envío.
+    for (const x of [...(original.trabajos || []).flatMap((t) => t.fotos), ...(original.formato1 || [])]) await db.putFoto({ id: x.id, parteId: original.id, blob: await jpeg() });
+    await db.putParte(original);
+    const leido = await db.getParte(original.id);
+    await pantalla((e) => { e.vista = 'envio'; e.parte = leido; e.perfil = perfilConToken(); });
+    let nuevoId = null;
+    try {
+      toca('[data-action="corregir"]');
+      await esperar(() => m.estado.vista === 'parte' && m.estado.parte.id !== original.id, 'Corregir no abre la revisión nueva');
+      nuevoId = m.estado.parte.id;
+      const n = await db.getParte(nuevoId);
+      igual([n.rev, n.estado, n.esquema], [2, 'borrador', modelo.ESQUEMA], 'revisión nueva migrada');
+      cierto(Array.isArray(n.maquinas) && Array.isArray(n.medidas) && Array.isArray(n.extras), 'la revisión tiene los apartados de hoy');
+      cierto(Array.isArray(validarCualquiera(n)), 'se puede validar');
+      if (errores.length) throw new Error(`errores en la app: ${errores.splice(0).join(' | ')}`);
+    } finally {
+      await descartarDelMovil(original.id);
+      if (nuevoId) await descartarDelMovil(nuevoId);
+    }
+  });
 });
 
 prueba('pantallas: envío', async () => {

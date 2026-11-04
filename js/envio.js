@@ -71,6 +71,7 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   };
   datos.preparado = isoLocal();
   delete datos.envios;
+  delete datos.esquema;   // solo del móvil (migrarParte): no es parte del contrato del Datos_
 
   const archivos = [
     new File([pdf], datos.archivos.pdf, { type: 'application/pdf' }),

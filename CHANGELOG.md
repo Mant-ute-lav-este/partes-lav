@@ -2,6 +2,13 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.27.0 · 2026-11-04 (por dentro: partes guardados por versiones antiguas)
+- Los borradores guardados por versiones antiguas de la app se ponen al día en un solo sitio (`migrarParte`, en `js/modelo.js`) cada vez que se leen del móvil, no solo al abrir la pantalla del parte. Así cualquier pantalla nueva los recibe completos. También se pone al día la revisión nueva al «Corregir» un parte antiguo. Todo en memoria, sin reescribir ni borrar nada de lo guardado.
+- Los partes cerrados y enviados no se tocan: su PDF y su `Datos_` salen igual que siempre.
+- Cada parte nuevo lleva `esquema: 2`, solo para el móvil: no va en el `Datos_` y el contrato del `Datos_` no cambia (sigue en `version: 1`).
+- Pruebas nuevas con «partes fósiles» (`pruebas/fosiles.js`), con la forma que guardaba cada versión desde la 0.5.0, en los 5 tipos de parte: inicio, parte, trabajos, envío, PDF, `Datos_`, validar, «Repetir el parte anterior» y «Corregir».
+- Para los capataces no cambia nada.
+
 ## Servidor v26 · 2026-11-04 (desplegado; seguridad menor)
 - Antes de mandar un parte a la oficina, el servidor comprueba la carpeta del `Datos_` (`AAAA-MM-DD/Infra|Super|Maquinaria/REF_Nombre`) y el nombre de cada foto del `Fotos_` (`T1_antes_1.jpg`, `Formato1_1.jpg`, `…_v2.jpg`). Power Automate los usa tal cual para guardar en SharePoint: así nadie puede guardar fuera de su carpeta con `../`. Si no cuadran, el parte no sale y el móvil ve «El parte trae una carpeta o un nombre de foto que no se admite. Avisa a la oficina.»
 - Los partes que hace la app siempre cumplen la regla (probado con los 5 tipos, rectificaciones, tildes y jornadas sin trabajos). Para los capataces no cambia nada.

@@ -1,6 +1,8 @@
 // Almacenamiento local en el móvil (IndexedDB): partes, fotos y ajustes.
 // Nada sale del móvil hasta que el capataz envía el parte.
 
+import { migrarParte } from './modelo.js';
+
 const NOMBRE = 'partes-lav';
 const VERSION = 2;   // 2: cola de salida
 let dbp = null;
@@ -41,9 +43,11 @@ async function tx(almacen, modo, fn) {
 export const kvGet = (k) => tx('kv', 'readonly', (s) => s.get(k));
 export const kvSet = (k, v) => tx('kv', 'readwrite', (s) => s.put(v, k));
 
-export const getParte = (id) => tx('partes', 'readonly', (s) => s.get(id));
+// Los partes salen siempre puestos al día (borradores de versiones antiguas, ver modelo.js).
+// Solo en memoria: lo guardado no se reescribe hasta que la app lo guarda por su cuenta.
+export const getParte = async (id) => migrarParte(await tx('partes', 'readonly', (s) => s.get(id)));
 export const putParte = (p) => tx('partes', 'readwrite', (s) => s.put(p));
-export const listarPartes = () => tx('partes', 'readonly', (s) => s.getAll());
+export const listarPartes = async () => ((await tx('partes', 'readonly', (s) => s.getAll())) || []).map(migrarParte);
 export const borrarParte = (id) => tx('partes', 'readwrite', (s) => s.delete(id));
 
 export const getFoto = (id) => tx('fotos', 'readonly', (s) => s.get(id));

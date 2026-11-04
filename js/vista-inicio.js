@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora } from './util.js';
 import { SUBTIPOS_MAQ, subtipoDe } from './validaciones.js';
 import {
-  PREFIJO_REF, claveContador, nuevaMaquinaVia, nuevoTajo, nuevoRealizado, ultimoParteDe, apartadosCopiables, repetirParte,
+  PREFIJO_REF, claveContador, nuevaMaquinaVia, nuevoTajo, nuevoRealizado, ultimoParteDe, apartadosCopiables, repetirParte, ESQUEMA,
 } from './modelo.js';
 import { estado, ir, render, guardarYa, maquinasViaCfg, capatazComoPersona, medidasCfg } from './estado.js';
 import { inputConfig } from './vista-acceso.js';
@@ -190,7 +190,8 @@ async function crearParte(tipo, maquina, sub, fecha, nocturna, copia = null) {
   const iso = isoLocal();
   estado.parte = {
     formato: 'parte-lav',
-    version: 1,
+    version: 1,   // formato del Datos_ (docs/DATOS-PARTE.md), no de la app
+    esquema: ESQUEMA,   // solo del móvil: ver migrarParte en modelo.js
     id: uuid(),
     ref: `${prefijo}-${String(n).padStart(4, '0')}`,
     rev: 1,
