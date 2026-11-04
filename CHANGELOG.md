@@ -2,6 +2,12 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.27.1 · 2026-11-04 (por dentro: solo se toca un borrador)
+- La regla «un parte cerrado, en cola o enviado ya no se cambia» se comprueba en un solo sitio de `js/eventos.js` (`ACCIONES_BORRADOR` y una comprobación al principio de cada evento), en vez de repetida a mano en unos 20 sitios. Antes, más de 20 botones (quitar persona, equipos, vagones, tajos, trabajos, fotos, «Cerrar parte», «Borrar»…) no la comprobaban; no fallaba porque solo salen en borradores, pero un botón nuevo podía olvidarla.
+- «Borrar» ya no borra nunca un parte que no sea borrador (los cerrados se quitan con «Descartar», que avisa).
+- Pruebas nuevas: todos los botones y campos sobre un parte enviado de los 5 tipos (no cambia nada) y sobre un borrador (sí cambia); y toda acción de `onClick` tiene que estar apuntada como «toca el parte» o «no lo toca».
+- Para los capataces no cambia nada.
+
 ## 0.27.0 · 2026-11-04 (por dentro: partes guardados por versiones antiguas)
 - Los borradores guardados por versiones antiguas de la app se ponen al día en un solo sitio (`migrarParte`, en `js/modelo.js`) cada vez que se leen del móvil, no solo al abrir la pantalla del parte. Así cualquier pantalla nueva los recibe completos. También se pone al día la revisión nueva al «Corregir» un parte antiguo. Todo en memoria, sin reescribir ni borrar nada de lo guardado.
 - Los partes cerrados y enviados no se tocan: su PDF y su `Datos_` salen igual que siempre.

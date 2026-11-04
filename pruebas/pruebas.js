@@ -2841,6 +2841,124 @@ prueba('recorrido: Descartar un parte cerrado lo quita del móvil con sus fotos,
   }
 });
 
+// ---------- solo se toca un borrador (regla de eventos.js) ----------
+// Botones de onClick que NO modifican el parte abierto (navegar, menú, envío, cuenta…). Toda acción
+// de eventos.js tiene que estar aquí o en ACCIONES_BORRADOR: si se añade un botón nuevo, la prueba
+// obliga a decidir en cuál va.
+const ACCIONES_LIBRES = [
+  'elegir-config', 'config-ejemplo', 'elegir-capataz', 'olvido-pin', 'ir', 'reenviar-codigo', 'comprobar-cuenta',
+  'enviar-pendientes', 'actualizar-lista', 'cerrar-sesion', 'reintentar-salida', 'enviar-gmail', 'descartar-parte',
+  'menu', 'cerrar-menu', 'cambiar-pin', 'cambiar-capataz', 'bloquear', 'ir-inicio', 'nuevo', 'elegir-maquina',
+  'cerrar-eleccion', 'repetir-si', 'repetir-no', 'cerrar-repetir', 'compartidas-abrir', 'compartidas-cerrar',
+  'compartidas-trabajo', 'compartidas-otro', 'compartidas-fase', 'compartidas-descartar', 'abrir', 'extras-volver',
+  'abrir-otro', 'cancelar-otro', 'editar-trabajo', 'ir-trabajo', 'volver-parte', 'trabajo-listo', 'cerrar-pregunta',
+  'ver-foto', 'cerrar-foto', 'borrar-borrador', 'guardar-salir', 'cerrar-errores', 'reintentar-envio', 'enviar',
+  'ver-pdf', 'corregir',
+];
+
+prueba('eventos: cada botón está apuntado como «toca el parte» o «no lo toca»', async () => {
+  const fuente = await fetch('../js/eventos.js', { cache: 'no-store' }).then((r) => r.text());
+  const desde = fuente.indexOf('export async function onClick');
+  const acciones = [...fuente.slice(desde).matchAll(/case '([^']+)':/g)].map((x) => x[1]);
+  cierto(acciones.length > 50, `solo se han encontrado ${acciones.length} acciones en onClick`);
+  const ev = await moduloDelMarco('./js/eventos.js');
+  const borrador = [...ev.ACCIONES_BORRADOR];
+  const sinApuntar = acciones.filter((a) => !borrador.includes(a) && !ACCIONES_LIBRES.includes(a));
+  igual(sinApuntar, [], 'acciones nuevas: ponlas en ACCIONES_BORRADOR (eventos.js) si cambian el parte, o en ACCIONES_LIBRES (esta prueba) si no');
+  igual(borrador.filter((a) => ACCIONES_LIBRES.includes(a)), [], 'apuntadas en las dos listas');
+  igual(borrador.filter((a) => !acciones.includes(a)), [], 'en ACCIONES_BORRADOR pero ya no existen');
+});
+
+/** Botones y campos de prueba para un parte de cada tipo: uno por cada manera de cambiarlo. */
+function tocarTodo(p, acciones) {
+  const clics = [...acciones].map((a) => `<button data-action="${a}" data-i="0" data-t="0" data-lista="vehiculos" data-id="${p.trabajos?.[0]?.fotos?.[0]?.id || 'x'}" data-fase="antes" data-origen="camara" data-nombre="Luis Ejemplo"></button>`);
+  const cambios = `
+    <input data-bind="observaciones" value="cambiado">
+    <select data-maqvia="0"><option value="otro" selected></option></select>
+    <select data-puesto="operario"><option value="otro" selected></option></select>
+    <select data-lista="vehiculos" data-i="0"><option value="otro" selected></option></select>
+    <input type="checkbox" data-coste="POI" checked>
+    <input type="checkbox" data-vias-op="trabajos.0.via" value="2" checked>
+    <input type="checkbox" data-medida="Batefuegos" checked>
+    <input type="radio" data-fin="1" value="noreal" checked>
+    <select data-motivo-parte data-otro="motivoSinTrabajosOtro" data-campo="motivoSinTrabajos"><option value="Lluvia" selected></option></select>
+    <select data-motivo-lista="trabajos.0" data-otro="motivoNoRealizadoOtro" data-campo="motivoNoRealizado"><option value="Lluvia" selected></option></select>
+    <select data-motivo="trabajos.0"><option value="Otro motivo" selected></option></select>
+    <select data-aparato="0"><option value="__otro" selected></option></select>`;
+  const escritos = `<input data-bind="observaciones" value="escrito"><input data-aparato-txt="0" value="escrito">`;
+  return { clics, cambios, escritos };
+}
+prueba('eventos: ningún botón ni campo cambia un parte enviado', async () => {
+  const { f, m, errores } = await appEnMarco();
+  const ev = await moduloDelMarco('./js/eventos.js');
+  f.contentWindow.confirm = () => true;
+  const malos = [];
+  const casos = [['INFRA', () => ej.parteInfra()], ['SUPER', () => ej.parteSuper()], ['maquinaria de vía', () => ej.parteMaqVia()],
+    ['locomotora', () => ej.parteLoco()], ['dresina', () => ej.parteLoco('dresina')]];
+  for (const [nombre, crear] of casos) {
+    const p = { ...crear(), id: crypto.randomUUID(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00' };
+    for (const x of [...p.trabajos.flatMap((t) => t.fotos), ...(p.formato1 || [])]) await db.putFoto({ id: x.id, parteId: p.id, blob: await jpeg() });
+    await db.putParte(p);
+    const foto = JSON.stringify(p);
+    const { clics, cambios, escritos } = tocarTodo(p, ev.ACCIONES_BORRADOR);
+    const probar = async (que, html, hacer) => {
+      Object.assign(m.estado, { vista: 'envio', parte: p, trabajoIdx: 0, perfil: perfilConToken(), config: ej.config, errores: [] });
+      const caja = m.app.ownerDocument.createElement('div');
+      caja.innerHTML = html;
+      m.app.append(caja);
+      try { hacer(caja.firstElementChild); } catch { /* un elemento de prueba incompleto puede dar error: lo que importa es el parte */ }
+      await new Promise((r) => setTimeout(r, 60));
+      caja.remove();
+      const ahora = m.estado.parte === p ? JSON.stringify(p) : 'el parte abierto ha cambiado por otro';
+      if (ahora !== foto) malos.push(`${nombre} · ${que}`);
+      Object.assign(p, JSON.parse(foto));
+      for (const k of Object.keys(p)) if (!(k in JSON.parse(foto))) delete p[k];
+    };
+    try {
+      for (const b of clics) await probar(b.match(/data-action="([^"]+)"/)[1], b, (el) => el.click());
+      const tmp = m.app.ownerDocument.createElement('div');
+      tmp.innerHTML = cambios;
+      for (const el of [...tmp.children]) await probar(`cambiar ${el.outerHTML.match(/data-[\w-]+/)[0]}`, el.outerHTML, (x) => x.dispatchEvent(new Event('change', { bubbles: true })));
+      tmp.innerHTML = escritos;
+      for (const el of [...tmp.children]) await probar(`escribir ${el.outerHTML.match(/data-[\w-]+/)[0]}`, el.outerHTML, (x) => x.dispatchEvent(new Event('input', { bubbles: true })));
+      const g = await db.getParte(p.id);
+      if (!g) malos.push(`${nombre} · el parte enviado se ha borrado del móvil`);
+      else if (g.estado !== 'enviado') malos.push(`${nombre} · el parte guardado ha pasado a «${g.estado}»`);
+    } finally {
+      await descartarDelMovil(p.id);
+    }
+  }
+  m.estado.parte = null;
+  m.estado.vista = 'inicio';
+  await new Promise((r) => setTimeout(r, 300));
+  errores.splice(0);   // los elementos de prueba incompletos dejan errores que no son de la app
+  igual(malos, [], 'han cambiado un parte enviado');
+  // Y al revés: en un borrador, los mismos botones y campos sí lo cambian.
+  const b = { ...borrador(ej.parteInfra()), id: crypto.randomUUID() };
+  Object.assign(m.estado, { vista: 'parte', parte: b, trabajoIdx: 0, perfil: perfilConToken(), config: ej.config, errores: [] });
+  // Cada uno en su caja: un botón repinta la pantalla y se llevaría los demás.
+  const hacer = async (html, fn) => {
+    const caja = m.app.ownerDocument.createElement('div');
+    caja.innerHTML = html;
+    m.app.append(caja);
+    fn(caja.firstElementChild);
+    await new Promise((r) => setTimeout(r, 60));
+    caja.remove();
+  };
+  try {
+    await hacer('<button data-action="nuevo-equipo" data-lista="vehiculos"></button>', (x) => x.click());
+    await hacer('<input data-bind="observaciones" value="cambiado">', (x) => x.dispatchEvent(new Event('change', { bubbles: true })));
+    await hacer('<input type="checkbox" data-medida="Batefuegos" checked>', (x) => x.dispatchEvent(new Event('change', { bubbles: true })));
+    await hacer('<input data-aparato-txt="0" value="Desvío 1">', (x) => x.dispatchEvent(new Event('input', { bubbles: true })));
+    igual([b.vehiculos.length, b.observaciones, b.medidas.includes('Batefuegos'), b.trabajos[0].aparato],
+      [2, 'cambiado', true, 'Desvío 1'], 'un borrador sí se puede cambiar (botón, campo, casilla y texto)');
+  } finally {
+    m.estado.parte = null;
+    m.estado.vista = 'inicio';
+    await descartarDelMovil(b.id);
+  }
+});
+
 // ---------- partes fósiles (guardados por versiones antiguas, ver fosiles.js) ----------
 // Cada caso se prueba aparte y se apuntan todos los que fallan, para ver de una vez qué versión rompe qué.
 

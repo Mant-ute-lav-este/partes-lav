@@ -33,8 +33,25 @@ import {
   enviarServidor, procesarYMostrar, enviarPorGmail, enviar, corregir, prepararEnvioActual, descartarParte,
 } from './vista-envio.js';
 
+// ---------- Solo se toca un borrador ----------
+// Un parte cerrado, en cola o enviado ya no se cambia (solo se corrige con una revisión nueva).
+// La regla se comprueba UNA vez, aquí: al principio de onClick para las acciones de esta lista, y
+// al principio de onInput/onChange para todos los campos del parte. Al añadir un botón nuevo que
+// cambie el parte, ponlo en esta lista; la prueba «eventos: cada botón está apuntado…» obliga a
+// decidirlo.
+export const ACCIONES_BORRADOR = new Set([
+  'nuevo-realizado', 'quitar-realizado', 'nuevo-vagon', 'quitar-vagon', 'quitar-persona', 'anadir-persona',
+  'copiar-personal', 'anadir-otro', 'extras-a-todos', 'extras-no', 'extras-si', 'extras-cerrar',
+  'nuevo-trabajo', 'copiar-trabajo-anterior', 'borrar-trabajo', 'anadir-aparato', 'quitar-aparato',
+  'anadir-desvio', 'quitar-desvio', 'nuevo-equipo', 'quitar-equipo', 'nueva-maqvia', 'quitar-maqvia',
+  'nuevo-tajo', 'quitar-tajo', 'foto', 'foto-formato', 'anadir-drp', 'quitar-drp', 'borrar-foto',
+  'borrar-parte', 'cerrar-parte',
+]);
+
+const esBorrador = () => Boolean(estado.parte && estado.parte.estado === 'borrador');
+
 export function aplicarBind(el) {
-  if (!estado.parte || estado.parte.estado !== 'borrador') return;
+  if (!esBorrador()) return;
   let v;
   if (el.type === 'checkbox') v = el.checked;
   else if (el.type === 'radio') {
@@ -56,12 +73,14 @@ export function onInput(e) {
     pintarResultados();
     return;
   }
+  // Todo lo demás que se escribe es un campo del parte.
+  if (!esBorrador()) return;
   if (el.dataset.pk) { aplicarPk(el, false); return; }
   if (el.dataset.hora) { aplicarHora(el, false); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
   if (el.dataset.aparatoTxt || el.dataset.desvioTxt) {
     const { t, prop, i } = destinoAparato(el, 'Txt');
-    if (!t || estado.parte.estado !== 'borrador') return;
+    if (!t) return;
     filasAparato(t, prop)[i].nombre = el.value;
     aplicarAparatos(t, false, prop);
     guardarPronto();
@@ -78,6 +97,16 @@ export async function onChange(e) {
     if (f) cargarConfigArchivo(f);
     return;
   }
+  // Menú → Aspecto (tema y letra): se aplica y se guarda en este móvil al instante, sin repintar el Menú.
+  if (el.dataset.aspecto) {
+    guardarAspecto({ [el.dataset.aspecto]: el.value });
+    return;
+  }
+  // Todo lo demás (fotos, DRP y campos) cambia el parte abierto.
+  if (!esBorrador()) {
+    if (el.files) el.value = '';
+    return;
+  }
   if (el.id === 'in-camara' || el.id === 'in-galeria') {
     const files = [...el.files];
     el.value = '';
@@ -90,14 +119,9 @@ export async function onChange(e) {
     if (files.length) await anadirDrp(files);
     return;
   }
-  // Menú → Aspecto (tema y letra): se aplica y se guarda en este móvil al instante, sin repintar el Menú.
-  if (el.dataset.aspecto) {
-    guardarAspecto({ [el.dataset.aspecto]: el.value });
-    return;
-  }
   if (el.dataset.aparato || el.dataset.desvio) {
     const { t, prop, i } = destinoAparato(el);
-    if (!t || estado.parte.estado !== 'borrador') return;
+    if (!t) return;
     const otro = el.value === '__otro';
     filasAparato(t, prop)[i] = { nombre: otro ? '' : el.value, otro };
     aplicarAparatos(t, true, prop);
@@ -112,7 +136,7 @@ export async function onChange(e) {
   // ¿Trabajo finalizado? Sí / No, sin terminar / No realizado (un no realizado tampoco está finalizado).
   if (el.dataset.fin) {
     const t = trabajoActual();
-    if (!t || estado.parte.estado !== 'borrador' || !el.checked) return;
+    if (!t || !el.checked) return;
     t.finalizado = el.value === 'si';
     t.noRealizado = el.value === 'noreal';
     guardarPronto();
@@ -122,7 +146,6 @@ export async function onChange(e) {
   // Motivo de «jornada sin trabajos»: es del parte, no de un trabajo.
   if (el.matches('[data-motivo-parte]')) {
     const p = estado.parte;
-    if (!p || p.estado !== 'borrador') return;
     p[el.dataset.otro] = el.value === '__otro';
     p[el.dataset.campo] = p[el.dataset.otro] ? '' : el.value;
     guardarPronto();
@@ -132,7 +155,7 @@ export async function onChange(e) {
   }
   if (el.dataset.motivoLista) {
     const t = trabajoActual();
-    if (!t || estado.parte.estado !== 'borrador') return;
+    if (!t) return;
     const motivo = el.dataset.campo;
     const esOtro = el.dataset.otro;
     t[esOtro] = el.value === '__otro';
@@ -144,7 +167,7 @@ export async function onChange(e) {
   }
   if (el.dataset.motivo) {
     const t = trabajoActual();
-    if (!t || estado.parte.estado !== 'borrador') return;
+    if (!t) return;
     t.motivoOtro = el.value === '__otro';
     t.motivoActuacion = t.motivoOtro ? '' : el.value;
     guardarPronto();
@@ -154,7 +177,6 @@ export async function onChange(e) {
   }
   if (el.matches('select[data-maqvia]')) {
     const p = estado.parte;
-    if (!p || p.estado !== 'borrador') return;
     const i = Number(el.dataset.maqvia);
     const horas = p.maquinasVia[i].horas;
     const c = maquinasDeVia()[Number(el.value)];
@@ -168,7 +190,7 @@ export async function onChange(e) {
   }
   if (el.matches('select[data-puesto]')) {
     const p = estado.parte;
-    if (!p || p.estado !== 'borrador' || el.value === '') return;
+    if (el.value === '') return;
     const puesto = el.dataset.puesto;
     const c = personalMaqCfg()[Number(el.value)];
     if (el.value !== 'otro' && c && p.personal.some((x) => x.puesto === puesto && x.nombre === c.nombre)) {
@@ -186,7 +208,6 @@ export async function onChange(e) {
     return;
   }
   if (el.matches('select[data-lista]')) {
-    if (!estado.parte || estado.parte.estado !== 'borrador') return;
     const lista = el.dataset.lista;
     const c = equiposCfg(lista)[Number(el.value)];
     estado.parte[lista][Number(el.dataset.i)] = el.value === 'otro' ? { descripcion: '', matricula: '', otro: true }
@@ -205,7 +226,7 @@ export async function onChange(e) {
   if (el.dataset.extra) { aplicarExtra(el); return; }
   if (el.dataset.coste) {
     const t = trabajoActual();
-    if (!t || estado.parte.estado !== 'borrador') return;
+    if (!t) return;
     // Una casilla o ninguna: al marcar una se desmarca la otra; al quitarla, queda en ninguno.
     t.tipoCoste = el.checked ? el.dataset.coste : '';
     guardarPronto();
@@ -215,7 +236,6 @@ export async function onChange(e) {
   // Vías (SUPER, tajo de vía, trabajo de locomotora/dresina): se pueden marcar varias.
   if (el.dataset.viasOp) {
     const p = estado.parte;
-    if (!p || p.estado !== 'borrador') return;
     const marcadas = [...app.querySelectorAll(`input[data-vias-op="${el.dataset.viasOp}"]:checked`)].map((x) => x.value);
     setPath(p, el.dataset.viasOp, unirVias(marcadas));
     guardarPronto();
@@ -223,7 +243,6 @@ export async function onChange(e) {
   }
   if (el.dataset.medida != null) {
     const p = estado.parte;
-    if (!p || p.estado !== 'borrador') return;
     const m = el.dataset.medida;
     p.medidas = el.checked ? [...new Set([...p.medidas, m])] : p.medidas.filter((x) => x !== m);
     // Mismo orden que la lista, para que el PDF salga siempre igual.
@@ -341,6 +360,7 @@ export async function onClick(e) {
   if (!el || !app.contains(el) || el.hasAttribute('data-stop')) return;
   const p = estado.parte;
   const i = el.dataset.i == null ? null : Number(el.dataset.i);
+  if (ACCIONES_BORRADOR.has(el.dataset.action) && !esBorrador()) return;
   switch (el.dataset.action) {
     case 'elegir-config': document.getElementById('in-config').click(); break;
     case 'config-ejemplo':

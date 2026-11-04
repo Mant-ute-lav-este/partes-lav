@@ -286,6 +286,9 @@ export async function cerrarParte() {
 }
 
 export async function borrarParte(id = estado.parte && estado.parte.id) {
+  // Solo borradores: un parte cerrado o enviado sale de «Descartar» (vista-envio.js), con sus avisos.
+  const guardado = id && await db.getParte(id);
+  if (guardado && guardado.estado !== 'borrador') return;
   if (!id || !confirm('¿Borrar este borrador y sus fotos? No se puede deshacer.')) return;
   for (const f of await db.fotosDeParte(id)) await db.borrarFoto(f.id);
   await db.borrarParte(id);
