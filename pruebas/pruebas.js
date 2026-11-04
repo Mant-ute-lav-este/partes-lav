@@ -1202,6 +1202,37 @@ async function servidorListo() {
   return E;
 }
 
+prueba('servidor: subir la lista cambia solo los ajustes que trae y conserva los demás', async () => {
+  const E = await servidorListo();
+  E.props.CLAVE_ADMIN = 'clave-prueba';
+  E.hojas.Ajustes.appendRow(['copia', 'copia@ejemplo.test']);
+  E.hojas.Ajustes.appendRow(['ajusteFuturo', 'no se toca']);   // uno añadido a mano en la hoja
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), accion: 'cargarLista', clave: 'clave-prueba', ...o });
+  const lista = {
+    formato: 'config-partes-lav', nombre: 'Lista 2', fecha: '2026-11-04', destinatario: 'nueva@ejemplo.test',
+    cabecera: { jefatura: 'J', ambito: 'A', empresa: 'E', lineaInfra: 'L040', lineaSuper: 'L038' },
+  };
+  igual(pedir({ config: lista }).ok, true, 'sube la lista');
+  const ordenado = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
+  igual(ordenado(E.s.ajustes_()), ordenado({
+    destinatario: 'nueva@ejemplo.test', copia: 'copia@ejemplo.test', ajusteFuturo: 'no se toca',
+    nombre: 'Lista 2', fecha: '2026-11-04', admin: 'nueva@ejemplo.test',
+    jefatura: 'J', ambito: 'A', empresa: 'E', lineaInfra: 'L040', lineaSuper: 'L038',
+  }), 'cambia lo de la lista, conserva «copia» y el ajuste que no conoce');
+  const claves = E.hojas.Ajustes._d.slice(1).map((f) => f[0]).filter(Boolean);
+  igual(claves.length, new Set(claves).size, 'sin claves repetidas en la hoja');
+  // Si la lista trae «copia», se cambia; vacía también vale (quitar la copia).
+  igual(pedir({ config: { ...lista, copia: '' } }).ok, true);
+  igual([E.s.ajustes_().copia, E.s.ajustes_().ajusteFuturo], ['', 'no se toca'], 'copia vacía y el otro sigue');
+  // Sin cabecera, los ajustes no se tocan.
+  const antes = JSON.stringify(E.s.ajustes_());
+  igual(pedir({ config: { formato: 'config-partes-lav', vehiculos: [] } }).ok, true);
+  igual(JSON.stringify(E.s.ajustes_()), antes, 'una lista sin cabecera no toca Ajustes');
+  // Con la clave mal, nada.
+  igual(pedir({ clave: 'otra', config: { ...lista, nombre: 'Mala' } }).ok, false, 'clave mala');
+  igual(E.s.ajustes_().nombre, 'Lista 2');
+});
+
 prueba('servidor: envía un parte sin tener bloqueado al resto', async () => {
   const E = await servidorListo();
   let bloqueadoAlEnviar = null;

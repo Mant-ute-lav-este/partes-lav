@@ -2,6 +2,11 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## Servidor v27 · 2026-11-04 (PREPARADO, SIN DESPLEGAR: va con el próximo cambio del servidor)
+- Al subir la lista de la oficina con cabecera (`cargarLista`), la hoja Ajustes ya no se vacía entera: solo cambian las claves que trae la lista (nombre, fecha, destinatario, admin, jefatura, ámbito, empresa, líneas y, si viene, `copia`). Cualquier otra fila añadida a mano en Ajustes se conserva. Antes solo se salvaba `copia`, con un parche.
+- Prueba nueva: subir la lista conserva un ajuste que no conoce, cambia `copia` solo si la lista la trae (también a vacía), una lista sin cabecera no toca Ajustes y con la clave mal no cambia nada.
+- Para los capataces, la oficina y la app del almacén no cambia nada.
+
 ## 0.27.1 · 2026-11-04 (por dentro: solo se toca un borrador)
 - La regla «un parte cerrado, en cola o enviado ya no se cambia» se comprueba en un solo sitio de `js/eventos.js` (`ACCIONES_BORRADOR` y una comprobación al principio de cada evento), en vez de repetida a mano en unos 20 sitios. Antes, más de 20 botones (quitar persona, equipos, vagones, tajos, trabajos, fotos, «Cerrar parte», «Borrar»…) no la comprobaban; no fallaba porque solo salen en borradores, pero un botón nuevo podía olvidarla.
 - «Borrar» ya no borra nunca un parte que no sea borrador (los cerrados se quitan con «Descartar», que avisa).

@@ -20,7 +20,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 26;
+const VERSION_SERVIDOR = 27;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -757,7 +757,7 @@ function apuntarUltimo_(email, ref) {
 /**
  * Sube la lista de la oficina (mismo formato que config-partes-lav.json). Requiere la clave de
  * administración. Solo cambia lo que venga: trabajadores, maquinas, vehiculos, aparatos, antiincendios, motivos y, si
- * viene la cabecera, los ajustes.
+ * viene la cabecera, los ajustes que trae (los demás de la hoja Ajustes se conservan).
  */
 function cargarLista_(d) {
   const clave = props_().getProperty('CLAVE_ADMIN');
@@ -807,13 +807,16 @@ function cargarLista_(d) {
     hecho.motivos = true;
   }
   if (c.cabecera) {
+    // Solo cambian las claves que trae la lista; las demás filas de Ajustes (las añadidas a mano,
+    // como «copia» si la lista no la trae) se quedan como están, en el mismo orden.
     const cab = c.cabecera;
-    const aj = {
+    const nuevos = {
       nombre: c.nombre || '', fecha: c.fecha || '', destinatario: c.destinatario || '', admin: c.admin || c.destinatario || '',
-      copia: c.copia != null ? c.copia : (ajustes_().copia || ''),   // si la lista no la trae, se conserva la que hay
       jefatura: cab.jefatura || '', ambito: cab.ambito || '', empresa: cab.empresa || '',
       lineaInfra: cab.lineaInfra || '', lineaSuper: cab.lineaSuper || '',
     };
+    if (c.copia != null) nuevos.copia = c.copia;
+    const aj = { ...ajustes_(), ...nuevos };
     reemplazar_('Ajustes', Object.keys(aj).map((k) => [k, aj[k]]));
     hecho.ajustes = true;
   }

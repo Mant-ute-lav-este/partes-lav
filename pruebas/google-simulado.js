@@ -163,7 +163,7 @@ function crearEntorno(codigo) {
   const s = new Function(...nombres, `${codigo}
     return { doPost, doGet, VERSION_SERVIDOR, configurar, limpiarSesiones_, resumenDiario, crearSesion_, tabla_, enviarCorreo_,
       archivarEnvios, archivarEnvios_, revisarRegistro, enlaceRevision, enlaceRevision_, reintentarPortal, reintentarPortal_,
-      copiaSeguridad, activarCopiaSemanal, activarResumenDiario, sha256_, firma_, pinFacil_, esperaTexto_, buscarUsuario_ };`)(...nombres.map((n) => g[n]));
+      copiaSeguridad, activarCopiaSemanal, activarResumenDiario, sha256_, firma_, pinFacil_, esperaTexto_, buscarUsuario_, ajustes_ };`)(...nombres.map((n) => g[n]));
   const post = (o) => JSON.parse(s.doPost({ postData: { contents: JSON.stringify(o) } }));
   return { s, post, g, hojas, props, cache, correos, portal, quien, activadores, registro, copias, codigo,
     bloqueado: () => bloqueado, aperturas: () => aperturas };
