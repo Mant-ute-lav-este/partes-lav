@@ -6,7 +6,7 @@
 // actualizan como script clásico, y un módulo no se podría cargar así. Por eso el envío
 // en segundo plano repite aquí la lógica de js/salida.js.
 
-const VERSION = 'v0.27.1';
+const VERSION = 'v0.28.0';
 const CACHE = `partes-lav-${VERSION}`;
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
 const ARCHIVOS = [
@@ -118,6 +118,16 @@ const MAX_MB_COMPARTIDA = 25;
 async function recibirCompartidas(req) {
   let recibidas = 1;   // si ni se puede leer el formulario, al menos una se ha perdido
   let guardadas = 0;
+  // Ha llegado algo compartido: este móvil ya tiene «Compartir → Partes LAV». Se apunta la primera vez
+  // (misma clave y forma que CLAVE_ACTIVO de js/compartidas.js).
+  try {
+    const activo = await op('kv', 'readonly', (s) => s.get('compartirActivo'));
+    if (!(activo && typeof activo === 'object' && activo.fecha)) {
+      await op('kv', 'readwrite', (s) => s.put({ fecha: isoLocal(), via: 'compartir' }, 'compartirActivo'));
+    }
+  } catch (err) {
+    await registrarFallo('compartir', err && err.message);
+  }
   try {
     const todas = (await req.formData()).getAll('fotos');
     recibidas = todas.length;

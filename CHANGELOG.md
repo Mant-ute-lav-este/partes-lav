@@ -2,6 +2,13 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.28.0 · 2026-11-10 (por dentro: saber qué móviles tienen «Compartir» activo)
+- Primer paso de la tanda 2 de «fotos desde WhatsApp» (`privado/PLAN-TANDA2.md`, fase 1). Para los capataces no cambia nada a la vista.
+- El móvil apunta, la primera vez que lo nota, que ya tiene «Compartir → Partes LAV» (clave `compartirActivo` de `kv`: `{ fecha, via }`): cuando llega algo compartido (`sw.js`) o cuando la app instalada arranca con la marca `?i=2`.
+- `manifest.webmanifest`: `id` fijo `/partes-lav/` (el mismo que Chrome ya le daba, para que no la tome por otra app) y `start_url` `./?i=2`. La marca llega con la misma renovación de Chrome que activa «Compartir». Probado antes en un móvil real con una copia aparte: un solo icono, datos conservados.
+- Sin cobertura la app abre igual con la marca (`sw.js` ya buscaba en la caché sin mirar lo que va tras el `?`; ahora una prueba lo vigila).
+- Pruebas nuevas: manifest (id, start_url), apertura sin cobertura con `?i=2`, la marca solo cuenta instalada, se guarda la primera vez, y `sw.js` lo apunta al recibir.
+
 ## Servidor v27 · 2026-11-04 (PREPARADO, SIN DESPLEGAR: va con el próximo cambio del servidor)
 - Al subir la lista de la oficina con cabecera (`cargarLista`), la hoja Ajustes ya no se vacía entera: solo cambian las claves que trae la lista (nombre, fecha, destinatario, admin, jefatura, ámbito, empresa, líneas y, si viene, `copia`). Cualquier otra fila añadida a mano en Ajustes se conserva. Antes solo se salvaba `copia`, con un parche.
 - Prueba nueva: subir la lista conserva un ajuste que no conoce, cambia `copia` solo si la lista la trae (también a vacía), una lista sin cabecera no toca Ajustes y con la clave mal no cambia nada.

@@ -4,6 +4,7 @@
 
 import * as db from './db.js';
 import { FASES } from './modelo.js';
+import { isoLocal } from './util.js';
 
 export const CLAVE_COMPARTIDAS = 'compartidas';
 // Cuántas no se han podido guardar al compartir (no eran fotos, muy grandes, más del máximo o sin
@@ -12,6 +13,32 @@ export const CLAVE_DESCARTADAS = 'compartidasDescartadas';
 // Los mismos límites están en sw.js (una prueba avisa si se separan).
 export const MAX_COMPARTIDAS = 30;
 export const MAX_MB_COMPARTIDA = 25;
+
+// «Compartir → Partes LAV» activo en este móvil: { fecha, via }. Chrome solo lo activa al renovar la
+// app instalada (no se puede forzar). Se apunta la primera vez que se nota, de dos formas:
+// via 'compartir' = ha llegado algo compartido (lo apunta sw.js, con la misma clave);
+// via 'arranque' = la app instalada arranca con la marca ?i=2 del manifest, que llega con la renovación.
+export const CLAVE_ACTIVO = 'compartirActivo';
+
+export async function compartirActivo() {
+  const v = await db.kvGet(CLAVE_ACTIVO);
+  return Boolean(v && typeof v === 'object' && v.fecha);
+}
+
+/**
+ * Al arrancar: si la app instalada se abre con la marca, este móvil ya está renovado. Solo en Android:
+ * en iPhone y en el ordenador la app instalada también arranca con la marca, pero allí no hay
+ * «Compartir → Partes LAV».
+ */
+export async function anotarArranque({
+  search = location.search,
+  instalada = matchMedia('(display-mode: standalone)').matches,
+  android = /Android/i.test(navigator.userAgent),
+} = {}) {
+  if (!android || !instalada || new URLSearchParams(search).get('i') !== '2') return;
+  if (await compartirActivo()) return;   // se guarda la primera vez
+  await db.kvSet(CLAVE_ACTIVO, { fecha: isoLocal(), via: 'arranque' });
+}
 
 /** Fotos que esperan: [{ id, archivo, llegada }]. Lista vacía si no hay nada o lo guardado no vale. */
 export async function leerCompartidas() {

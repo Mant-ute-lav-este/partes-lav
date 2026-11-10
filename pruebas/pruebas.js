@@ -1016,6 +1016,64 @@ prueba('compartir: el manifest y sw.js usan la misma dirección, el mismo campo 
     cierto(v(sw) && v(sw) === v(js), `${k} distinto en sw.js (${v(sw)}) y js/compartidas.js (${v(js)})`);
   }
   for (const f of ['./js/compartidas.js', './js/vista-compartidas.js']) cierto(sw.includes(`'${f}'`), `falta ${f} en ARCHIVOS de sw.js`);
+  cierto(sw.includes(`'${js.match(/CLAVE_ACTIVO = '(\w+)'/)?.[1]}'`), 'sw.js y js/compartidas.js deben usar la misma clave para «Compartir activo»');
+});
+
+// Saber qué móviles tienen ya «Compartir → Partes LAV»: Chrome solo lo activa al renovar la app
+// instalada, y con esa misma renovación llega la dirección de arranque con la marca ?i=2. El id fijo
+// es el que Chrome ya daba a la app (su start_url de siempre): si cambiara, Chrome la tomaría por
+// otra app. Probado en un móvil real con una copia el 2026-11-10 (privado/PLAN-TANDA2.md).
+prueba('compartir: el manifest fija el id de siempre y arranca con la marca ?i=2', async () => {
+  const man = await fetch('../manifest.webmanifest', { cache: 'no-store' }).then((r) => r.json());
+  igual([man.id, man.start_url, man.scope], ['/partes-lav/', './?i=2', './'], 'id, start_url y scope');
+});
+
+// Con la marca, la portada tiene que salir de la caché sin cobertura igual que sin ella.
+prueba('compartir: sin cobertura, sw.js abre la app también con ./?i=2', async () => {
+  const codigo = await fetch('../sw.js', { cache: 'no-store' }).then((r) => r.text());
+  const manejadores = {};
+  const nombre = `prueba-sw-${Date.now()}`;
+  const cachesPrueba = { open: () => caches.open(nombre), keys: () => caches.keys(), delete: (k) => caches.delete(k) };
+  new Function('self', 'caches', 'fetch', codigo)(
+    { addEventListener: (t, f) => { manejadores[t] = f; }, clients: {}, skipWaiting() {}, location: new URL('../', location.href) },
+    cachesPrueba,
+    () => Promise.reject(new TypeError('sin cobertura')));
+  const raiz = new URL('../', location.href).href;
+  try {
+    await (await caches.open(nombre)).put(raiz, new Response('portada'));
+    let respuesta;
+    manejadores.fetch({ request: new Request(`${raiz}?i=2`), respondWith: (p) => { respuesta = p; } });
+    cierto(respuesta, 'sw.js no atiende la dirección con la marca');
+    igual(await (await respuesta).text(), 'portada', 'sin cobertura debe dar la portada guardada');
+  } finally {
+    await caches.delete(nombre);
+  }
+});
+
+prueba('compartir: la app apunta «Compartir activo» al arrancar instalada con la marca', async () => {
+  const { anotarArranque, compartirActivo, CLAVE_ACTIVO } = await import('../js/compartidas.js');
+  const antes = await db.kvGet(CLAVE_ACTIVO);
+  try {
+    await db.kvSet(CLAVE_ACTIVO, null);
+    await anotarArranque({ search: '?i=2', instalada: false, android: true });
+    igual(await compartirActivo(), false, 'en el navegador (no instalada) no cuenta');
+    await anotarArranque({ search: '', instalada: true, android: true });
+    igual(await compartirActivo(), false, 'instalada sin la marca: aún no renovada');
+    await anotarArranque({ search: '?i=2', instalada: true, android: false });
+    igual(await compartirActivo(), false, 'iPhone u ordenador: aunque arranque con la marca, allí no hay Compartir');
+    await anotarArranque({ search: '?i=2', instalada: true, android: true });
+    igual(await compartirActivo(), true, 'instalada y con la marca: activado');
+    const primera = await db.kvGet(CLAVE_ACTIVO);
+    igual(primera.via, 'arranque');
+    cierto(/^\d{4}-\d\d-\d\dT/.test(primera.fecha), 'con la fecha');
+    await db.kvSet(CLAVE_ACTIVO, { ...primera, fecha: '2026-01-01T00:00:00+01:00' });
+    await anotarArranque({ search: '?i=2', instalada: true, android: true });
+    igual((await db.kvGet(CLAVE_ACTIVO)).fecha, '2026-01-01T00:00:00+01:00', 'se guarda la primera vez, no se pisa');
+    await db.kvSet(CLAVE_ACTIVO, 'roto');
+    igual(await compartirActivo(), false, 'lo guardado que no vale no cuenta');
+  } finally {
+    await db.kvSet(CLAVE_ACTIVO, antes ?? null);
+  }
 });
 
 prueba('compartir: sw.js guarda solo las fotos, abre la app y no pasa del máximo', async () => {
@@ -1024,6 +1082,7 @@ prueba('compartir: sw.js guarda solo las fotos, abre la app y no pasa del máxim
   const antes = await db.kvGet('compartidas');
   const fallosAntes = await db.kvGet('fallos');   // lo «raro» del final apunta un fallo: no debe quedarse
   const descartadasAntes = await db.kvGet('compartidasDescartadas');
+  const activoAntes = await db.kvGet('compartirActivo');
   const descartadas = async () => Number(await db.kvGet('compartidasDescartadas')) || 0;
   const enviar = async (archivos) => {
     const fd = new FormData();
@@ -1034,8 +1093,14 @@ prueba('compartir: sw.js guarda solo las fotos, abre la app y no pasa del máxim
   try {
     await db.kvSet('compartidas', null);
     await db.kvSet('compartidasDescartadas', null);
+    await db.kvSet('compartirActivo', null);
     const r = await enviar([await foto('IMG-20261103-WA0001.jpg'), new File(['hola'], 'nota.txt', { type: 'text/plain' }),
       new File([], 'vacia.jpg', { type: 'image/jpeg' }), await foto('IMG-20261103-WA0002.jpg')]);
+    const activo = await db.kvGet('compartirActivo');
+    igual(activo && activo.via, 'compartir', 'si llega algo compartido, el móvil ya tiene «Compartir» activo');
+    cierto(/^\d{4}-\d\d-\d\dT/.test(activo.fecha), 'con la fecha');
+    const { compartirActivo } = await import('../js/compartidas.js');
+    igual(await compartirActivo(), true, 'la app entiende lo que guarda sw.js');
     igual(r.status, 303, 'abre la app con una redirección');
     igual(r.headers.get('Location'), new URL('../', location.href).href, 'a la portada');
     let l = await db.kvGet('compartidas');
@@ -1061,6 +1126,7 @@ prueba('compartir: sw.js guarda solo las fotos, abre la app y no pasa del máxim
     await db.kvSet('compartidas', antes ?? null);
     await db.kvSet('fallos', fallosAntes || []);
     await db.kvSet('compartidasDescartadas', descartadasAntes ?? null);
+    await db.kvSet('compartirActivo', activoAntes ?? null);
   }
 });
 
