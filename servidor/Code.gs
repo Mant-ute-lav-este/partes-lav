@@ -4,7 +4,8 @@
  * - Registra a los capataces (Gmail + código por correo + nombre de la lista + PIN).
  *   Cada registro queda pendiente hasta que la oficina lo aprueba desde un enlace.
  *   Si alguien olvida el PIN, crea otro con un código que le llega al correo.
- * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, aparatos con sus PK, medidas antiincendios, motivos, cabecera, y máquinas de vía y su personal para el parte de maquinaria).
+ * - Sirve a la app la lista de la oficina (trabajadores, máquinas, vehículos, aparatos con sus PK, medidas antiincendios, motivos, cabecera, y máquinas de vía y su personal para el parte de maquinaria;
+ *   y, a quien ve el botón HERBICIDA, los casos SIOS de la campaña, los productos y las máquinas).
  * - Recibe los partes y los manda por correo a la oficina, donde Power Automate los
  *   guarda en la carpeta de Teams.
  * - Manda los datos de cada parte (sin fotos) al portal de la UTE, si está configurado.
@@ -20,7 +21,7 @@
 // Número de esta versión del servidor. SUBIRLO en cada despliegue (el mismo que «Versión N» en
 // Gestionar implementaciones) y apuntarlo en el CHANGELOG. Sale en la lista que pide la app
 // (Menú → «Servidor: vN») y en la página de la URL: así se comprueba qué versión está en marcha.
-const VERSION_SERVIDOR = 27;
+const VERSION_SERVIDOR = 28;
 const ZONA = 'Europe/Madrid';
 const MAX_ADJUNTOS_BYTES = 24 * 1024 * 1024;   // Gmail admite 25 MB por correo
 const MAX_ARCHIVOS = 12;   // PDF, Datos y Fotos, más hasta 6 registros DRP de la bateadora (con margen)
@@ -189,7 +190,13 @@ function configurar() {
   crearHoja_(libro, 'MaquinasVia', ['Descripcion', 'UIC', 'Trabajo', 'Parte']);
   crearHoja_(libro, 'PersonalMaquinaria', ['Nombre', 'Empresa', 'Categoria']);
   crearHoja_(libro, 'Motivos', ['Tipo', 'Motivo']);
-  crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
+  Object.keys(HERBICIDA_).forEach((k) => crearHoja_(libro, HERBICIDA_[k].hoja, HERBICIDA_[k].cab));
+  const ajustes = crearHoja_(libro, 'Ajustes', ['Clave', 'Valor']);
+  // Los ajustes de la campaña de herbicida, si aún no están: la campaña empieza apagada.
+  const claves = ajustes.getDataRange().getValues().map((f) => String(f[0]));
+  [['herbicidaActiva', 'no'], ['herbicidaProbadores', '']].forEach((a) => {
+    if (claves.indexOf(a[0]) < 0) ajustes.appendRow(a);
+  });
   crearHoja_(libro, 'Errores', ['Recibido', 'Fecha', 'Usuario', 'Version', 'Tipo', 'Mensaje']);
   const sobra = libro.getSheetByName('Hoja 1') || libro.getSheetByName('Sheet1');
   if (sobra && libro.getSheets().length > 1) libro.deleteSheet(sobra);
@@ -705,6 +712,7 @@ function config_(d) {
         descripcion: String(v.Descripcion), matricula: String(v.Matricula || ''),
       })),
       motivos: motivos,
+      herbicida: herbicida_(aj, u.Email),
     },
   };
 }
@@ -717,7 +725,57 @@ function configVacia_() {
     cabecera: { jefatura: '', ambito: '', empresa: '', lineaInfra: '', lineaSuper: '' },
     capataces: [], trabajadores: [], maquinas: [], aparatos: [], antiincendios: [],
     maquinasVia: [], personalMaquinaria: [], vehiculos: [], motivos: { infra: [], super: [] },
+    herbicida: herbicidaVacio_(),
   };
+}
+
+// ---------- Campaña de herbicida (v28) ----------
+
+/**
+ * Las tres listas de la campaña: hoja, cabecera y el nombre de cada campo en la app y en cargarLista
+ * (mismo orden). La primera columna es la que no puede ir vacía. Para otra campaña (o el desbroce) se
+ * carga una lista de casos nueva: la app no da por fijos los casos.
+ */
+const HERBICIDA_ = {
+  casos: {
+    hoja: 'CasosHerbicida',
+    cab: ['Caso', 'Linea', 'Via', 'PkInicio', 'PkFin', 'Superficie', 'Ubicacion', 'Desbroce'],
+    campos: ['caso', 'linea', 'via', 'pkInicio', 'pkFin', 'superficie', 'ubicacion', 'desbroce'],
+  },
+  productos: { hoja: 'ProductosHerbicida', cab: ['Nombre', 'Dosis'], campos: ['nombre', 'dosis'] },
+  maquinas: { hoja: 'MaquinasHerbicida', cab: ['Descripcion'], campos: ['descripcion'] },
+};
+
+function herbicidaVacio_() {
+  return { activa: false, probador: false, visible: false, casos: [], productos: [], maquinas: [] };
+}
+
+/**
+ * Lo de la campaña para este usuario. El botón HERBICIDA se ve si la campaña está activa (ajuste
+ * herbicidaActiva) o si su correo está en herbicidaProbadores. Las listas solo van a quien ve el
+ * botón (así no se cargan los demás móviles), y la lista de probadores nunca sale del servidor.
+ */
+function herbicida_(aj, email) {
+  const o = herbicidaVacio_();
+  o.activa = siNo_(aj.herbicidaActiva);
+  o.probador = correosValidos_(aj.herbicidaProbadores).split(',').indexOf(String(email || '').toLowerCase()) >= 0;
+  o.visible = o.activa || o.probador;
+  if (!o.visible) return o;
+  Object.keys(HERBICIDA_).forEach((k) => {
+    const def = HERBICIDA_[k];
+    o[k] = tabla_(def.hoja).filas.filter((f) => String(f[def.cab[0]] || '').trim()).map((f) => {
+      const x = {};
+      def.campos.forEach((c, i) => { x[c] = String(f[def.cab[i]] == null ? '' : f[def.cab[i]]); });
+      return x;
+    });
+  });
+  return o;
+}
+
+/** «sí», «Sí», «SI», «true», «1»… → true. Cualquier otra cosa (también vacío) → false. */
+function siNo_(v) {
+  const s = String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  return s === 'si' || s === 'true' || s === '1';
 }
 
 /**
@@ -756,7 +814,7 @@ function apuntarUltimo_(email, ref) {
 
 /**
  * Sube la lista de la oficina (mismo formato que config-partes-lav.json). Requiere la clave de
- * administración. Solo cambia lo que venga: trabajadores, maquinas, vehiculos, aparatos, antiincendios, motivos y, si
+ * administración. Solo cambia lo que venga: trabajadores, maquinas, vehiculos, aparatos, antiincendios, motivos, herbicida y, si
  * viene la cabecera, los ajustes que trae (los demás de la hoja Ajustes se conservan).
  */
 function cargarLista_(d) {
@@ -805,6 +863,23 @@ function cargarLista_(d) {
       (m.super || []).map((x) => ['super', x]),
     ));
     hecho.motivos = true;
+  }
+  // Campaña de herbicida (v28): { herbicida: { casos, productos, maquinas } }. Solo cambian las listas
+  // que vienen; las filas sin su primer campo (el nº de caso, el nombre…) no entran. Los ajustes
+  // herbicidaActiva y herbicidaProbadores no van aquí: se cambian a mano en la hoja Ajustes.
+  if (c.herbicida && typeof c.herbicida === 'object') {
+    hecho.herbicida = {};
+    Object.keys(HERBICIDA_).forEach((k) => {
+      const lista = c.herbicida[k];
+      if (!Array.isArray(lista)) return;
+      const def = HERBICIDA_[k];
+      const filas = lista
+        .map((o) => def.campos.map((campo) => String((o && o[campo]) == null ? '' : o[campo]).trim()))
+        .filter((f) => f[0]);
+      asegurarHoja_(def.hoja, def.cab);
+      reemplazar_(def.hoja, filas);
+      hecho.herbicida[k] = filas.length;
+    });
   }
   if (c.cabecera) {
     // Solo cambian las claves que trae la lista; las demás filas de Ajustes (las añadidas a mano,
@@ -971,8 +1046,9 @@ function mandarParte_(d, u, aj) {
 // Power Automate guarda en SharePoint en '/Documentos compartidos/General/Partes/' + Datos_.carpeta, y cada
 // foto con el nombre Fotos_.fotos[].archivo, tal cual (A7). La app siempre los hace con esta forma
 // (envio.js: carpetaDestino y los nombres T1_antes_1.jpg, Formato1_1.jpg, …_v2.jpg): nada de '..' ni '/' de más.
-const CARPETA_PARTE = /^\d{4}-\d{2}-\d{2}\/(Infra|Super|Maquinaria)\/[A-Za-z0-9][A-Za-z0-9_-]*$/;
-const NOMBRE_FOTO = /^(T\d+_[a-z]+_\d+|Formato1_\d+)(_v\d+)?\.jpg$/;
+// Desde la v28, también la carpeta Herbicida y las fotos con el nº SIOS delante de la fase (T1_385208_antes_1.jpg).
+const CARPETA_PARTE = /^\d{4}-\d{2}-\d{2}\/(Infra|Super|Maquinaria|Herbicida)\/[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const NOMBRE_FOTO = /^(T\d+(_\d{1,9})?_[a-z]+_\d+|Formato1_\d+)(_v\d+)?\.jpg$/;
 
 /** Comprueba la carpeta del Datos_ y los nombres de foto del Fotos_ antes de que el correo salga. */
 function comprobarRutas_(adjuntos) {

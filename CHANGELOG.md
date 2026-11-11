@@ -26,7 +26,17 @@ La versión que ve el capataz está en Ajustes («Versión de la app»). Al publ
 - Sin cobertura la app abre igual con la marca (`sw.js` ya buscaba en la caché sin mirar lo que va tras el `?`; ahora una prueba lo vigila).
 - Pruebas nuevas: manifest (id, start_url), apertura sin cobertura con `?i=2`, la marca solo cuenta instalada, se guarda la primera vez, y `sw.js` lo apunta al recibir.
 
-## Servidor v27 · 2026-11-04 (PREPARADO, SIN DESPLEGAR: va con el próximo cambio del servidor)
+## Servidor v28 · 2026-11-11 (desplegado; lleva dentro la v27, que no llegó a desplegarse)
+- En «Gestionar implementaciones» sale como **Versión 27** (Google numera sus versiones seguidas y la v27 nunca se desplegó). La página del servidor dice v28.
+- Desplegado como «Nueva versión» de la implementación de siempre; `configurar()` ejecutado; 338 casos cargados en CasosHerbicida.
+- **Campaña de herbicida, lado del servidor** (`DISEÑO\PLAN-HERBICIDA.md`, paso 1). Para los capataces no cambia nada hasta que la app lo use y se active.
+- Hojas nuevas **CasosHerbicida** (Caso, Linea, Via, PkInicio, PkFin, Superficie, Ubicacion, Desbroce), **ProductosHerbicida** (Nombre, Dosis) y **MaquinasHerbicida** (Descripcion). Las dos últimas, vacías: el hueco queda listo para cuando lleguen las listas.
+- Ajustes nuevos en la hoja Ajustes: **herbicidaActiva** (`sí`/`no`) y **herbicidaProbadores** (correos separados por coma). `configurar()` los añade si faltan, con la campaña apagada, y crea las hojas.
+- `config` trae `herbicida: { activa, probador, visible, casos, productos, maquinas }`. `visible` = campaña activa o correo en la lista de probadores. Las listas solo van a quien ve el botón; la lista de probadores no sale nunca del servidor. Una cuenta pendiente lo recibe todo vacío.
+- `cargarLista` acepta `herbicida: { casos, productos, maquinas }`: solo cambia las listas que trae y descarta las filas sin su primer campo.
+- Comprobación de rutas (A7): admite la carpeta `AAAA-MM-DD/Herbicida/…` y las fotos con el nº SIOS delante de la fase (`T1_385208_antes_1.jpg`).
+
+### De la v27 (va en la misma v28)
 - Al subir la lista de la oficina con cabecera (`cargarLista`), la hoja Ajustes ya no se vacía entera: solo cambian las claves que trae la lista (nombre, fecha, destinatario, admin, jefatura, ámbito, empresa, líneas y, si viene, `copia`). Cualquier otra fila añadida a mano en Ajustes se conserva. Antes solo se salvaba `copia`, con un parche.
 - Prueba nueva: subir la lista conserva un ajuste que no conoce, cambia `copia` solo si la lista la trae (también a vacía), una lista sin cabecera no toca Ajustes y con la clave mal no cambia nada.
 - Para los capataces, la oficina y la app del almacén no cambia nada.

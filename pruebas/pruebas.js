@@ -1284,6 +1284,7 @@ prueba('servidor: subir la lista cambia solo los ajustes que trae y conserva los
     destinatario: 'nueva@ejemplo.test', copia: 'copia@ejemplo.test', ajusteFuturo: 'no se toca',
     nombre: 'Lista 2', fecha: '2026-11-04', admin: 'nueva@ejemplo.test',
     jefatura: 'J', ambito: 'A', empresa: 'E', lineaInfra: 'L040', lineaSuper: 'L038',
+    herbicidaActiva: 'no', herbicidaProbadores: '',   // los pone configurar() (v28)
   }), 'cambia lo de la lista, conserva «copia» y el ajuste que no conoce');
   const claves = E.hojas.Ajustes._d.slice(1).map((f) => f[0]).filter(Boolean);
   igual(claves.length, new Set(claves).size, 'sin claves repetidas en la hoja');
@@ -1297,6 +1298,67 @@ prueba('servidor: subir la lista cambia solo los ajustes que trae y conserva los
   // Con la clave mal, nada.
   igual(pedir({ clave: 'otra', config: { ...lista, nombre: 'Mala' } }).ok, false, 'clave mala');
   igual(E.s.ajustes_().nombre, 'Lista 2');
+});
+
+// Datos inventados: el repositorio es público.
+const CASOS_HERBICIDA = [
+  { caso: '900001', linea: '040', via: 'V1 / V2', pkInicio: '286+808', pkFin: '286+865', superficie: '114', ubicacion: 'DESMONTE', desbroce: 'si' },
+  { caso: '900002', linea: '044', via: 'V1', pkInicio: '459+050', pkFin: '459+600', superficie: '1650.5', ubicacion: 'TERRAPLÉN', desbroce: '' },
+];
+
+prueba('servidor: listas de herbicida (v28): se cargan y solo las recibe quien ve el botón', async () => {
+  const E = await servidorListo();
+  E.props.CLAVE_ADMIN = 'clave-prueba';
+  const pedir = (o) => E.post({ peticion: crypto.randomUUID(), accion: 'cargarLista', clave: 'clave-prueba', ...o });
+  const config = (token = E.token) => E.post({ accion: 'config', token, peticion: crypto.randomUUID() });
+  const ajuste = (clave, valor) => { E.hojas.Ajustes._d.find((f) => f[0] === clave)[1] = valor; };
+  // configurar() deja las tres hojas y los dos ajustes, con la campaña apagada.
+  for (const h of ['CasosHerbicida', 'ProductosHerbicida', 'MaquinasHerbicida']) cierto(E.hojas[h], 'hoja ' + h);
+  igual(E.hojas.CasosHerbicida._d[0], ['Caso', 'Linea', 'Via', 'PkInicio', 'PkFin', 'Superficie', 'Ubicacion', 'Desbroce']);
+  igual([E.s.ajustes_().herbicidaActiva, E.s.ajustes_().herbicidaProbadores], ['no', '']);
+  E.s.configurar();   // repetirlo no duplica los ajustes
+  igual(E.hojas.Ajustes._d.filter((f) => f[0] === 'herbicidaActiva').length, 1, 'herbicidaActiva una sola vez');
+
+  // Carga: solo cambia las listas que trae; las filas sin nº de caso no entran.
+  const r = pedir({ config: { formato: 'config-partes-lav', herbicida: {
+    casos: [...CASOS_HERBICIDA, { caso: '  ', linea: '040' }], productos: [{ nombre: 'Producto X', dosis: '8' }] } } });
+  igual(r.ok, true, r.error);
+  igual(r.herbicida, { casos: 2, productos: 1 }, 'lo que ha cargado');
+  igual(pedir({ config: { formato: 'config-partes-lav', herbicida: { maquinas: [{ descripcion: 'Cuba 1' }] } } }).herbicida, { maquinas: 1 });
+  igual(E.hojas.CasosHerbicida._d.filter((f) => f[0]).length - 1, 2, 'los casos siguen');
+
+  // Campaña apagada y sin ser probador: el botón no sale y las listas van vacías.
+  let h = config().config.herbicida;
+  igual(h, { activa: false, probador: false, visible: false, casos: [], productos: [], maquinas: [] }, 'apagada');
+  // Probador (da igual mayúsculas y separadores): las ve. La lista de probadores nunca va al móvil.
+  ajuste('herbicidaProbadores', 'otro@ejemplo.test; ANA@ejemplo.test');
+  const c = config();
+  h = c.config.herbicida;
+  igual([h.activa, h.probador, h.visible], [false, true, true], 'probador');
+  igual(h.casos, CASOS_HERBICIDA, 'casos tal cual');
+  igual(h.productos, [{ nombre: 'Producto X', dosis: '8' }]);
+  igual(h.maquinas, [{ descripcion: 'Cuba 1' }]);
+  cierto(!JSON.stringify(c).includes('otro@ejemplo.test'), 'sin los correos de los probadores');
+  // Activa para todos: «sí», «Sí», «SI», «true»…; cualquier otra cosa la deja apagada.
+  ajuste('herbicidaProbadores', '');
+  for (const v of ['sí', 'Sí', 'SI', 'si', 'TRUE', '1']) {
+    ajuste('herbicidaActiva', v);
+    h = config().config.herbicida;
+    igual([h.activa, h.visible, h.casos.length], [true, true, 2], 'activa con ' + JSON.stringify(v));
+  }
+  for (const v of ['no', '', 'NO', 'quizá']) {
+    ajuste('herbicidaActiva', v);
+    igual(config().config.herbicida.visible, false, 'apagada con ' + JSON.stringify(v));
+  }
+
+  // Una cuenta pendiente no recibe nada, aunque la campaña esté activa.
+  ajuste('herbicidaActiva', 'sí');
+  E.hojas.Usuarios.appendRow(['pen@ejemplo.test', 'Pendiente Prueba', 'pendiente', 's', 'h', '0', '0', '2026-01-01', '']);
+  igual(config(E.s.crearSesion_('pen@ejemplo.test')).config.herbicida.casos, [], 'pendiente');
+
+  // Subir la lista de la oficina con cabecera no toca los ajustes de la campaña.
+  igual(pedir({ config: { formato: 'config-partes-lav', nombre: 'L', cabecera: {} } }).ok, true);
+  igual(E.s.ajustes_().herbicidaActiva, 'sí', 'la cabecera conserva herbicidaActiva');
 });
 
 prueba('servidor: envía un parte sin tener bloqueado al resto', async () => {
@@ -1544,9 +1606,10 @@ prueba('servidor: una cuenta pendiente recibe la lista vacía, y al aprobarla la
   igual([r.ok, r.estado, r.nombre], [true, 'pendiente', 'Pendiente Prueba'], r.error);
   const c = r.config;
   igual(c.formato, 'config-partes-lav', 'misma forma que la lista de verdad');
-  for (const [k, v] of Object.entries(c)) {
+  for (const [k, v] of Object.entries({ ...c, ...c.herbicida })) {
     if (Array.isArray(v)) igual(v.length, 0, k + ' vacía');
   }
+  igual(c.herbicida.visible, false, 'sin botón de herbicida');
   igual([c.destinatario, c.cabecera.empresa, c.motivos.infra.length], ['', '', 0], 'sin datos de la oficina');
   cierto(!JSON.stringify(r).includes('HAB-777') && !JSON.stringify(r).includes('1234ABC'), 'ni habilitaciones ni matrículas');
 
@@ -1594,6 +1657,13 @@ prueba('servidor: no deja salir un parte con una carpeta o un nombre de foto que
   cierto(mal.test(E.post(E.parte({ archivos: [{ nombre: 'Fotos_x.txt', texto: '{"fotos":5}' }] })).error), 'Fotos_ sin lista');
   igual(E.correos.length, 0, 'no ha salido ningún correo');
   igual(conFotos([{ archivo: 'T2_telsalida_1_v2.jpg', base64: 'eA==' }, { archivo: 'Formato1_3.jpg', base64: 'eA==' }]).ok, true, 'los buenos sí salen');
+  // Herbicida (v28): su carpeta y las fotos con el nº SIOS delante de la fase.
+  igual(conDatos({ carpeta: '2026-11-16/Herbicida/HER-0001_Ana_Prueba' }).ok, true, 'carpeta Herbicida');
+  igual(conFotos([{ archivo: 'T1_900001_antes_1.jpg', base64: 'eA==' }, { archivo: 'T35_900002_despues_2_v2.jpg', base64: 'eA==' }]).ok, true, 'fotos con SIOS');
+  for (const archivo of ['T1_9_0_antes_1.jpg', 'T1_1234567890_antes_1.jpg', 'T1__antes_1.jpg', 'T1_900001_antes.jpg']) {
+    cierto(mal.test(conFotos([{ archivo, base64: 'eA==' }]).error), 'foto ' + archivo);
+  }
+  cierto(mal.test(conDatos({ carpeta: '2026-11-16/herbicida/HER-0001' }).error), 'herbicida en minúsculas');
   // El rechazo no deja la reserva puesta: se puede corregir y reenviar con el mismo envioId.
   const p = E.parte({ archivos: [{ nombre: 'Datos_x.txt', texto: '{}' }] });
   cierto(mal.test(E.post(p).error), 'primero, mal');
