@@ -25,7 +25,10 @@ import {
   filasAparato, aplicarAparatos, destinoAparato,
 } from './vista-trabajo.js';
 import { anadirDrp, quitarDrp } from './vista-drp.js';
-import { referenciaDe } from './compartidas.js';
+import { referenciaDe, borrarPase } from './compartidas.js';
+import {
+  abrirOrigenFoto, origenFotoMovil, origenFotoWhatsapp, origenFotoVolver, origenFotoHecho, cerrarOrigenFoto,
+} from './vista-origen-foto.js';
 import {
   abrirCompartidas, cerrarCompartidas, elegirTrabajoCompartidas, otroTrabajoCompartidas, colocarCompartidas, descartarCompartidas,
 } from './vista-compartidas.js';
@@ -45,7 +48,7 @@ export const ACCIONES_BORRADOR = new Set([
   'nuevo-trabajo', 'copiar-trabajo-anterior', 'borrar-trabajo', 'anadir-aparato', 'quitar-aparato',
   'anadir-desvio', 'quitar-desvio', 'nuevo-equipo', 'quitar-equipo', 'nueva-maqvia', 'quitar-maqvia',
   'nuevo-tajo', 'quitar-tajo', 'foto', 'foto-formato', 'anadir-drp', 'quitar-drp', 'borrar-foto',
-  'borrar-parte', 'cerrar-parte',
+  'borrar-parte', 'cerrar-parte', 'origen-foto-movil', 'origen-foto-whatsapp',
 ]);
 
 const esBorrador = () => Boolean(estado.parte && estado.parte.estado === 'borrador');
@@ -444,7 +447,7 @@ export async function onClick(e) {
         ir('setup-capataz');
       }
       break;
-    case 'bloquear': ir('pin'); break;
+    case 'bloquear': borrarPase().catch(() => {}); ir('pin'); break;   // bloquear acaba también el pase de WhatsApp
     case 'ir-inicio': ir('inicio'); break;
     case 'nuevo':
       if (el.dataset.tipo === 'MAQUINARIA') { estado.eligeMaquina = true; render(); } else nuevoParte(el.dataset.tipo);
@@ -541,15 +544,26 @@ export async function onClick(e) {
         toast('Pon primero la referencia: sale en el sello de la foto.', 3500);
         break;
       }
-      estado.fotoPendiente = { fase: el.dataset.fase, origen: el.dataset.origen };
-      document.getElementById(el.dataset.origen === 'camara' ? 'in-camara' : 'in-galeria').click();
+      const pendiente = { fase: el.dataset.fase, origen: el.dataset.origen };
+      if (pendiente.origen === 'galeria') { abrirOrigenFoto(pendiente); break; }
+      estado.fotoPendiente = pendiente;
+      document.getElementById('in-camara').click();
       break;
     }
     case 'foto-formato':
       if ((p.formato1 || []).length >= MAX_FORMATO1) { toast(`Ya hay ${MAX_FORMATO1} fotos: borra alguna para añadir otra.`, 3500); break; }
-      estado.fotoPendiente = { formato: true, origen: el.dataset.origen };
-      document.getElementById(el.dataset.origen === 'camara' ? 'in-camara' : 'in-galeria').click();
+      {
+        const pendiente = { formato: true, origen: el.dataset.origen };
+        if (pendiente.origen === 'galeria') { abrirOrigenFoto(pendiente); break; }
+        estado.fotoPendiente = pendiente;
+        document.getElementById('in-camara').click();
+      }
       break;
+    case 'origen-foto-movil': origenFotoMovil(); break;
+    case 'origen-foto-whatsapp': origenFotoWhatsapp(); break;
+    case 'origen-foto-volver': origenFotoVolver(); break;
+    case 'origen-foto-cerrar': cerrarOrigenFoto(); break;
+    case 'origen-foto-hecho': origenFotoHecho(); break;
     case 'anadir-drp': document.getElementById('in-drp').click(); break;
     case 'quitar-drp': quitarDrp(el.dataset.id); break;
     case 'ver-foto': estado.fotoVista = el.dataset.id; render(); break;

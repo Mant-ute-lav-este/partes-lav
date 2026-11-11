@@ -2,6 +2,20 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.29.0 · 2026-11-11 (fotos de WhatsApp directas a su sitio)
+- **Fase 3 · 5 minutos sin PIN** (`privado/PLAN-TANDA2.md`). Al abrir «Fotos de WhatsApp» el móvil guarda a dónde van (clave `paseWhatsapp` de `kv`: parte, trabajo y fase, o el formato de SUPER) durante 5 minutos. Al compartir, la app se recarga: si hay fotos esperando y el pase vale, **entra sin PIN**, abre ese trabajo, pone las fotos en su fase con su sello y vuelve a la pantalla de pasos con «✓ Añadida. Comparte la siguiente o pulsa Hecho». Cada foto renueva los 5 minutos.
+- El pase se acaba con «Hecho», «Atrás», «Bloquear», «Cerrar sesión», a los 5 minutos sin fotos, si el parte ya no es borrador o el trabajo/fase ya no existe, y si alguna foto no ha cabido (formato lleno). Nunca salta un PIN bloqueado por intentos; si el reloj del móvil va hacia atrás o el pase dura más de 5 minutos, no vale. Sin pase, todo como antes: PIN y «¿De qué trabajo son?».
+- En la pantalla de pasos, tocar fuera de la hoja ya no la cierra (se perdería el pase sin querer).
+- `js/app.js`: antes de pedir el PIN prueba `entrarConPase` (`js/vista-compartidas.js`). Pruebas nuevas: cuándo vale el pase, entrada sin PIN, 5 casos en que pide PIN sin tocar nada, parte cerrado, formato lleno, crear/quitar el pase con los botones y el **arranque real de la app** con y sin pase. 163 pruebas; revisión de código hecha (6 avisos, arreglados).
+
+### Fase 2 (va en la misma 0.29.0)
+- Tanda 2 de «fotos desde WhatsApp», fase 2 (`privado/PLAN-TANDA2.md`). Al tocar **🖼️ Galería** (fotos de un trabajo, telefonemas y formato de SUPER) sale una hoja nueva, `js/vista-origen-foto.js`, que depende del móvil:
+  - **Android con la app instalada y «Compartir» ya activo:** «¿De dónde es la foto?» con **Fotos del móvil** y **Fotos de WhatsApp**. WhatsApp enseña 4 pasos (abre WhatsApp → mantén pulsada la foto y ⋮ → Compartir → desliza hasta Partes LAV), «Irán a: Trabajo 2 · Después» y el escape «Fotos del móvil → Colecciones → WhatsApp» para muchas fotos (Compartir va de una en una). No hay botón «Abrir WhatsApp»: ninguno de los 4 enlaces probados lo abría.
+  - **Android instalada, «Compartir» aún sin activar:** solo «Fotos del móvil», con «Las fotos de WhatsApp están en Colecciones → WhatsApp» y el aviso «El envío directo desde WhatsApp se activará solo: deja una noche el móvil cargando con WiFi».
+  - **Navegador, iPhone u ordenador:** nada cambia (se abre el selector como siempre).
+- `estado.compartirActivo` se lee al arrancar; reglas en `modoOrigen` (`js/compartidas.js`). Acciones nuevas: `origen-foto-movil` (toca el parte), `origen-foto-whatsapp`, `-volver`, `-cerrar` (libres).
+- Pruebas: qué ve cada móvil, las pantallas de las dos caras (trabajo, telefonema y formato) y el recorrido de toques; 157 en total. La prueba «ningún botón ni campo cambia un parte enviado» espera a que pase un guardado diferido de la prueba anterior (fallaba al azar) y, si falla, dice qué campo cambió.
+
 ## 0.28.0 · 2026-11-10 (por dentro: saber qué móviles tienen «Compartir» activo)
 - Primer paso de la tanda 2 de «fotos desde WhatsApp» (`privado/PLAN-TANDA2.md`, fase 1). Para los capataces no cambia nada a la vista.
 - El móvil apunta, la primera vez que lo nota, que ya tiene «Compartir → Partes LAV» (clave `compartirActivo` de `kv`: `{ fecha, via }`): cuando llega algo compartido (`sw.js`) o cuando la app instalada arranca con la marca `?i=2`.

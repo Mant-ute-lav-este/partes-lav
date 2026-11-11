@@ -5,9 +5,55 @@ import * as db from './db.js';
 import { esc, toast } from './util.js';
 import {
   leerCompartidas, borrarCompartidas, quitarCompartida, tomarDescartadas, destinosFotos, MAX_COMPARTIDAS, MAX_MB_COMPARTIDA,
+  leerPase, renovarPase, borrarPase, fasesFoto, referenciaDe,
 } from './compartidas.js';
 import { estado, ir, render, guardarYa } from './estado.js';
 import { anadirFotos } from './vista-trabajo.js';
+
+/**
+ * Al abrir la app (tras compartir desde WhatsApp): si hay fotos esperando y un pase válido, entra sin
+ * PIN, abre el trabajo (o el formato de SUPER) del pase y las pone en su fase. Devuelve true si ha
+ * entrado; false si hay que pedir el PIN (sin pase, caducado, PIN bloqueado, sin fotos o el destino ya
+ * no vale: entonces el pase se borra y las fotos siguen esperando a la hoja de siempre).
+ */
+export async function entrarConPase() {
+  const pase = await leerPase();
+  if (!pase) return false;
+  const intentos = await db.kvGet('intentosPin');
+  if (intentos && Date.now() < Number(intentos.hasta)) return false;   // PIN bloqueado: el pase no lo salta
+  const fotos = await leerCompartidas();
+  if (!fotos.length) return false;
+  const p = await db.getParte(pase.parteId);
+  const borrador = p && p.estado === 'borrador';
+  let ti = -1;
+  if (borrador && !pase.formato) {
+    ti = (p.trabajos || []).findIndex((t) => t.id === pase.trabajoId);
+    const t = p.trabajos[ti];
+    if (t && (!referenciaDe(t) || !fasesFoto(p, t).some(([f]) => f === pase.fase))) ti = -1;
+  }
+  const formato = Boolean(borrador && pase.formato && p.tipo === 'SUPER');
+  if (!formato && ti < 0) { await borrarPase(); return false; }
+  await renovarPase(pase);
+  estado.parte = p;
+  if (formato) await ir('parte');
+  else { estado.trabajoIdx = ti; await ir('trabajo'); }
+  const pendiente = formato ? { formato: true, origen: 'galeria' } : { fase: pase.fase, origen: 'galeria' };
+  const cuantas = () => (formato ? (p.formato1 || []).length : p.trabajos[ti].fotos.length);
+  const antes = cuantas();
+  // Como colocarCompartidas: una a una, guardando el parte antes de sacarla de la espera.
+  await anadirFotos(fotos.map((x) => x.archivo), {
+    ...pendiente,
+    trasCada: async (k) => { await guardarYa(); await quitarCompartida(fotos[k].id); },
+  });
+  // Cuenta desde la última foto. Si alguna no ha cabido y sigue esperando (formato lleno), el pase se
+  // acaba: si no, cada vez que se abriera la app volvería a entrar sin PIN y a renovarse.
+  if ((await leerCompartidas()).length) await borrarPase();
+  else await renovarPase(pase);
+  estado.origenFoto = { modo: 'activado', paso: 'whatsapp', pendiente, anadidas: cuantas() > antes };
+  render();
+  await avisarDescartadas().catch(() => {});
+  return true;
+}
 
 const MINIATURAS = 4;
 let colocando = false;   // un segundo toque mientras se colocan no las mete otra vez

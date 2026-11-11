@@ -2300,6 +2300,7 @@ async function pantalla(preparar, ...esperados) {
     vista: 'inicio', config: ej.config, perfil: perfilEjemplo(), reg: {}, otros: [], lista: [], parte: null, trabajoIdx: null,
     busqueda: '', otroAbierto: false, errores: [], menu: false, eligeMaquina: false, fotoVista: null, procesando: '',
     envio: null, preguntaOtro: false, preguntaExtras: false, repetir: null, avisoCopia: '', nCompartidas: 0, compartidas: null,
+    origenFoto: null,
   });
   preparar(estado);
   render();
@@ -2405,6 +2406,67 @@ prueba('pantallas: trabajo de INFRA', async () => {
     Object.assign(e.parte.trabajos[0], { finalizado: false, noRealizado: true, motivoNoRealizado: 'Falta de material' });
     Object.assign(e.parte.trabajos[1], { sinFotos: true, motivoSinFotos: 'Sin luz suficiente' });
   }, 'No realizado · Falta de material', 'Sin fotos: Sin luz suficiente');
+});
+
+// Galería con dos caras (tanda 2 de «fotos desde WhatsApp», fase 2): el móvil que ya tiene «Compartir»
+// ve las dos vías; el que aún no, solo «Fotos del móvil» con la ayuda; navegador, iPhone y PC, nada nuevo.
+prueba('compartir: qué ve cada móvil al tocar Galería', async () => {
+  const { modoOrigen } = await import('../js/compartidas.js');
+  igual(modoOrigen({ activo: true, instalada: false, android: true }), 'directo', 'en el navegador, sin hoja');
+  igual(modoOrigen({ activo: true, instalada: true, android: false }), 'directo', 'iPhone u ordenador, sin hoja');
+  igual(modoOrigen({ activo: false, instalada: true, android: true }), 'sinActivar', 'Android instalada aún sin renovar');
+  igual(modoOrigen({ activo: true, instalada: true, android: true }), 'activado', 'Android con Compartir');
+});
+
+prueba('pantallas: hoja «¿De dónde es la foto?» de las dos caras', async () => {
+  const hoja = (modo, paso = 'elige', pendiente = { fase: 'despues', origen: 'galeria' }) => (e) => {
+    e.vista = 'trabajo'; e.parte = borrador(ej.parteInfra()); e.trabajoIdx = 1;
+    e.origenFoto = { modo, paso, pendiente };
+  };
+  await pantalla(hoja('activado'), '¿De dónde es la foto?', 'Fotos del móvil', 'Fotos de WhatsApp');
+  await pantalla(hoja('activado', 'whatsapp'), 'Irán a: Trabajo 2 · Después', 'Mantén pulsada la foto', 'Desliza hasta ver Partes LAV',
+    'Colecciones → WhatsApp');
+  await pantalla(hoja('sinActivar'), 'Colecciones → WhatsApp', 'se activará solo');
+  cierto(!marco.m.app.textContent.includes('Fotos de WhatsApp'), 'sin activar no se ofrece lo que no va a funcionar');
+  await pantalla((e) => {
+    e.vista = 'parte'; e.parte = borrador(ej.parteSuper());
+    e.origenFoto = { modo: 'activado', paso: 'whatsapp', pendiente: { formato: true, origen: 'galeria' } };
+  }, 'Irán a: ' + util.FORMATO1);
+  await pantalla((e) => {
+    e.vista = 'trabajo'; e.parte = borrador(ej.parteSuper()); e.trabajoIdx = 0;
+    e.origenFoto = { modo: 'activado', paso: 'whatsapp', pendiente: { fase: 'telentrada', origen: 'galeria' } };
+  }, 'Telefonema de entrada');
+});
+
+prueba('recorrido: Galería abre la hoja solo si hay algo que elegir y «Fotos del móvil» abre el selector', async () => {
+  const { m } = await appEnMarco();
+  const o = await moduloDelMarco('./js/vista-origen-foto.js');
+  const pendiente = { fase: 'antes', origen: 'galeria' };
+  const p = { ...borrador(ej.parteInfra()), id: crypto.randomUUID() };   // «Fotos de WhatsApp» lo guarda: se borra al final
+  const paseAntes = await db.kvGet('paseWhatsapp');
+  try {
+  await pantalla((e) => { e.vista = 'trabajo'; e.parte = p; e.trabajoIdx = 0; });
+  o.abrirOrigenFoto(pendiente, 'directo');
+  igual([m.estado.origenFoto, m.estado.fotoPendiente], [null, pendiente], 'directo: sin hoja, listo para elegir');
+  m.estado.fotoPendiente = null;
+  o.abrirOrigenFoto(pendiente, 'activado');
+  igual([m.estado.origenFoto && m.estado.origenFoto.paso, m.estado.fotoPendiente], ['elige', null], 'activado: hoja y aún nada elegido');
+  toca('[data-action="origen-foto-whatsapp"]');
+  igual(m.estado.origenFoto.paso, 'whatsapp');
+  toca('[data-action="origen-foto-volver"]');
+  igual(m.estado.origenFoto.paso, 'elige');
+  toca('[data-action="origen-foto-movil"]');
+  igual([m.estado.origenFoto, m.estado.fotoPendiente], [null, pendiente], '«Fotos del móvil» cierra la hoja y abre el selector');
+  o.abrirOrigenFoto(pendiente, 'sinActivar');
+  toca('[data-action="origen-foto-cerrar"]');
+  igual(m.estado.origenFoto, null, 'se puede cancelar');
+  m.estado.fotoPendiente = null;
+  } finally {
+    await new Promise((r) => setTimeout(r, 200));   // que acaben el guardado y el pase de «Fotos de WhatsApp»
+    m.estado.parte = null;
+    await descartarDelMovil(p.id);
+    await db.kvSet('paseWhatsapp', paseAntes ?? null);
+  }
 });
 
 prueba('pantallas: varios aparatos en un trabajo', async () => {
@@ -2870,6 +2932,177 @@ prueba('recorrido: tras el PIN se abre sola la hoja de las fotos compartidas y a
   }
 });
 
+// ---------- pase de 5 minutos sin PIN para las fotos de WhatsApp (tanda 2, fase 3) ----------
+// «Fotos de WhatsApp» guarda a dónde van (pase). Compartir recarga la app: si hay fotos esperando y el
+// pase vale, entra sin PIN, las pone en su sitio y renueva el pase. Si no, el PIN de siempre.
+
+prueba('pase de WhatsApp: cuándo vale', async () => {
+  const { paseValido, PASE_MS } = await import('../js/compartidas.js');
+  const t = 1_800_000_000_000;
+  const p = { parteId: 'p', trabajoId: 't', fase: 'antes', desde: t, hasta: t + PASE_MS };
+  igual(PASE_MS, 5 * 60 * 1000, 'cinco minutos');
+  cierto(paseValido(p, t + 1000), 'recién hecho vale');
+  cierto(!paseValido(p, t + PASE_MS), 'a los 5 minutos ya no');
+  cierto(!paseValido(p, t - 1000), 'si el reloj del móvil va hacia atrás, no vale');
+  cierto(!paseValido({ ...p, hasta: t + 10 * PASE_MS }, t + 1000), 'uno que dure más de 5 minutos no vale (tocado a mano)');
+  cierto(!paseValido({ ...p, parteId: '' }, t + 1000), 'sin parte no vale');
+  for (const raro of [null, 'x', 5, {}, { ...p, desde: String(t) }]) cierto(!paseValido(raro, t + 1000), `no vale: ${JSON.stringify(raro)}`);
+});
+
+/** Deja un parte en el móvil, un pase y fotos esperando; devuelve lo necesario para probar y deshacer. */
+async function prepararPase({ pase = {}, fotos = 2, intentos = null } = {}) {
+  const { m, errores } = await appEnMarco();
+  const comp = await moduloDelMarco('./js/compartidas.js');
+  const vc = await moduloDelMarco('./js/vista-compartidas.js');
+  const guardado = { c: await db.kvGet('compartidas'), pa: await db.kvGet('paseWhatsapp'), i: await db.kvGet('intentosPin') };
+  const p = { ...borrador(ej.parteInfra()), id: crypto.randomUUID() };
+  await db.putParte(p);
+  const ahora = Date.now();
+  await db.kvSet('paseWhatsapp', { parteId: p.id, trabajoId: p.trabajos[0].id, fase: 'despues', desde: ahora, hasta: ahora + comp.PASE_MS, ...pase });
+  const llega = async (n) => ({ id: n, archivo: new File([await jpeg(320, 240)], n, { type: 'image/jpeg' }), llegada: '2026-11-11T10:00:00+01:00' });
+  await db.kvSet('compartidas', fotos ? await Promise.all(Array.from({ length: fotos }, (_, k) => llega(`WA${k}.jpg`))) : null);
+  await db.kvSet('intentosPin', intentos);
+  Object.assign(m.estado, { vista: '', parte: null, trabajoIdx: null, perfil: perfilConToken(), config: ej.config, origenFoto: null, compartidas: null });
+  const deshacer = async () => {
+    m.estado.parte = null;
+    m.estado.origenFoto = null;
+    await descartarDelMovil(p.id);
+    await db.kvSet('compartidas', guardado.c ?? null);
+    await db.kvSet('paseWhatsapp', guardado.pa ?? null);
+    await db.kvSet('intentosPin', guardado.i ?? null);
+  };
+  return { m, errores, vc, p, deshacer };
+}
+
+prueba('pase de WhatsApp: con fotos esperando y pase válido entra sin PIN y las pone en su sitio', async () => {
+  const { m, errores, vc, p, deshacer } = await prepararPase();
+  try {
+    const antes = (await db.kvGet('paseWhatsapp')).desde;
+    await new Promise((r) => setTimeout(r, 20));
+    igual(await vc.entrarConPase(), true, 'entra');
+    igual([m.estado.vista, m.estado.trabajoIdx], ['trabajo', 0], 'en el trabajo del pase');
+    const g = await db.getParte(p.id);
+    const nuevas = g.trabajos[0].fotos.slice(p.trabajos[0].fotos.length);
+    igual(nuevas.map((x) => [x.fase, x.origen]), [['despues', 'galeria'], ['despues', 'galeria']], 'las dos en Después');
+    igual(await db.kvGet('compartidas'), null, 'ya no quedan esperando');
+    cierto((await db.kvGet('paseWhatsapp')).desde > antes, 'el pase se renueva con cada foto');
+    cierto(m.app.textContent.includes('Fotos de WhatsApp') && m.app.textContent.includes('Hecho'), 'vuelve a la hoja de WhatsApp para la siguiente');
+    toca('[data-action="origen-foto-hecho"]');
+    for (let i = 0; i < 40 && (await db.kvGet('paseWhatsapp')); i++) await new Promise((r) => setTimeout(r, 25));
+    igual([await db.kvGet('paseWhatsapp'), m.estado.origenFoto], [null, null], '«Hecho» acaba el pase');
+    if (errores.length) throw new Error(`errores en la app: ${errores.splice(0).join(' | ')}`);
+  } finally {
+    await deshacer();
+  }
+});
+
+prueba('pase de WhatsApp: sin pase válido o sin fotos, pide el PIN y no toca nada', async () => {
+  const { PASE_MS } = await import('../js/compartidas.js');
+  const casos = [
+    ['sin fotos esperando', { fotos: 0 }],
+    ['pase caducado', { pase: { desde: Date.now() - PASE_MS - 1000, hasta: Date.now() - 1000 } }],
+    ['PIN bloqueado por intentos', { intentos: { n: 5, hasta: Date.now() + 60000 } }],
+    ['trabajo que ya no existe', { pase: { trabajoId: 'no-existe' } }],
+    ['fase que no es de ese trabajo', { pase: { fase: 'telentrada' } }],
+  ];
+  for (const [que, op] of casos) {
+    const { m, vc, p, deshacer } = await prepararPase(op);
+    try {
+      igual(await vc.entrarConPase(), false, `${que}: no entra`);
+      igual(m.estado.parte, null, `${que}: no abre ningún parte`);
+      igual((await db.getParte(p.id)).trabajos[0].fotos.length, p.trabajos[0].fotos.length, `${que}: no añade fotos`);
+      if (op.fotos !== 0) igual(((await db.kvGet('compartidas')) || []).length, 2, `${que}: las fotos siguen esperando`);
+    } finally {
+      await deshacer();
+    }
+  }
+  // Un parte que ya no es borrador: no entra y el pase se acaba.
+  const { vc, p, deshacer } = await prepararPase();
+  try {
+    await db.putParte({ ...p, estado: 'cerrado' });
+    igual(await vc.entrarConPase(), false, 'parte cerrado: no entra');
+    igual(await db.kvGet('paseWhatsapp'), null, 'y el pase se borra');
+  } finally {
+    await deshacer();
+  }
+});
+
+// Si una foto no cabe (formato de SUPER ya lleno) sigue esperando: el pase no puede renovarse, o
+// cada vez que se abriera la app se entraría sin PIN para siempre.
+prueba('pase de WhatsApp: si alguna foto no cabe, el pase se acaba y no dice «Añadida»', async () => {
+  const { m, vc, p, deshacer } = await prepararPase({ fotos: 1 });
+  try {
+    const sup = { ...borrador(ej.parteSuper()), id: p.id };
+    sup.formato1 = Array.from({ length: util.MAX_FORMATO1 }, (_, k) => ({ id: `f${k}`, origen: 'camara', etiqueta: 'X', anadida: '2026-11-11T09:00:00+01:00' }));
+    await db.putParte(sup);
+    const pase = await db.kvGet('paseWhatsapp');
+    await db.kvSet('paseWhatsapp', { parteId: p.id, formato: true, desde: pase.desde, hasta: pase.hasta });
+    igual(await vc.entrarConPase(), true, 'entra (las fotos tenían a dónde ir)');
+    igual((await db.kvGet('compartidas') || []).length, 1, 'la que no cabe sigue esperando');
+    igual(await db.kvGet('paseWhatsapp'), null, 'y el pase se acaba');
+    cierto(!m.app.textContent.includes('✓ Añadida'), 'no dice «Añadida»');
+  } finally {
+    await deshacer();
+  }
+});
+
+prueba('pase de WhatsApp: «Fotos de WhatsApp» lo crea, «Atrás» y «Bloquear» lo quitan', async () => {
+  const { m, deshacer, p } = await prepararPase({ fotos: 0 });
+  try {
+    await db.kvSet('paseWhatsapp', null);
+    const o = await moduloDelMarco('./js/vista-origen-foto.js');
+    await pantalla((e) => { e.vista = 'trabajo'; e.parte = p; e.trabajoIdx = 1; e.perfil = perfilConToken(); });
+    o.abrirOrigenFoto({ fase: 'durante', origen: 'galeria' }, 'activado');
+    toca('[data-action="origen-foto-whatsapp"]');
+    for (let i = 0; i < 40 && !(await db.kvGet('paseWhatsapp')); i++) await new Promise((r) => setTimeout(r, 25));
+    const pase = await db.kvGet('paseWhatsapp');
+    igual([pase && pase.parteId, pase && pase.trabajoId, pase && pase.fase], [p.id, p.trabajos[1].id, 'durante'], 'guarda a dónde van');
+    cierto(!m.app.querySelector('.capa[data-action]'), 'tocar fuera de la hoja no la cierra (se perdería el pase)');
+    toca('[data-action="origen-foto-volver"]');
+    for (let i = 0; i < 40 && (await db.kvGet('paseWhatsapp')); i++) await new Promise((r) => setTimeout(r, 25));
+    igual(await db.kvGet('paseWhatsapp'), null, '«Atrás» lo quita');
+    toca('[data-action="origen-foto-whatsapp"]');
+    for (let i = 0; i < 40 && !(await db.kvGet('paseWhatsapp')); i++) await new Promise((r) => setTimeout(r, 25));
+    m.app.insertAdjacentHTML('beforeend', '<button data-action="bloquear" id="b-bloquear"></button>');
+    toca('#b-bloquear');
+    for (let i = 0; i < 40 && (await db.kvGet('paseWhatsapp')); i++) await new Promise((r) => setTimeout(r, 25));
+    igual(await db.kvGet('paseWhatsapp'), null, '«Bloquear» lo quita');
+  } finally {
+    await deshacer();
+  }
+});
+
+// La prueba de verdad: la app recién abierta (como tras compartir) con pase entra sin PIN; sin pase, al PIN.
+prueba('pase de WhatsApp: al abrir la app, con pase entra al trabajo y sin pase pide el PIN', async () => {
+  const perfilAntes = await db.kvGet('perfil');
+  const configAntes = await db.kvGet('config');
+  const arrancar = async () => {
+    const f = document.createElement('iframe');
+    f.style.cssText = 'width:400px;height:700px;border:0';
+    await new Promise((res) => { f.onload = res; f.src = '../index.html'; document.body.append(f); });
+    const m = await f.contentWindow.eval(`import(${JSON.stringify(new URL('./js/estado.js', f.contentWindow.location.href).href)})`);
+    for (let i = 0; i < 200 && !['pin', 'trabajo'].includes(m.estado.vista); i++) await new Promise((r) => setTimeout(r, 50));
+    for (let i = 0; i < 200 && m.estado.procesando; i++) await new Promise((r) => setTimeout(r, 50));
+    const vista = m.estado.vista;
+    f.remove();
+    return vista;
+  };
+  const { p, deshacer } = await prepararPase({ fotos: 1 });
+  try {
+    await db.kvSet('perfil', { ...perfilConToken(), pin: { salt: btoa('sal-de-prueba-16'), hash: 'x', iter: 1 } });
+    await db.kvSet('config', ej.config);
+    igual(await arrancar(), 'trabajo', 'con pase y foto esperando: directo al trabajo');
+    igual((await db.getParte(p.id)).trabajos[0].fotos.length, p.trabajos[0].fotos.length + 1, 'con la foto puesta');
+    await db.kvSet('paseWhatsapp', null);
+    await db.kvSet('compartidas', [{ id: 'z', archivo: new File([await jpeg()], 'z.jpg', { type: 'image/jpeg' }), llegada: '2026-11-11T10:00:00+01:00' }]);
+    igual(await arrancar(), 'pin', 'sin pase: PIN');
+  } finally {
+    await deshacer();
+    await db.kvSet('perfil', perfilAntes ?? null);
+    await db.kvSet('config', configAntes ?? null);
+  }
+});
+
 prueba('recorrido: un parte con algo sin rellenar no se cierra y dice qué falta', async () => {
   const { f, m } = await appEnMarco();
   f.contentWindow.confirm = () => true;
@@ -2950,7 +3183,7 @@ const ACCIONES_LIBRES = [
   'compartidas-trabajo', 'compartidas-otro', 'compartidas-fase', 'compartidas-descartar', 'abrir', 'extras-volver',
   'abrir-otro', 'cancelar-otro', 'editar-trabajo', 'ir-trabajo', 'volver-parte', 'trabajo-listo', 'cerrar-pregunta',
   'ver-foto', 'cerrar-foto', 'borrar-borrador', 'guardar-salir', 'cerrar-errores', 'reintentar-envio', 'enviar',
-  'ver-pdf', 'corregir',
+  'ver-pdf', 'corregir', 'origen-foto-volver', 'origen-foto-cerrar', 'origen-foto-hecho',
 ];
 
 prueba('eventos: cada botón está apuntado como «toca el parte» o «no lo toca»', async () => {
@@ -2988,6 +3221,10 @@ function tocarTodo(p, acciones) {
 prueba('eventos: ningún botón ni campo cambia un parte enviado', async () => {
   const { f, m, errores } = await appEnMarco();
   const ev = await moduloDelMarco('./js/eventos.js');
+  // Un guardado diferido (500 ms) de la prueba anterior no puede caer sobre el parte enviado de esta:
+  // se deja pasar antes de abrir ninguno (sin parte abierto, guardarYa no hace nada).
+  m.estado.parte = null;
+  await new Promise((r) => setTimeout(r, 700));
   f.contentWindow.confirm = () => true;
   const malos = [];
   const casos = [['INFRA', () => ej.parteInfra()], ['SUPER', () => ej.parteSuper()], ['maquinaria de vía', () => ej.parteMaqVia()],
@@ -3007,7 +3244,11 @@ prueba('eventos: ningún botón ni campo cambia un parte enviado', async () => {
       await new Promise((r) => setTimeout(r, 60));
       caja.remove();
       const ahora = m.estado.parte === p ? JSON.stringify(p) : 'el parte abierto ha cambiado por otro';
-      if (ahora !== foto) malos.push(`${nombre} · ${que}`);
+      if (ahora !== foto) {
+        const antes = JSON.parse(foto);
+        const campos = m.estado.parte === p ? Object.keys({ ...antes, ...p }).filter((k) => JSON.stringify(p[k]) !== JSON.stringify(antes[k])) : [];
+        malos.push(`${nombre} · ${que}${campos.length ? ` (cambia: ${campos.join(', ')})` : ''}`);
+      }
       Object.assign(p, JSON.parse(foto));
       for (const k of Object.keys(p)) if (!(k in JSON.parse(foto))) delete p[k];
     };

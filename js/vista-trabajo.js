@@ -9,6 +9,7 @@ import { faltasTrabajo, listaAparatos, unirAparatos, pkDeAparatos } from './vali
 import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS, MOTIVOS_SIN_TRABAJOS } from './modelo.js';
 import { app, estado, urls, ir, render, guardarYa, guardarPronto, motivosCfg } from './estado.js';
 import { cabeceraParte, campo, campoHora, campoPk, radio, casillasVias } from './campos.js';
+import { vOrigenFoto } from './vista-origen-foto.js';
 
 // ---------- Trabajo ----------
 
@@ -339,6 +340,7 @@ export function vTrabajo() {
   <input type="file" id="in-camara" accept="image/*" capture="environment" hidden>
   <input type="file" id="in-galeria" accept="image/*" multiple hidden>
   ${estado.fotoVista ? vFotoGrande() : ''}
+  ${estado.origenFoto ? vOrigenFoto() : ''}
   ${estado.preguntaOtro ? vPreguntaOtro(t) : ''}`;
 }
 

@@ -32,12 +32,56 @@ export async function compartirActivo() {
  */
 export async function anotarArranque({
   search = location.search,
-  instalada = matchMedia('(display-mode: standalone)').matches,
-  android = /Android/i.test(navigator.userAgent),
+  instalada = esInstalada(),
+  android = esAndroid(),
 } = {}) {
   if (!android || !instalada || new URLSearchParams(search).get('i') !== '2') return;
   if (await compartirActivo()) return;   // se guarda la primera vez
   await db.kvSet(CLAVE_ACTIVO, { fecha: isoLocal(), via: 'arranque' });
+}
+
+export const esAndroid = () => /Android/i.test(navigator.userAgent);
+export const esInstalada = () => matchMedia('(display-mode: standalone)').matches;
+
+/**
+ * Qué pasa al tocar 🖼️ Galería: 'directo' = abre el selector como siempre (navegador, iPhone u ordenador:
+ * allí no hay «Compartir → Partes LAV»); 'activado' = hoja con «Fotos del móvil» y «Fotos de WhatsApp»;
+ * 'sinActivar' = hoja solo con «Fotos del móvil», su ayuda y el aviso de que se activará solo.
+ */
+export function modoOrigen({ activo, instalada, android }) {
+  if (!android || !instalada) return 'directo';
+  return activo ? 'activado' : 'sinActivar';
+}
+
+// Pase de «Fotos de WhatsApp»: { parteId, trabajoId, fase } o { parteId, formato: true }, más desde/hasta
+// (milisegundos). Lo crea la pantalla de pasos; compartir recarga la app y, mientras valga y haya fotos
+// esperando, se entra sin PIN y van directas a su sitio (vista-compartidas.js, entrarConPase). Se renueva
+// con cada foto y se acaba con «Hecho», «Atrás», «Bloquear» o a los 5 minutos sin fotos.
+export const CLAVE_PASE = 'paseWhatsapp';
+export const PASE_MS = 5 * 60 * 1000;
+
+/** Vale si no ha caducado, no dura más de 5 minutos y el reloj no ha ido hacia atrás desde que se hizo. */
+export function paseValido(p, ahora = Date.now()) {
+  return Boolean(p && typeof p === 'object' && p.parteId && typeof p.desde === 'number' && typeof p.hasta === 'number' &&
+    ahora >= p.desde && ahora < p.hasta && p.hasta - p.desde <= PASE_MS);
+}
+
+export async function crearPase(destino) {
+  const ahora = Date.now();
+  await db.kvSet(CLAVE_PASE, { ...destino, desde: ahora, hasta: ahora + PASE_MS });
+}
+
+export async function renovarPase(p) {
+  const ahora = Date.now();
+  await db.kvSet(CLAVE_PASE, { ...p, desde: ahora, hasta: ahora + PASE_MS });
+}
+
+export const borrarPase = () => db.kvSet(CLAVE_PASE, null);
+
+/** El pase guardado si vale; si no, null. */
+export async function leerPase() {
+  const p = await db.kvGet(CLAVE_PASE);
+  return paseValido(p) ? p : null;
 }
 
 /** Fotos que esperan: [{ id, archivo, llegada }]. Lista vacía si no hay nada o lo guardado no vale. */

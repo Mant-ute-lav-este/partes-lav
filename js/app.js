@@ -12,12 +12,13 @@ import * as db from './db.js';
 import { hayServidor, SERVIDOR_URL } from './servidor.js';
 import { iniciarFallos, registrarFallo, enviarFallos, cerrarSesionesPendientes } from './fallos.js';
 import { limpiarFotosAntiguas } from './espacio.js';
-import { anotarArranque } from './compartidas.js';
+import { anotarArranque, compartirActivo } from './compartidas.js';
+import { entrarConPase } from './vista-compartidas.js';
 import { esc } from './util.js';
 import { app, estado, sincronizar, refrescarVista, ir, guardarYa } from './estado.js';
 import { onInput, onChange, onSubmit, onClick } from './eventos.js';
 
-export const APP_VERSION = '0.28.0';
+export const APP_VERSION = '0.29.0';
 
 // ---------- Arranque ----------
 
@@ -75,11 +76,18 @@ async function iniciar() {
     return;
   }
   // ¿Este móvil ya tiene «Compartir → Partes LAV»? (marca ?i=2 del manifest; no cambia nada a la vista)
-  try { await anotarArranque(); } catch (e) { registrarFallo('compartir', e.message); }
+  try {
+    await anotarArranque();
+    estado.compartirActivo = await compartirActivo();   // la hoja de Galería se adapta a esto
+  } catch (e) { registrarFallo('compartir', e.message); }
   // Antes de abrir ningún parte: fotos de partes enviados hace más de 30 días fuera del móvil.
   try { await limpiarFotosAntiguas(); } catch (e) { registrarFallo('limpieza', e.message); }
   // Con servidor hay que estar registrado: un perfil antiguo, sin registro, vuelve a la bienvenida.
-  if (estado.perfil && (estado.perfil.token || !hayServidor())) return ir('pin');
+  if (estado.perfil && (estado.perfil.token || !hayServidor())) {
+    // Recién compartida una foto desde «Fotos de WhatsApp» (pase de 5 minutos): directa a su sitio, sin PIN.
+    try { if (await entrarConPase()) return undefined; } catch (e) { registrarFallo('compartir', e.message); }
+    return ir('pin');
+  }
   if (hayServidor()) return ir('bienvenida');
   if (!estado.config) return ir('setup-datos');
   return ir('setup-capataz');

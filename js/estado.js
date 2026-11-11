@@ -46,6 +46,8 @@ export const estado = {
   avisoCopia: '',        // aviso en el parte recién copiado del anterior
   nCompartidas: 0,       // fotos compartidas desde WhatsApp esperando a que se coloquen (aviso en Inicio)
   compartidas: null,     // hoja abierta para colocarlas: { destinos, elegido, miniaturas }
+  compartirActivo: false, // este móvil ya tiene «Compartir → Partes LAV» (se lee al arrancar, ver app.js)
+  origenFoto: null,      // hoja «¿De dónde es la foto?» al tocar Galería: { modo, paso, pendiente }
 };
 export const urls = new Map();   // id de foto → URL para las miniaturas
 
@@ -143,6 +145,7 @@ export async function ir(vista) {
   estado.preguntaExtras = false;
   estado.eligeMaquina = false;
   estado.repetir = null;
+  estado.origenFoto = null;
   render();
   window.scrollTo(0, 0);
   if (vista === 'envio') prepararEnvioActual();
@@ -160,7 +163,7 @@ export function render() {
     (estado.procesando ? `<div class="capa centro"><div class="hoja pequena"><div class="girando"></div><p>${esc(estado.procesando)}</p></div></div>` : '');
   window.scrollTo(0, y);
   document.body.classList.toggle('sin-scroll',
-    Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.compartidas || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
+    Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.compartidas || estado.origenFoto || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
   pintarResultados();
   cargarMiniaturas();
   const auto = app.querySelector('[data-autofocus]');

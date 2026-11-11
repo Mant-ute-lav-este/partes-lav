@@ -15,6 +15,7 @@ import { cabeceraParte, refParte, radio, vErrores } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 import { vParteMaq } from './vista-maquinaria.js';
 import { vFotoGrande, bloqueSinTrabajos } from './vista-trabajo.js';
+import { vOrigenFoto } from './vista-origen-foto.js';
 
 // ---------- Parte ----------
 
@@ -106,6 +107,7 @@ export function vParte() {
   ${p.tipo === 'SUPER' ? `<input type="file" id="in-camara" accept="image/*" capture="environment" hidden>
   <input type="file" id="in-galeria" accept="image/*" multiple hidden>` : ''}
   ${estado.fotoVista ? vFotoGrande() : ''}
+  ${estado.origenFoto ? vOrigenFoto() : ''}
   ${estado.errores.length ? vErrores() : ''}
   ${estado.preguntaExtras ? vPreguntaExtras() : ''}`;
 }

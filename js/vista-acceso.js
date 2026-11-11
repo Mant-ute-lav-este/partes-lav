@@ -175,6 +175,7 @@ export async function cerrarSesion() {
   estado.perfil = null;
   await db.kvSet('perfil', null);
   await db.kvSet('intentosPin', null);
+  await db.kvSet('paseWhatsapp', null);   // el pase sin PIN de «Fotos de WhatsApp» muere con la sesión
   ir(hayServidor() ? 'bienvenida' : 'setup-capataz');
   if (token) apuntarSesionCerrada(token);   // sin esperar: sin cobertura se queda en cola
 }

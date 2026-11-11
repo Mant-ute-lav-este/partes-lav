@@ -120,6 +120,8 @@ small { color: var(--suave); }
 .sub-tarjeta { background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 12px; padding: 14px; margin-top: 12px; }
 .aviso { background: var(--aviso-fondo); color: var(--aviso-txt); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-weight: 600; }
 .nota { font-size: .9rem; color: var(--suave); }
+.hoja .pasos { padding-left: 1.4em; margin: 10px 0; }
+.hoja .pasos li { margin: 8px 0; font-size: 1.05rem; }
 .error { color: var(--peligro); font-weight: 600; }
 .vacio { color: var(--suave); text-align: center; padding: 14px 0; }
 .contador { background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 999px; padding: 0 10px; font-size: .85rem; }
