@@ -44,13 +44,12 @@ export const esAndroid = () => /Android/i.test(navigator.userAgent);
 export const esInstalada = () => matchMedia('(display-mode: standalone)').matches;
 
 /**
- * Qué pasa al tocar 🖼️ Galería: 'directo' = abre el selector como siempre (navegador, iPhone u ordenador:
- * allí no hay «Compartir → Partes LAV»); 'activado' = hoja con «Fotos del móvil» y «Fotos de WhatsApp»;
- * 'sinActivar' = hoja solo con «Fotos del móvil», su ayuda y el aviso de que se activará solo.
+ * Qué pasa al tocar 🖼️ Galería: 'directo' = abre el selector como siempre (navegador, iPhone, ordenador
+ * y móviles Android donde «Compartir → Partes LAV» aún no está activo); 'activado' = hoja con «Fotos del
+ * móvil» y «Fotos de WhatsApp».
  */
 export function modoOrigen({ activo, instalada, android }) {
-  if (!android || !instalada) return 'directo';
-  return activo ? 'activado' : 'sinActivar';
+  return android && instalada && activo ? 'activado' : 'directo';
 }
 
 // Pase de «Fotos de WhatsApp»: { parteId, trabajoId, fase } o { parteId, formato: true }, más desde/hasta

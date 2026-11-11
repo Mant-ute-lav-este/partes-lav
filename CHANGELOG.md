@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.29.1 · 2026-11-11 (quita las indicaciones sobre el álbum de WhatsApp)
+- Se quita el texto «Colecciones → WhatsApp» (el nombre del álbum cambia según el móvil) y la hoja «Elige las fotos» de los móviles donde «Compartir» aún no está activo: allí 🖼️ Galería vuelve a abrir el selector directamente, como antes de la 0.29.0. La hoja «¿De dónde es la foto?» solo sale en Android con la app instalada y «Compartir» activo. Lo demás no cambia.
+
 ## 0.29.0 · 2026-11-11 (fotos de WhatsApp directas a su sitio)
 - **Fase 3 · 5 minutos sin PIN** (`privado/PLAN-TANDA2.md`). Al abrir «Fotos de WhatsApp» el móvil guarda a dónde van (clave `paseWhatsapp` de `kv`: parte, trabajo y fase, o el formato de SUPER) durante 5 minutos. Al compartir, la app se recarga: si hay fotos esperando y el pase vale, **entra sin PIN**, abre ese trabajo, pone las fotos en su fase con su sello y vuelve a la pantalla de pasos con «✓ Añadida. Comparte la siguiente o pulsa Hecho». Cada foto renueva los 5 minutos.
 - El pase se acaba con «Hecho», «Atrás», «Bloquear», «Cerrar sesión», a los 5 minutos sin fotos, si el parte ya no es borrador o el trabajo/fase ya no existe, y si alguna foto no ha cabido (formato lleno). Nunca salta un PIN bloqueado por intentos; si el reloj del móvil va hacia atrás o el pase dura más de 5 minutos, no vale. Sin pase, todo como antes: PIN y «¿De qué trabajo son?».

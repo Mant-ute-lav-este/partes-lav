@@ -2414,7 +2414,7 @@ prueba('compartir: qué ve cada móvil al tocar Galería', async () => {
   const { modoOrigen } = await import('../js/compartidas.js');
   igual(modoOrigen({ activo: true, instalada: false, android: true }), 'directo', 'en el navegador, sin hoja');
   igual(modoOrigen({ activo: true, instalada: true, android: false }), 'directo', 'iPhone u ordenador, sin hoja');
-  igual(modoOrigen({ activo: false, instalada: true, android: true }), 'sinActivar', 'Android instalada aún sin renovar');
+  igual(modoOrigen({ activo: false, instalada: true, android: true }), 'directo', 'Android instalada aún sin renovar: como siempre');
   igual(modoOrigen({ activo: true, instalada: true, android: true }), 'activado', 'Android con Compartir');
 });
 
@@ -2424,10 +2424,8 @@ prueba('pantallas: hoja «¿De dónde es la foto?» de las dos caras', async () 
     e.origenFoto = { modo, paso, pendiente };
   };
   await pantalla(hoja('activado'), '¿De dónde es la foto?', 'Fotos del móvil', 'Fotos de WhatsApp');
-  await pantalla(hoja('activado', 'whatsapp'), 'Irán a: Trabajo 2 · Después', 'Mantén pulsada la foto', 'Desliza hasta ver Partes LAV',
-    'Colecciones → WhatsApp');
-  await pantalla(hoja('sinActivar'), 'Colecciones → WhatsApp', 'se activará solo');
-  cierto(!marco.m.app.textContent.includes('Fotos de WhatsApp'), 'sin activar no se ofrece lo que no va a funcionar');
+  await pantalla(hoja('activado', 'whatsapp'), 'Irán a: Trabajo 2 · Después', 'Mantén pulsada la foto', 'Desliza hasta ver Partes LAV');
+  cierto(!marco.m.app.textContent.includes('Colecciones'), 'sin indicaciones sobre dónde está el álbum (cambia según el móvil)');
   await pantalla((e) => {
     e.vista = 'parte'; e.parte = borrador(ej.parteSuper());
     e.origenFoto = { modo: 'activado', paso: 'whatsapp', pendiente: { formato: true, origen: 'galeria' } };
@@ -2457,7 +2455,7 @@ prueba('recorrido: Galería abre la hoja solo si hay algo que elegir y «Fotos d
   igual(m.estado.origenFoto.paso, 'elige');
   toca('[data-action="origen-foto-movil"]');
   igual([m.estado.origenFoto, m.estado.fotoPendiente], [null, pendiente], '«Fotos del móvil» cierra la hoja y abre el selector');
-  o.abrirOrigenFoto(pendiente, 'sinActivar');
+  o.abrirOrigenFoto(pendiente, 'activado');
   toca('[data-action="origen-foto-cerrar"]');
   igual(m.estado.origenFoto, null, 'se puede cancelar');
   m.estado.fotoPendiente = null;

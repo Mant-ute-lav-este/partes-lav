@@ -1,7 +1,6 @@
-// Hoja «¿De dónde es la foto?» al tocar 🖼️ Galería. Según el móvil (ver modoOrigen en compartidas.js):
-// 'directo' no hay hoja (se abre el selector como siempre); 'activado' ofrece «Fotos del móvil» y
-// «Fotos de WhatsApp» (pasos para compartir desde WhatsApp); 'sinActivar' solo «Fotos del móvil» con
-// la ayuda de dónde están las de WhatsApp y el aviso de que el envío directo se activará solo.
+// Hoja «¿De dónde es la foto?» al tocar 🖼️ Galería, solo en móviles Android con la app instalada y
+// «Compartir» ya activo (ver modoOrigen en compartidas.js): «Fotos del móvil» o «Fotos de WhatsApp»
+// (pasos para compartir desde WhatsApp). En cualquier otro caso se abre el selector como siempre.
 
 import { esc, FORMATO1 } from './util.js';
 import { estado, render, guardarYa } from './estado.js';
@@ -96,22 +95,14 @@ export function vOrigenFoto() {
       <li>Toca <strong>Compartir</strong>.</li>
       <li><strong>Desliza hasta ver Partes LAV</strong> y tócala.</li>
     </ol>
-    <p class="nota">Se manda una foto cada vez: vuelve a esta app después de cada una.
-      ¿Muchas fotos de golpe? Usa <strong>Fotos del móvil → Colecciones → WhatsApp</strong>.</p>
+    <p class="nota">Se manda una foto cada vez: vuelve a esta app después de cada una.</p>
     <button class="btn primario grande" data-action="origen-foto-hecho">Hecho</button>
     <button class="btn" data-action="origen-foto-volver">‹ Atrás</button>`;
-  } else if (o.modo === 'activado') {
+  } else {
     cuerpo = `
     <h2>¿De dónde es la foto?</h2>
     <button class="btn secundario grande" data-action="origen-foto-movil">🖼️ Fotos del móvil</button>
     <button class="btn secundario grande" data-action="origen-foto-whatsapp">💬 Fotos de WhatsApp</button>
-    <button class="btn" data-action="origen-foto-cerrar">Cancelar</button>`;
-  } else {
-    cuerpo = `
-    <h2>Elige las fotos</h2>
-    <p>Las fotos de WhatsApp están en <strong>Colecciones → WhatsApp</strong>.</p>
-    <button class="btn primario grande" data-action="origen-foto-movil">🖼️ Fotos del móvil</button>
-    <p class="nota">El envío directo desde WhatsApp se activará solo: deja una noche el móvil cargando con WiFi.</p>
     <button class="btn" data-action="origen-foto-cerrar">Cancelar</button>`;
   }
   // En la pantalla de pasos, tocar fuera no la cierra: se acabaría el pase sin querer. Solo «Hecho» o «Atrás».
