@@ -11,6 +11,21 @@ export const uuid = () => crypto.randomUUID();
 export const FORMATO1 = 'Formato 1';
 export const MAX_FORMATO1 = 6;        // fotos como máximo
 export const LADO_FORMATO1 = 2400;    // píxeles del lado largo (más que las fotos normales: se lee letra a mano)
+// HERBICIDA: 20-35 casos con 2 fotos tienen que caber en un correo (el servidor corta en 24 MB).
+// Medido (12/11/2026, foto de mucho detalle): 1024 px a 0,75 ≈ 160 KB → 70 fotos ≈ 15 MB de adjuntos.
+export const LADO_HERBICIDA = 1024;
+export const CALIDAD_HERBICIDA = 0.75;
+
+/**
+ * Número a la española con dos decimales como mucho: «1.650», «11.114», «0,04», «3,9».
+ * Siempre con punto de miles (toLocaleString no lo pone en los de 4 cifras). Acepta texto con coma.
+ */
+export function fmtNum(n) {
+  const x = typeof n === 'number' ? n : Number(String(n == null ? '' : n).replace(',', '.'));
+  const v = Math.round((Number.isFinite(x) ? x : 0) * 100) / 100;
+  const [ent, dec] = Math.abs(v).toFixed(2).replace(/\.?0+$/, '').split('.');
+  return `${v < 0 ? '-' : ''}${ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}${dec ? `,${dec}` : ''}`;
+}
 
 // Registros DRP de la bateadora (opcionales, solo en el parte de bateadora).
 export const MAX_DRP = 6;                    // archivos como máximo

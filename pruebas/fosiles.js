@@ -17,6 +17,9 @@
 //   0.15.0 evb (vía y dresina)
 //   0.20.0 sinTrabajos, motivoSinTrabajos
 //   0.21.0 drp (vía)
+//   0.30.0 esquema 3: llega el parte HERBICIDA (ocupaciones, productos, caldo, casos SIOS en «trabajos»).
+//          Los demás tipos no cambian de forma, así que no hay fósil nuevo de ellos; el HERBICIDA
+//          entra en TIPOS cuando tenga PDF y envío (paso 3 del plan del herbicida).
 // Antes de la 0.5.0 (2026-10-02, un solo día de pruebas) no hay partes guardados que importen.
 // Las fotos tienen la misma forma desde la primera versión.
 

@@ -1,6 +1,8 @@
 // Validaciones de los partes y comprobaciones de los campos. Son funciones puras, sin pantalla
 // ni estado, para poder probarlas solas (pruebas/pruebas.js).
 
+import { codigoSios, llevaAnexoFotos } from './modelo.js';
+
 // PIN nuevo: la misma regla que pinFacil_ del servidor (v23; hay una prueba que compara los dos).
 // Solo al crear o cambiar el PIN: los que ya existen siguen valiendo.
 const PIN_TIPICOS = ['2580', '0852', '1004', '6969', '147258', '159753', '258036', '696969'];
@@ -64,14 +66,17 @@ export function pkDeAparatos(nombres, lista) {
  * Peso del correo de un parte. Las fotos viajan en base64 dentro del Fotos_.txt, que a su vez se
  * adjunta en base64, y el PDF lleva una copia reducida: en total, unas 2,4 veces lo que pesan.
  * Gmail admite 25 MB; se avisa a partir de 20 para dejar margen.
+ * Si el PDF no lleva anexo de fotos (HERBICIDA, ver llevaAnexoFotos), solo el doble base64: unas 1,78 veces (1,333 × 1,333).
  */
 export const LIMITE_CORREO_MB = 20;
 const FACTOR_CORREO = 2.4;
-export const pesoCorreoMB = (bytesFotos) => bytesFotos.reduce((a, b) => a + b, 0) * FACTOR_CORREO / 1048576;
+const FACTOR_CORREO_SIN_ANEXO = 1.78;
+export const factorCorreo = (p) => (llevaAnexoFotos(p) ? FACTOR_CORREO : FACTOR_CORREO_SIN_ANEXO);
+export const pesoCorreoMB = (bytesFotos, factor = FACTOR_CORREO) => bytesFotos.reduce((a, b) => a + b, 0) * factor / 1048576;
 
 /** Cuántas fotos (de tamaño medio) hay que quitar para bajar del límite; 0 si ya cabe. */
-export function fotosAQuitar(bytesFotos) {
-  const peso = pesoCorreoMB(bytesFotos);
+export function fotosAQuitar(bytesFotos, factor = FACTOR_CORREO) {
+  const peso = pesoCorreoMB(bytesFotos, factor);
   if (!bytesFotos.length || peso <= LIMITE_CORREO_MB) return 0;
   const mediaMB = peso / bytesFotos.length;
   return Math.min(bytesFotos.length, Math.ceil((peso - LIMITE_CORREO_MB) / mediaMB));
@@ -244,6 +249,123 @@ export function validar(p) {
   if (p.usaVehiculos == null) add('Indica si se han usado vehículos (Sí o No).');
   else if (p.usaVehiculos && !p.vehiculos.some((v) => !vacio(v.descripcion))) {
     add('Has marcado que se han usado vehículos: elige cuál (o marca «No»).');
+  }
+  if (p.medidasOtrasSi && vacio(p.medidasOtras)) add('Has marcado «Otras» medidas antiincendios: escribe cuáles.');
+  else if (vacio(p.antiincendios)) add('Marca al menos una medida antiincendios.');
+  return e;
+}
+
+// ---------- Parte HERBICIDA ----------
+
+/** Mismo nombre sin mirar tildes, mayúsculas ni espacios de más. */
+export const mismoNombre = (a, b) => {
+  const n = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return Boolean(n(a)) && n(a) === n(b);
+};
+
+/**
+ * «1.200» escrito a mano: ¿mil doscientos o uno coma dos? La app lee el punto como decimal (1,2), así
+ * que se pide escribirlo sin dudas en vez de adivinar. Los datos de la lista de la campaña no se miran.
+ */
+export const pareceMiles = (s) => /^[1-9]\d{0,2}(\.\d{3})+$/.test(String(s == null ? '' : s).trim());   // «0.125» no: es decimal
+const dudaMiles = (s) => `«${String(s).trim()}»: escríbelo sin punto (${String(s).trim().replace(/\./g, '')}) o, si lleva decimales, con coma.`;
+
+/**
+ * Lo que le falta a un caso SIOS: nº, línea, vía, PK, m², el medio (si en el parte hay mochila y
+ * máquina), los m² hechos si es «solo una parte», y fotos de antes y de después (o el motivo de no tenerlas).
+ */
+export function faltasCaso(t, p) {
+  const e = [];
+  const add = (corto, largo) => e.push({ corto, largo });
+  const vacio = (s) => !String(s == null ? '' : s).trim();
+  if (vacio((t.referencia || {}).codigo)) add('nº de SIOS', 'falta el número de SIOS.');
+  if (vacio(t.linea)) add('línea', 'falta la línea.');
+  if (vacio(t.via)) add('vía', 'falta la vía.');
+  if (!pkValido(t.pkInicio)) add('PK inicio', 'falta el PK de inicio (km y metros).');
+  if (!pkValido(t.pkFin)) add('PK fin', 'falta el PK de fin (km y metros).');
+  if (!numeroOk(t.superficie)) add('m² del caso', 'faltan los m² del caso.');
+  else if (!t.deLista && pareceMiles(t.superficie)) add('m² del caso', `m² del caso: ${dudaMiles(t.superficie)}`);
+  if (p && p.usaMochila && p.usaMaquina && !t.medio) add('mochila o máquina', 'elige si se ha regado con mochila, máquina o ambas.');
+  if (t.parcial) {
+    if (!numeroOk(t.m2Hechos)) add('m² hechos', 'has marcado «Solo una parte»: pon los m² hechos.');
+    else if (pareceMiles(t.m2Hechos)) add('m² hechos', `m² hechos: ${dudaMiles(t.m2Hechos)}`);
+    else if (numeroOk(t.superficie) && aNumero(t.m2Hechos) > aNumero(t.superficie)) add('m² hechos', 'los m² hechos no pueden pasar de los m² del caso.');
+  }
+  if (t.sinFotos) {
+    if (vacio(t.motivoSinFotos)) {
+      add('por qué no hay fotos', t.sinFotosOtro
+        ? 'has elegido «Otro» motivo para no hacer fotos: escríbelo.' : 'indica por qué no se han podido hacer fotos.');
+    }
+    return e;
+  }
+  const hay = (fase) => (t.fotos || []).some((f) => f.fase === fase);
+  if (!hay('antes')) add('foto de antes', 'falta al menos una foto de ANTES.');
+  if (!hay('despues')) add('foto de después', 'falta al menos una foto de DESPUÉS.');
+  return e;
+}
+
+export function faltasOcupacion(o) {
+  const e = [];
+  const add = (corto, largo) => e.push({ corto, largo });
+  const vacio = (s) => !String(s == null ? '' : s).trim();
+  if (vacio(o.acta)) add('nº de acta', 'falta el nº de acta.');
+  if (vacio(o.telefonema)) add('telefonema', 'falta el nº de telefonema.');
+  if (!horaValida(o.entrada)) add('hora de entrada', 'falta la hora de entrada en vía.');
+  if (!horaValida(o.salida)) add('hora de salida', 'falta la hora de salida de vía.');
+  if (vacio(o.linea)) add('línea', 'falta la línea.');
+  if (vacio(o.via)) add('vía', 'falta la vía.');
+  if (!pkValido(o.pkInicio)) add('PK inicio', 'falta el PK de inicio.');
+  if (!pkValido(o.pkFin)) add('PK fin', 'falta el PK de fin.');
+  if (o.terminada == null) add('¿terminada?', 'indica si se ha terminado (Sí o No).');
+  return e;
+}
+
+export function validarHer(p) {
+  const e = [];
+  const add = (msg, trabajo = null) => e.push({ msg, trabajo });
+  const vacio = (s) => !String(s == null ? '' : s).trim();
+  if (!p.fecha) add('Falta la fecha de la jornada.');
+  if (!p.personal.length) add('Añade al menos una persona en «Personal».');
+  else if (!p.personal.some((x) => mismoNombre(x.nombre, p.capataz))) add(`El aplicador cualificado (${p.capataz}) tiene que estar en «Personal».`);
+  if (p.sinTrabajos) {
+    if (faltaMotivoSinTrabajos(p)) add(faltaMotivoSinTrabajos(p));
+    return e;
+  }
+  if (p.sinOcupacion) {
+    if (!horaValida(p.horaInicio)) add('Hoy no se ha ocupado la vía: falta la hora de inicio.');
+    if (!horaValida(p.horaFin)) add('Hoy no se ha ocupado la vía: falta la hora de fin.');
+  } else if (!(p.ocupaciones || []).length) {
+    add('Añade al menos una ocupación de vía (o marca «Hoy no se ha ocupado la vía»).');
+  } else {
+    p.ocupaciones.forEach((o, i) => faltasOcupacion(o).forEach((f) => add(`Ocupación ${i + 1}: ${f.largo}`)));
+  }
+  if (!p.usaMochila && !p.usaMaquina) add('Indica cómo se ha regado: mochila, máquina o las dos.');
+  if (p.usaMaquina && p.maquinaHer && p.maquinaHer.otro && vacio(p.maquinaHer.descripcion)) add('Has elegido «Otra» máquina: escribe cuál.');
+  if (!p.trabajos.length) add('Añade al menos un caso SIOS.');
+  // Repetidos por las cifras del nº («S-385952» y «385952» son el mismo caso), igual que el nombre de las fotos.
+  const vistos = new Map();
+  p.trabajos.forEach((t, i) => {
+    for (const f of faltasCaso(t, p)) add(`Caso ${i + 1}: ${f.largo}`, i);
+    const c = codigoSios(t);
+    if (c && vistos.has(c)) add(`Caso ${i + 1}: el SIOS ${c} ya está en el caso ${vistos.get(c) + 1}.`, i);
+    else if (c) vistos.set(c, i);
+  });
+  // Los productos vacíos no cuentan, pero el número del mensaje es el de la pantalla (Producto 1, 2, 3).
+  const usado = (x) => !vacio(x.nombre) || x.otro || !vacio(x.dosis);
+  if (!(p.productos || []).some(usado)) add('Pon al menos un producto con su dosis.');
+  (p.productos || []).forEach((x, i) => {
+    if (!usado(x)) return;
+    if (vacio(x.nombre)) add(`Producto ${i + 1}: ${x.otro ? 'escribe cuál es' : 'elige el producto'}.`);
+    if (!numeroOk(x.dosis)) add(`Producto ${i + 1}: pon la dosis (ml por litro).`);
+    else if (pareceMiles(x.dosis)) add(`Producto ${i + 1}: dosis ${dudaMiles(x.dosis)}`);
+  });
+  if (!numeroOk(p.caldo)) add('Pon los litros de caldo gastados.');
+  else if (pareceMiles(p.caldo)) add(`Caldo gastado ${dudaMiles(p.caldo)}`);
+  if (!p.confirmaCantidades) add('Marca que el caldo y la dosis son las cantidades reales.');
+  if (p.usaExtras) {
+    const hs = extrasDelParte(p);
+    if (!hs.length) add('Has marcado horas extra: pon las horas de quien las haya hecho (o marca «No»).');
+    hs.filter((x) => !x.tipo).forEach((x) => add(`Horas extra de ${x.nombre}: elige si son normales, nocturnas o festivas.`));
   }
   if (p.medidasOtrasSi && vacio(p.medidasOtras)) add('Has marcado «Otras» medidas antiincendios: escribe cuáles.');
   else if (vacio(p.antiincendios)) add('Marca al menos una medida antiincendios.');

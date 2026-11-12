@@ -1,7 +1,8 @@
-// PDF A4 apaisado con el aspecto del parte en papel. Se genera en el móvil con jsPDF.
+// PDF A4 apaisado con el aspecto del parte en papel (HERBICIDA, vertical como su papel). Se genera en el móvil con jsPDF.
 
-import { fmtFecha, fmtFechaHora, FORMATO1 } from './util.js';
-import { puestosDe, listaAparatos } from './validaciones.js';
+import { fmtFecha, fmtFechaHora, fmtNum, FORMATO1 } from './util.js';
+import { puestosDe, listaAparatos, mismoNombre } from './validaciones.js';
+import { calculosHerbicida, medioCaso, m2Caso, llevaAnexoFotos, NOMBRE_MEDIO } from './modelo.js';
 
 const PT = 0.3528;              // 1 punto tipográfico en mm
 const M = 8;                    // margen
@@ -10,6 +11,9 @@ const FONDO = 210 - 12;         // límite inferior (deja sitio al pie)
 const PAD = 1.2;
 const GRIS = [222, 222, 222];
 const OSCURO = [45, 45, 45];
+// Ancho útil y límite inferior de la hoja de este PDF (HERBICIDA va en vertical: c.an y c.fondo).
+const anchoUtil = (c) => c.an || AN;
+const fondo = (c) => c.fondo || FONDO;
 
 // Las fuentes estándar del PDF solo tienen caracteres latinos (WinAnsi).
 function limpia(s) {
@@ -31,7 +35,7 @@ function fila(c, celdas, { minH = 6, valign = 'middle' } = {}) {
   const med = celdas.map((x) => lineas(doc, x.t, x.w, x.s || 8, x.b));
   const lh = (x) => (x.s || 8) * PT * 1.18;
   const h = Math.max(minH, ...celdas.map((x, i) => med[i].length * lh(x) + 2 * PAD));
-  if (c.y + h > FONDO && !c.sinSalto) nuevaPagina(c);
+  if (c.y + h > fondo(c) && !c.sinSalto) nuevaPagina(c);
   let x = M;
   celdas.forEach((cel, i) => {
     if (cel.fill) { doc.setFillColor(...cel.fill); doc.rect(x, c.y, cel.w, h, 'FD'); } else doc.rect(x, c.y, cel.w, h, 'S');
@@ -59,10 +63,10 @@ function nuevaPagina(c) {
 }
 
 function seccion(c, titulo, reserva = 14) {
-  if (c.y + 2 + 6 + reserva > FONDO) nuevaPagina(c); else c.y += 2.5;
+  if (c.y + 2 + 6 + reserva > fondo(c)) nuevaPagina(c); else c.y += 2.5;
   const { doc } = c;
   doc.setFillColor(...OSCURO);
-  doc.rect(M, c.y, AN, 6, 'F');
+  doc.rect(M, c.y, anchoUtil(c), 6, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(255, 255, 255);
@@ -77,10 +81,10 @@ function seccion(c, titulo, reserva = 14) {
  */
 function tabla(c, cols, filas, { s = 7.5, vacio = '' } = {}) {
   const cab = () => fila(c, cols.map((col) => ({ w: col.w, t: col.t, fill: GRIS, b: true, s: 6.5, a: 'center' })), { minH: 6 });
-  if (c.y + 14 > FONDO) nuevaPagina(c);
+  if (c.y + 14 > fondo(c)) nuevaPagina(c);
   cab();
   if (!filas.length && vacio) {
-    fila(c, [{ w: AN, t: vacio, s, color: [90, 90, 90] }]);
+    fila(c, [{ w: anchoUtil(c), t: vacio, s, color: [90, 90, 90] }]);
     return;
   }
   for (const f of filas) {
@@ -88,7 +92,7 @@ function tabla(c, cols, filas, { s = 7.5, vacio = '' } = {}) {
       const v = f[i] && typeof f[i] === 'object' ? f[i] : { t: f[i] };
       return { w: col.w, t: v.t, s: v.s || s, a: col.a || 'left', color: v.color };
     });
-    if (c.y + altoFila(c.doc, celdas) > FONDO) { nuevaPagina(c); cab(); }
+    if (c.y + altoFila(c.doc, celdas) > fondo(c)) { nuevaPagina(c); cab(); }
     fila(c, celdas, { valign: 'top' });
   }
 }
@@ -209,7 +213,8 @@ async function paginasFotos(c, parte, leerFoto, lista, nombreAnexo, textoPie, la
 export async function generarPDF(parte, config, versionApp = '', leerFoto = null) {
   const J = window.jspdf && window.jspdf.jsPDF;
   if (!J) throw new Error('Falta el generador de PDF. Abre la app una vez con cobertura y vuelve a intentarlo.');
-  const doc = new J({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+  const vertical = parte.tipo === 'HERBICIDA';   // su papel es una hoja vertical
+  const doc = new J({ orientation: vertical ? 'portrait' : 'landscape', unit: 'mm', format: 'a4', compress: true });
   doc.setLineWidth(0.2);
   doc.setDrawColor(0, 0, 0);
   doc.setProperties({
@@ -218,7 +223,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     author: parte.capataz,
     creator: `Partes LAV ${versionApp}`,
   });
-  const c = { doc, y: M };
+  const c = vertical ? { doc, y: M, an: 210 - 2 * M, fondo: 297 - 12 } : { doc, y: M };
   const cab = (config && config.cabecera) || {};
   const tipoTxt = parte.tipo === 'INFRA' ? 'INFRAESTRUCTURA' : 'SUPERESTRUCTURA';
   const linea = parte.tipo === 'INFRA' ? cab.lineaInfra : cab.lineaSuper;
@@ -227,6 +232,13 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
   if (parte.tipo === 'MAQUINARIA') {
     if (parte.subtipo && parte.subtipo !== 'via') cuerpoLocoDresina(c, parte, cab);
     else cuerpoMaquinaria(c, parte, cab);
+    pdfPie(c, parte, versionApp);
+    return doc.output('blob');
+  }
+  // HERBICIDA: como su papel. Sin anexo de fotos (llevaAnexoFotos): van sueltas en la carpeta del parte.
+  if (parte.tipo === 'HERBICIDA') {
+    cuerpoHerbicida(c, parte, cab);
+    if (leerFoto && llevaAnexoFotos(parte)) await anexoFotos(c, parte, leerFoto);
     pdfPie(c, parte, versionApp);
     return doc.output('blob');
   }
@@ -251,14 +263,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     { ...L, w: 40, t: 'HORA DE CIERRE (MÓVIL)' }, { w: AN - 199, t: fmtFechaHora(parte.cierre) || '—', b: true },
   ], { minH: 8 });
 
-  if (parte.rectificaA) {
-    c.y += 1.5;
-    fila(c, [{
-      w: AN, b: true, s: 8.5, color: [170, 0, 0],
-      t: `PARTE RECTIFICATIVO: sustituye a la revisión ${parte.rectificaA.rev} de este parte` +
-        `${parte.rectificaA.cierre ? ` (cerrada el ${fmtFechaHora(parte.rectificaA.cierre)})` : ''}.`,
-    }], { minH: 7 });
-  }
+  avisoRectificativo(c, parte);
 
   // Personal
   seccion(c, `PERSONAL (${parte.personal.length})`);
@@ -345,7 +350,7 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
     fila(c, [{ w: AN, t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
   }
 
-  if (leerFoto) {
+  if (leerFoto && llevaAnexoFotos(parte)) {
     await anexoFotos(c, parte, leerFoto);
     if (parte.tipo === 'SUPER') await anexoFormato(c, parte, leerFoto);
   }
@@ -354,13 +359,24 @@ export async function generarPDF(parte, config, versionApp = '', leerFoto = null
   return doc.output('blob');
 }
 
+/** Parte rectificativo: una línea en rojo debajo de la cabecera. */
+function avisoRectificativo(c, parte) {
+  if (!parte.rectificaA) return;
+  c.y += 1.5;
+  fila(c, [{
+    w: anchoUtil(c), b: true, s: 8.5, color: [170, 0, 0],
+    t: `PARTE RECTIFICATIVO: sustituye a la revisión ${parte.rectificaA.rev} de este parte` +
+      `${parte.rectificaA.cierre ? ` (cerrada el ${fmtFechaHora(parte.rectificaA.cierre)})` : ''}.`,
+  }], { minH: 7 });
+}
+
 /** Jornada en la que no se pudo trabajar: una sección con el motivo, en rojo, y las observaciones. */
 function seccionSinTrabajos(c, parte) {
   seccion(c, 'JORNADA SIN TRABAJOS');
-  fila(c, [{ w: AN, t: `No se ha podido trabajar: ${parte.motivoSinTrabajos || ''}`, b: true, s: 10, color: [170, 0, 0] }], { minH: 12 });
+  fila(c, [{ w: anchoUtil(c), t: `No se ha podido trabajar: ${parte.motivoSinTrabajos || ''}`, b: true, s: 10, color: [170, 0, 0] }], { minH: 12 });
   if ((parte.observaciones || '').trim()) {
     seccion(c, 'OBSERVACIONES');
-    fila(c, [{ w: AN, t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
+    fila(c, [{ w: anchoUtil(c), t: parte.observaciones, s: 8 }], { minH: 9, valign: 'top' });
   }
 }
 
@@ -393,15 +409,17 @@ function pdfHorasExtra(c, parte) {
 function pdfPie(c, parte, versionApp) {
   const { doc } = c;
   const n = doc.getNumberOfPages();
+  const ancho = c.an ? c.an + 2 * M : 297;
+  const alto = c.fondo ? 297 : 210;
   for (let i = 1; i <= n; i++) {
     doc.setPage(i);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(90, 90, 90);
-    const yPie = 210 - 7;
+    const yPie = alto - 7;
     doc.text(limpia(`Cerrado en el móvil: ${fmtFechaHora(parte.cierre) || '-'}`), M, yPie);
-    doc.text(limpia(`Partes LAV ${versionApp} · id ${parte.id.slice(0, 8)}`), 297 / 2, yPie, { align: 'center' });
-    doc.text(`Página ${i} de ${n}`, 297 - M, yPie, { align: 'right' });
+    doc.text(limpia(`Partes LAV ${versionApp} · id ${parte.id.slice(0, 8)}`), ancho / 2, yPie, { align: 'center' });
+    doc.text(`Página ${i} de ${n}`, ancho - M, yPie, { align: 'right' });
   }
   doc.setTextColor(0, 0, 0);
 }
@@ -641,4 +659,189 @@ function cuerpoMaquinaria(c, parte, cab) {
   }
 
   pdfHorasExtra(c, parte);
+}
+
+// ---------- Parte HERBICIDA (como «PARTE HERBICIDA» en papel) ----------
+// Hoja A4 vertical, calcada del papel: cabecera (encargado y fecha), personal, ocupaciones de vía con la
+// descripción, casos SIOS en dos columnas con la superficie total, casillas antiincendios y producto con
+// la firma del aplicador. Lo que el papel no tiene (medio, solo una parte, sin fotos, L/ha) va dentro de
+// su celda o en una línea debajo de la tabla. Sin anexo de fotos: van sueltas en la carpeta del parte.
+
+const ROJO = [170, 0, 0];
+
+/** Una celda suelta en (x, y): para las que ocupan varias filas (cabecera, descripción, firma). */
+function caja(doc, x, y, w, h, texto, { s = 8, b = false, a = 'center', fill = null } = {}) {
+  if (fill) { doc.setFillColor(...fill); doc.rect(x, y, w, h, 'FD'); } else doc.rect(x, y, w, h, 'S');
+  if (texto == null || texto === '') return;
+  const ls = lineas(doc, texto, w, s, b);
+  const alto = ls.length * s * PT * 1.18;
+  const tx = a === 'center' ? x + w / 2 : a === 'right' ? x + w - PAD : x + PAD;
+  doc.text(ls, tx, y + Math.max(PAD, (h - alto) / 2), { baseline: 'top', align: a, lineHeightFactor: 1.18 });
+}
+
+/** Cabecera de una tabla del papel: gris, en negrita y centrada. cols: [[texto, ancho]]. */
+const cabTabla = (cols, s = 6.5) => cols.map(([t, w]) => ({ w, t, fill: GRIS, b: true, s, a: 'center' }));
+
+function cuerpoHerbicida(c, parte, cab) {
+  const { doc } = c;
+  const W = c.an;
+  const k = calculosHerbicida(parte);
+
+  // Cabecera: empresas, título, encargado y fecha (día, mes y año, cada uno en su casilla).
+  const y0 = c.y;
+  doc.rect(M, y0, 40, 14, 'S');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 120, 70);
+  doc.text('coalvi', M + 4, y0 + 3, { baseline: 'top' });
+  doc.setTextColor(30, 90, 170);
+  doc.text('rover', M + 23, y0 + 3, { baseline: 'top' });
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.text('MANTENIMIENTO LAV ESTE UTE', M + 20, y0 + 10, { baseline: 'top', align: 'center' });
+  caja(doc, M + 40, y0, W - 100, 14, 'PARTE HERBICIDA', { s: 15, b: true });
+  const xd = M + W - 60;
+  caja(doc, xd, y0, 36, 7, 'ENCARGADO', { s: 7.5 });
+  caja(doc, xd + 36, y0, 24, 7, 'FECHA', { s: 7.5 });
+  caja(doc, xd, y0 + 7, 36, 7, parte.capataz, { s: 7, b: true });
+  const [aa, mm, dd] = String(parte.fecha || '').split('-');
+  [dd, mm, aa].forEach((v, j) => caja(doc, xd + 36 + j * 8, y0 + 7, 8, 7, v || '', { s: j === 2 ? 6 : 7.5, b: true }));
+  c.y = y0 + 14;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(90, 90, 90);
+  doc.text(limpia(`Ref. ${parte.ref}${parte.rev > 1 ? `   ·   Rev. ${parte.rev}` : ''}${[cab.empresa, cab.ambito].filter(Boolean).map((x) => `   ·   ${x}`).join('')}`),
+    M, c.y + 1, { baseline: 'top' });
+  doc.setTextColor(0, 0, 0);
+  c.y += 4.5;
+  avisoRectificativo(c, parte);
+
+  // Personal: el capataz es el aplicador cualificado (va el primero); los demás, básicos autorizados.
+  // Las horas extra van en HORAS y su tipo y motivo en OBSERVACIONES (el papel no tiene más sitio).
+  const gente = [...parte.personal].sort((a, b) => Number(mismoNombre(b.nombre, parte.capataz)) - Number(mismoNombre(a.nombre, parte.capataz)));
+  const extra = (x) => (parte.usaExtras && (parte.extras || []).find((e) => e.nombre === x.nombre && Number(e.horas) > 0)) || null;
+  const colsP = [['PERSONAL', 92], ['ET / PSH', 18], ['CATEGORIA', 24], ['HORAS', 18], ['OBSERVACIONES', W - 152]];
+  const filasP = gente.map((x) => {
+    const e = extra(x);
+    return [`${mismoNombre(x.nombre, parte.capataz) ? 'Cualificado' : 'Básico'}: ${x.nombre}${x.otro ? ' *' : ''}`, '', x.categoria,
+      e ? `${String(e.horas).replace('.', ',')} extra` : '',
+      [x.empresa, e && [e.tipo, e.motivo].filter(Boolean).join(': ')].filter(Boolean).join(' · ')];
+  });
+  while (filasP.length < 6) filasP.push([filasP.length ? 'Básico:' : 'Cualificado:', '', '', '', '']);
+  c.y += 2;
+  fila(c, cabTabla(colsP, 7.5), { minH: 6 });
+  for (const f of filasP) {
+    fila(c, f.map((t, j) => ({ w: colsP[j][1], t, s: j === 4 ? 6.5 : 7.5, a: j === 0 || j === 4 ? 'left' : 'center' })), { minH: 5.5 });
+  }
+  if (gente.some((x) => x.otro)) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.5);
+    doc.text('* Añadido por el capataz: no está en la lista de la oficina.', M, c.y + 1, { baseline: 'top' });
+    c.y += 4;
+  }
+
+  if (parte.sinTrabajos) { seccionSinTrabajos(c, parte); return; }
+
+  // Ocupaciones de vía: tres filas como mínimo (como el papel) y la descripción del trabajo a la derecha.
+  const ocs = parte.sinOcupacion ? [] : (parte.ocupaciones || []);
+  const colsO = [['Nº\nACTA', 13], ['Nº TELEF\n/ HORA', 16], ['HORA\nENTRADA', 15], ['HORA\nSALIDA', 14], ['LINEA', 11], ['VIA', 10],
+    ['PK INICIO', 18], ['PK FINAL', 18], ['¿FIN?\nSI/NO', 11]];
+  const wIzq = colsO.reduce((s, [, w]) => s + w, 0);
+  const nO = Math.max(3, ocs.length);
+  c.y += 3;
+  if (c.y + 8 + nO * 6 > fondo(c)) nuevaPagina(c);
+  fila(c, [...cabTabla(colsO), { w: W - wIzq, t: 'DESCRIPCION TRABAJOS', fill: GRIS, b: true, s: 7.5, a: 'center' }], { minH: 8 });
+  const yDesc = c.y;
+  c.sinSalto = true;   // la descripción es una sola caja al lado de estas filas: no se parten
+  for (let j = 0; j < nO; j++) {
+    const o = ocs[j];
+    const v = o ? [o.acta, o.telefonema, o.entrada, o.salida, o.linea, o.via, o.pkInicio, o.pkFin, SI_NO(o.terminada)] : colsO.map(() => '');
+    fila(c, v.map((t, i) => ({ w: colsO[i][1], t, s: 7, a: 'center' })), { minH: 5.5 });
+  }
+  c.sinSalto = false;
+  const maq = parte.maquinaHer && parte.maquinaHer.descripcion ? ` (${parte.maquinaHer.descripcion})` : '';
+  const medios = [parte.usaMochila && 'Mochila', parte.usaMaquina && `Máquina${maq}`].filter(Boolean).join(' y ');
+  caja(doc, M + wIzq, yDesc, W - wIzq, c.y - yDesc, [
+    `Riego de herbicida: ${parte.trabajos.length} caso(s) SIOS, ${fmtNum(k.m2)} m².`,
+    medios && `Con ${medios}.`,
+    parte.sinOcupacion && `Hoy no se ha ocupado la vía. Hora de inicio: ${parte.horaInicio || '-'} · Hora de fin: ${parte.horaFin || '-'}.`,
+  ].filter(Boolean).join('\n'), { s: 7.5, a: 'left' });
+
+  // Casos SIOS en una sola columna (Ricardo, 12/11: caben mejor que en las dos del papel), con su PK, el
+  // medio y, en rojo, los que van sin fotos. Al final, la superficie total, como en el papel.
+  const casos = parte.trabajos || [];
+  const colsC = [{ t: 'Nº', w: 9, a: 'center' }, { t: 'Línea', w: 15, a: 'center' }, { t: 'Caso SIOS', w: 28, a: 'center' },
+    { t: 'P.K.', w: 46, a: 'center' }, { t: 'Medio', w: 22, a: 'center' }, { t: 'Superficie m2', w: 30, a: 'center' },
+    { t: 'Zona / observaciones', w: W - 150 }];
+  c.y += 3;
+  tabla(c, colsC, casos.map((t, i) => {
+    const rojo = (v) => (t.sinFotos ? { t: v, color: ROJO } : v);
+    return [String(i + 1), t.linea, rojo((t.referencia && t.referencia.codigo) || ''), [t.pkInicio, t.pkFin].filter(Boolean).join(' - '),
+      NOMBRE_MEDIO[medioCaso(parte, t)] || '-',
+      t.parcial ? `${fmtNum(m2Caso(t))} de ${fmtNum(t.superficie)}\n(solo una parte)` : fmtNum(m2Caso(t)),
+      rojo([t.ubicacion, t.sinFotos && 'SIN FOTOS'].filter(Boolean).join(' · '))];
+  }), { vacio: 'Sin casos' });
+  fila(c, [{ w: 120, t: 'Superficie Total', fill: GRIS, b: true, s: 8, a: 'right' }, { w: 30, t: `${fmtNum(k.m2)} m²`, b: true, s: 8, a: 'center' },
+    { w: W - 150, t: '' }], { minH: 6 });
+  // Debajo: m² por medio, hectáreas, fotos y, en rojo, los casos sin fotos.
+  const porMedio = Object.entries(k.porMedio).filter(([, v]) => v).map(([m, v]) => `${NOMBRE_MEDIO[m]}: ${fmtNum(v)} m²`);
+  const nFotos = casos.reduce((n, t) => n + (t.fotos || []).length, 0);
+  fila(c, [{ w: W, s: 7, t: [...porMedio, `${fmtNum(k.ha)} ha`,
+    `${nFotos} foto${nFotos === 1 ? '' : 's'} en la carpeta del parte (con el nº SIOS en el nombre de cada una)`].join('   ·   ') }], { minH: 5.5 });
+  const sinFotos = casos.map((t, i) => ({ t, i })).filter(({ t }) => t.sinFotos);
+  if (sinFotos.length) {
+    fila(c, [{ w: W, s: 7.5, b: true, color: ROJO,
+      t: `SIN FOTOS: ${sinFotos.map(({ t, i }) => `caso ${i + 1} (SIOS ${(t.referencia && t.referencia.codigo) || ''}): ${t.motivoSinFotos || ''}`).join('; ')}` }], { minH: 6 });
+  }
+
+  // Medidas antiincendios: las dos casillas del papel (extintores / otros medios).
+  const medidas = parte.medidas || [];
+  const extintores = medidas.some((x) => /^extintor/i.test(x));
+  const otras = [...medidas.filter((x) => !/^extintor/i.test(x)), parte.medidasOtrasSi && (parte.medidasOtras || '').trim()].filter(Boolean).join('; ');
+  c.y += 3;
+  if (c.y + 14 > fondo(c)) nuevaPagina(c);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('SE TOMAN MEDIDAS PREVENTIVAS ANTIINCENDIOS:', M, c.y, { baseline: 'top' });
+  c.y += 5;
+  const casilla = (x, marcada) => {
+    doc.rect(x, c.y + 0.3, 3, 3, 'S');
+    if (marcada) { doc.line(x + 0.5, c.y + 0.8, x + 2.5, c.y + 2.8); doc.line(x + 2.5, c.y + 0.8, x + 0.5, c.y + 2.8); }
+  };
+  casilla(M + 2, extintores);
+  doc.text('EXTINTORES', M + 7, c.y, { baseline: 'top' });
+  casilla(M + 40, Boolean(otras));
+  doc.text('OTROS MEDIOS:', M + 45, c.y, { baseline: 'top' });
+  const xo = M + 72;
+  const lo = lineas(doc, otras, M + W - xo, 8, false);
+  if (lo.length) doc.text(lo, xo + PAD, c.y + 0.3, { baseline: 'top', lineHeightFactor: 1.18 });
+  const altoO = Math.max(1, lo.length) * 8 * PT * 1.18;
+  doc.line(xo, c.y + altoO + 0.8, M + W, c.y + altoO + 0.8);
+  c.y += altoO + 3.5;
+
+  // Producto y caldo, con la firma del aplicador cualificado a la derecha (como el papel). El producto
+  // por hectárea, que el papel no tiene, va debajo del producto total.
+  const colsPr = [['Producto', 40], ['Dosis / Litro', 22], ['Caldo / Hectárea', 26], ['Producto Total Utilizado', 36], ['Caldo Total Utilizado', 26]];
+  const wPr = colsPr.reduce((s, [, w]) => s + w, 0);
+  const nP = Math.max(3, k.productos.length);
+  if (c.y + 8 + nP * 6.5 + 7 > fondo(c)) nuevaPagina(c);
+  fila(c, [...colsPr.map(([t, w]) => ({ w, t, fill: GRIS, s: 7, a: 'center' })),
+    { w: W - wPr, t: 'Firma Aplicador\nCualificado', fill: GRIS, s: 7, a: 'center' }], { minH: 8 });
+  const yFirma = c.y;
+  c.sinSalto = true;   // la firma es una sola caja al lado de estas filas
+  for (let j = 0; j < nP; j++) {
+    const x = k.productos[j];
+    const v = [x ? x.nombre : '', x ? `${fmtNum(x.dosis)} ml/L` : '', j === 0 ? `${fmtNum(k.caldoHa)} L/ha` : '',
+      x ? `${fmtNum(x.total)} L\n(${fmtNum(x.porHa)} L/ha)` : '', j === 0 ? `${fmtNum(k.caldo)} L` : ''];
+    fila(c, v.map((t, i) => ({ w: colsPr[i][1], t, s: 7.5, a: i === 0 ? 'left' : 'center' })), { minH: 6 });
+  }
+  c.sinSalto = false;
+  caja(doc, M + wPr, yFirma, W - wPr, c.y - yFirma, `${parte.capataz}\nFirmado al cerrar el parte en el móvil:\n${fmtFechaHora(parte.cierre) || '-'}`, { s: 6.5 });
+  fila(c, [{ w: W, s: 7.5, b: true, color: parte.confirmaCantidades ? undefined : ROJO,
+    t: parte.confirmaCantidades ? 'El aplicador confirma que son las cantidades reales.' : 'SIN CONFIRMAR que son las cantidades reales.' }], { minH: 6 });
+
+  if ((parte.observaciones || '').trim()) {
+    fila(c, [{ w: 30, t: 'OBSERVACIONES', fill: GRIS, b: true, s: 7 }, { w: W - 30, t: parte.observaciones, s: 7.5 }], { minH: 7, valign: 'top' });
+  }
 }

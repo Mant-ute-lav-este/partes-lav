@@ -2,6 +2,14 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.30.0 · 2026-11-12 (parte HERBICIDA, oculto: solo para los probadores)
+- **Tipo de parte nuevo, HERBICIDA** (referencia `HER-`, campaña de 2º riego), plan en `DISEÑO\PLAN-HERBICIDA.md`. El botón solo sale si el servidor (v28+) dice que la campaña está activa o que el correo está en `herbicidaProbadores`; para los demás capataces no cambia nada.
+- Parte como el papel: personal (el capataz es el aplicador «Cualificado», los demás «Básicos»), ocupaciones de vía o «Hoy no se ha ocupado la vía», mochila / máquina, hasta 3 productos con su dosis, caldo gastado y confirmación de cantidades reales; la app calcula producto total, producto por hectárea y caldo por hectárea.
+- **Casos SIOS en una lista**, como la maqueta: un solo buscador (con 3 cifras ya propone casos de la lista de la campaña y cada toque añade uno) y, en cada caso, fotos de antes y después con cámara o galería, medio y «¿Solo una parte?». «Más datos» abre la ficha del caso; un nº que no está en la lista se añade a mano.
+- Fotos a 1024 px y calidad 0,75, con el nº SIOS en el nombre (`T1_<SIOS>_antes_1.jpg`) y carpeta `AAAA-MM-DD/Herbicida/…`. Correo con «PARTE LAV» en el asunto, como siempre.
+- **PDF** en A4 vertical, calcado del parte de papel, con los casos en una sola columna (nº, línea, SIOS, PK, medio, m², zona) y la superficie total; **sin anexo de fotos** («N fotos en la carpeta del parte»). Los PDF de los demás tipos no cambian.
+- Esquema de los partes del móvil a 3 (`migrarParte`). Probado en móvil real con la copia de pruebas (servidor de pruebas v28, casos inventados).
+
 ## 0.29.1 · 2026-11-11 (quita las indicaciones sobre el álbum de WhatsApp)
 - Se quita el texto «Colecciones → WhatsApp» (el nombre del álbum cambia según el móvil) y la hoja «Elige las fotos» de los móviles donde «Compartir» aún no está activo: allí 🖼️ Galería vuelve a abrir el selector directamente, como antes de la 0.29.0. La hoja «¿De dónde es la foto?» solo sale en Android con la app instalada y «Compartir» activo. Lo demás no cambia.
 

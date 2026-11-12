@@ -4,7 +4,7 @@
 import { uuid, normaliza } from './util.js';
 
 export const FASES = [['antes', 'Antes'], ['durante', 'Durante'], ['despues', 'Después']];
-export const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ' };
+export const PREFIJO_REF = { INFRA: 'INF', SUPER: 'SUP', MAQUINARIA: 'MAQ', HERBICIDA: 'HER' };
 
 /** Clave del contador del móvil para un prefijo: INF, SUP y MAQ van por tipo (como siempre); LOC y DRE, por prefijo. */
 export function claveContador(prefijo) {
@@ -126,12 +126,21 @@ export function textoMedidas(p) {
 // que es la versión del formato del Datos_ (docs/DATOS-PARTE.md).
 
 /** Esquema de los partes de esta versión de la app. 1 = cualquier parte de antes de la 0.27.0. */
-export const ESQUEMA = 2;
+export const ESQUEMA = 3;
 
 /** Pone al día un borrador guardado por una versión anterior (lo cambia y lo devuelve). */
 export function migrarParte(p) {
   if (!p || typeof p !== 'object' || p.estado !== 'borrador') return p;
   if ((p.esquema || 1) >= ESQUEMA) return p;
+  if ((p.esquema || 1) < 2) migrar1a2(p);
+  // 2 → 3 (0.30.0): llega el parte HERBICIDA. Los demás tipos no cambian; a un HERBICIDA se le
+  // completa lo que falte (hoy no hay ninguno anterior: queda para los que lleguen después).
+  if (p.tipo === 'HERBICIDA') completarHerbicida(p);
+  p.esquema = ESQUEMA;
+  return p;
+}
+
+function migrar1a2(p) {
   // 1 → 2: todo lo que fue llegando de la 0.6 a la 0.26.
   // 0.6.0: maquinaria y vehículos por separado; lo apuntado antes queda como vehículos y se
   // vuelve a preguntar por la maquinaria.
@@ -168,8 +177,127 @@ export function migrarParte(p) {
     if (!t.telefonema) t.telefonema = { numero: '', salida: '' };
     else if (!('salida' in t.telefonema)) t.telefonema.salida = '';
   }
-  p.esquema = ESQUEMA;
+}
+
+// ---------- Parte HERBICIDA (campaña de herbicida, 0.30.0) ----------
+// Como el papel: ocupaciones de vía en el parte y una lista de casos SIOS regados. Cada caso se guarda
+// en p.trabajos (así las fotos, la cola, «Corregir» y el aviso de peso funcionan igual que en INFRA),
+// con referencia SIOS, su ubicación y m² (de la lista de la campaña), el medio y sus fotos.
+
+export const MAX_PRODUCTOS = 3;
+export const MEDIOS_HER = [['mochila', 'Mochila'], ['maquina', 'Máquina'], ['ambas', 'Ambas']];
+export const NOMBRE_MEDIO = Object.fromEntries(MEDIOS_HER);
+export const FASES_HER = [['antes', 'Antes'], ['despues', 'Después']];
+
+export const nuevaOcupacion = (previa = null) => ({
+  id: uuid(), acta: '', telefonema: '', entrada: '', salida: '',
+  linea: previa ? previa.linea : '', via: previa ? previa.via : '', pkInicio: previa ? previa.pkFin : '', pkFin: '', terminada: null,
+});
+
+export const nuevoProducto = () => ({ nombre: '', dosis: '', otro: false });
+
+export function nuevoCaso() {
+  return {
+    id: uuid(),
+    referencia: { tipo: 'SIOS', codigo: '', motivo: '' },
+    linea: '', via: '', pkInicio: '', pkFin: '', superficie: '', ubicacion: '', desbroce: '',
+    deLista: false,       // los datos vienen de la lista de la campaña (se pueden cambiar)
+    medio: '',            // solo si se marcan mochila y máquina: 'mochila', 'maquina' o 'ambas'
+    parcial: false,       // «¿Solo una parte?»: se apuntan los m² hechos
+    m2Hechos: '',
+    sinFotos: false, motivoSinFotos: '',
+    fotos: [],
+  };
+}
+
+/** Campos propios del parte HERBICIDA (los que no tienen los demás tipos). */
+export function camposHerbicida() {
+  return {
+    ocupaciones: [],
+    sinOcupacion: false, horaInicio: '', horaFin: '',   // «Hoy no se ha ocupado la vía»
+    usaMochila: false, usaMaquina: false, maquinaHer: { descripcion: '', otro: false },
+    productos: [nuevoProducto()],
+    caldo: '',            // litros de caldo gastados en todo el parte
+    confirmaCantidades: false,
+  };
+}
+
+/** Completa un borrador HERBICIDA con lo que le falte (repetible, sin borrar nada). */
+export function completarHerbicida(p) {
+  for (const [k, v] of Object.entries(camposHerbicida())) if (!(k in p)) p[k] = v;
+  for (const t of p.trabajos || []) {
+    for (const [k, v] of Object.entries(nuevoCaso())) if (k !== 'id' && !(k in t)) t[k] = v;
+  }
   return p;
+}
+
+const num = (s) => {
+  const n = Number(String(s == null ? '' : s).replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * ¿El PDF lleva anexo con las fotos? Sí, salvo HERBICIDA (35 casos no caben en un correo con anexo:
+ * sus fotos van sueltas). Lo usan el PDF y el aviso de peso (factorCorreo), para que no se desacompasen.
+ */
+export const llevaAnexoFotos = (p) => Boolean(p) && p.tipo !== 'HERBICIDA';
+
+/** Nº SIOS de un caso, solo las cifras («S-385.952» → «385952»): para ver repetidos y nombrar las fotos. */
+export const codigoSios = (t) => String((t && t.referencia && t.referencia.codigo) || '').replace(/\D/g, '');
+
+/** Medio de un caso: con un solo medio marcado en el parte, ese; con los dos, el del caso. */
+export function medioCaso(p, t) {
+  if (p.usaMochila && p.usaMaquina) return t.medio || '';
+  return p.usaMochila ? 'mochila' : p.usaMaquina ? 'maquina' : '';
+}
+
+/** m² regados de un caso: los hechos si es «solo una parte»; si no, la superficie del caso. */
+export const m2Caso = (t) => (t.parcial ? num(t.m2Hechos) : num(t.superficie));
+
+/**
+ * Cálculos del parte: m² y hectáreas regadas, m² por medio, caldo por hectárea y, por producto, el
+ * total (caldo × dosis) y por hectárea. Sin hectáreas, «por hectárea» queda en 0.
+ */
+export function calculosHerbicida(p) {
+  const m2 = (p.trabajos || []).reduce((a, t) => a + m2Caso(t), 0);
+  const ha = m2 / 10000;
+  const porMedio = { mochila: 0, maquina: 0, ambas: 0 };
+  for (const t of p.trabajos || []) {
+    const m = medioCaso(p, t);
+    if (porMedio[m] != null) porMedio[m] += m2Caso(t);
+  }
+  const caldo = num(p.caldo);
+  const productos = (p.productos || []).filter((x) => String(x.nombre || '').trim()).map((x) => {
+    const total = caldo * num(x.dosis) / 1000;   // L de caldo × ml/L → litros de producto
+    return { nombre: x.nombre.trim(), dosis: num(x.dosis), total, porHa: ha ? total / ha : 0 };
+  });
+  return { m2, ha, porMedio, caldo, caldoHa: ha ? caldo / ha : 0, productos };
+}
+
+/** Casos de la lista de la campaña cuyo nº contiene lo escrito (desde 3 cifras), los que empiezan por ello primero. */
+export function buscarCasos(lista, texto, max = 8) {
+  const q = String(texto || '').replace(/\D/g, '');
+  if (q.length < 3) return [];
+  return (lista || [])
+    .filter((c) => String(c.caso).includes(q))
+    .sort((a, b) => Number(!String(a.caso).startsWith(q)) - Number(!String(b.caso).startsWith(q)) || String(a.caso).localeCompare(String(b.caso)))
+    .slice(0, max);
+}
+
+/** Copia en el caso los datos de la lista de la campaña (línea, vía, PK, m², ubicación y desbroce). */
+export function aplicarCasoLista(t, c) {
+  Object.assign(t, {
+    linea: String(c.linea || ''), via: String(c.via || ''), pkInicio: String(c.pkInicio || ''), pkFin: String(c.pkFin || ''),
+    superficie: String(c.superficie || ''), ubicacion: String(c.ubicacion || ''), desbroce: String(c.desbroce || ''), deLista: true,
+  });
+  t.referencia = { ...(t.referencia || {}), tipo: 'SIOS', codigo: String(c.caso) };
+  return t;
+}
+
+/** Vacía los datos que vinieron de la lista (al cambiar a mano el nº de un caso elegido de la lista). */
+export function quitarDatosLista(t) {
+  Object.assign(t, { linea: '', via: '', pkInicio: '', pkFin: '', superficie: '', ubicacion: '', desbroce: '', deLista: false });
+  return t;
 }
 
 /** Nombre antiguo de migrarParte (lo usan las pantallas del parte). */
@@ -216,6 +344,11 @@ export function apartadosCopiables(previo, capataz, medidasLista) {
   if (medidas.length || otras) {
     r.push({ clave: 'medidas', titulo: 'Medidas antiincendios', detalle: [medidas.length && `${medidas.length} medida(s)`, otras && `Otras: ${otras}`].filter(Boolean).join(' · ') });
   }
+  // HERBICIDA: los productos con su dosis (el caldo no, es de cada día).
+  const productos = (previo.productos || []).filter((x) => String(x.nombre || '').trim());
+  if (previo.tipo === 'HERBICIDA' && productos.length) {
+    r.push({ clave: 'productos', titulo: 'Productos y dosis', detalle: productos.map((x) => `${x.nombre}${x.dosis ? ` (${x.dosis} ml/L)` : ''}`).join(', ') });
+  }
   return r;
 }
 
@@ -251,6 +384,10 @@ export function repetirParte(nuevo, previo, claves, medidasLista) {
     p.medidasOtrasSi = Boolean(previo.medidasOtrasSi && (previo.medidasOtras || '').trim());
     p.medidasOtras = p.medidasOtrasSi ? previo.medidasOtras : '';
     p.antiincendios = textoMedidas(p);
+  }
+  if (claves.includes('productos') && p.tipo === 'HERBICIDA') {
+    const ps = (previo.productos || []).filter((x) => String(x.nombre || '').trim()).slice(0, MAX_PRODUCTOS);
+    if (ps.length) p.productos = ps.map((x) => ({ nombre: x.nombre, dosis: x.dosis || '', otro: Boolean(x.otro) }));
   }
   return p;
 }

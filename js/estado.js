@@ -15,6 +15,7 @@ import {
 import { vInicio } from './vista-inicio.js';
 import { vParte, pintarResultados } from './vista-parte.js';
 import { vTrabajo, cargarMiniaturas, liberarFotos } from './vista-trabajo.js';
+import { pintarCasos } from './vista-herbicida.js';
 import { vEnvio, prepararEnvioActual } from './vista-envio.js';
 import { leerCompartidas } from './compartidas.js';
 import { abrirCompartidas, cerrarCompartidas, avisarDescartadas } from './vista-compartidas.js';
@@ -42,12 +43,14 @@ export const estado = {
   cambiandoPin: false,
   preguntaOtro: false,   // «¿Has hecho otro trabajo?» al terminar el último trabajo
   preguntaExtras: false, // «¿Ha habido horas extra?» al cerrar el parte
-  repetir: null,         // «¿Empezar igual que el último parte?» al crear un INFRA o SUPER
+  repetir: null,         // «¿Empezar igual que el último parte?» al crear un INFRA, SUPER o HERBICIDA
   avisoCopia: '',        // aviso en el parte recién copiado del anterior
   nCompartidas: 0,       // fotos compartidas desde WhatsApp esperando a que se coloquen (aviso en Inicio)
   compartidas: null,     // hoja abierta para colocarlas: { destinos, elegido, miniaturas }
   compartirActivo: false, // este móvil ya tiene «Compartir → Partes LAV» (se lee al arrancar, ver app.js)
   origenFoto: null,      // hoja «¿De dónde es la foto?» al tocar Galería: { modo, paso, pendiente }
+  verCasos: false,       // HERBICIDA: la pantalla del parte enseña la lista de casos SIOS
+  buscaSios: '',         // lo escrito en el buscador de esa lista
 };
 export const urls = new Map();   // id de foto → URL para las miniaturas
 
@@ -137,6 +140,9 @@ export async function ir(vista) {
     estado.busqueda = '';
     estado.otroAbierto = false;
   }
+  // HERBICIDA: la ficha de un caso vuelve («‹ Casos») a la lista de casos; al salir del parte se cierra.
+  if (vista === 'trabajo' && estado.parte && estado.parte.tipo === 'HERBICIDA') estado.verCasos = true;
+  if (vista !== 'parte' && vista !== 'trabajo') { estado.verCasos = false; estado.buscaSios = ''; }
   estado.vista = vista;
   estado.errores = [];
   estado.menu = false;
@@ -165,6 +171,7 @@ export function render() {
   document.body.classList.toggle('sin-scroll',
     Boolean(estado.menu || estado.eligeMaquina || estado.repetir || estado.compartidas || estado.origenFoto || estado.fotoVista || estado.preguntaOtro || estado.preguntaExtras || estado.errores.length || estado.procesando));
   pintarResultados();
+  pintarCasos();
   cargarMiniaturas();
   const auto = app.querySelector('[data-autofocus]');
   if (auto) auto.focus();

@@ -6,7 +6,11 @@ import { api, hayServidor } from './servidor.js';
 import { procesarSalida } from './salida.js';
 import { setPath, toast, MAX_FORMATO1 } from './util.js';
 import { nombrePuesto, unirVias, errorPinNuevo } from './validaciones.js';
-import { nuevaMaquinaVia, nuevoTajo, nuevoRealizado, persona, EQUIPOS, textoMedidas } from './modelo.js';
+import {
+  nuevaMaquinaVia, nuevoTajo, nuevoRealizado, persona, EQUIPOS, textoMedidas, nuevaOcupacion, nuevoProducto, MAX_PRODUCTOS, aplicarCasoLista, quitarDatosLista, codigoSios,
+  nuevoCaso,
+} from './modelo.js';
+import { herbicidaCfg, pintarCasos, pintarCalculosHer } from './vista-herbicida.js';
 import {
   app, estado, entrarApp, sincronizar, cargarConfigServidor, refrescarVista, registrarSync, ir, render,
   guardarYa, guardarPronto, maquinasDeVia, maquinasViaCfg, personalMaqCfg, catalogo, equiposCfg, medidasCfg,
@@ -49,6 +53,8 @@ export const ACCIONES_BORRADOR = new Set([
   'anadir-desvio', 'quitar-desvio', 'nuevo-equipo', 'quitar-equipo', 'nueva-maqvia', 'quitar-maqvia',
   'nuevo-tajo', 'quitar-tajo', 'foto', 'foto-formato', 'anadir-drp', 'quitar-drp', 'borrar-foto',
   'borrar-parte', 'cerrar-parte', 'origen-foto-movil', 'origen-foto-whatsapp',
+  'nueva-ocupacion', 'quitar-ocupacion', 'elegir-caso', 'nuevo-producto', 'quitar-producto',
+  'anadir-caso', 'anadir-caso-mano',
 ]);
 
 const esBorrador = () => Boolean(estado.parte && estado.parte.estado === 'borrador');
@@ -76,8 +82,30 @@ export function onInput(e) {
     pintarResultados();
     return;
   }
+  if (el.id === 'buscar-sios') {   // HERBICIDA, lista de casos: lo escrito no es del parte hasta elegir
+    estado.buscaSios = el.value;
+    pintarCasos();
+    return;
+  }
   // Todo lo demás que se escribe es un campo del parte.
   if (!esBorrador()) return;
+  // HERBICIDA: nº de SIOS con propuestas de la lista de la campaña (sin repintar, para no perder el teclado).
+  if (el.id === 'buscar-caso') {
+    aplicarBind(el);
+    const t = trabajoActual();
+    // Venía de la lista y se cambia el nº a mano: la línea, vía, PK y m² eran de otro caso, se vacían
+    // (una sola vez: luego deLista ya es false). Se repinta y el cursor vuelve al final del nº.
+    if (t && t.deLista) {
+      quitarDatosLista(t);
+      guardarPronto();
+      render();
+      const nuevo = app.querySelector('#buscar-caso');
+      if (nuevo) { nuevo.focus(); const n = nuevo.value.length; nuevo.setSelectionRange(n, n); }
+      return;
+    }
+    pintarCasos();
+    return;
+  }
   if (el.dataset.pk) { aplicarPk(el, false); return; }
   if (el.dataset.hora) { aplicarHora(el, false); return; }
   if (el.dataset.extra) { aplicarExtra(el); return; }
@@ -89,7 +117,10 @@ export function onInput(e) {
     guardarPronto();
     return;
   }
-  if (el.matches('[data-bind]') && el.type !== 'radio' && el.type !== 'checkbox') aplicarBind(el);
+  if (el.matches('[data-bind]') && el.type !== 'radio' && el.type !== 'checkbox') {
+    aplicarBind(el);
+    pintarCalculosHer();   // HERBICIDA: dosis y caldo cambian los cálculos al momento
+  }
 }
 
 export async function onChange(e) {
@@ -208,6 +239,29 @@ export async function onChange(e) {
       const inp = app.querySelector(`[data-bind="personal.${p.personal.length - 1}.nombre"]`);
       if (inp) inp.focus();
     }
+    return;
+  }
+  // HERBICIDA: máquina de la lista de la campaña (u «Otra»).
+  if (el.matches('select[data-maqher]')) {
+    const c = herbicidaCfg().maquinas[Number(el.value)];
+    estado.parte.maquinaHer = el.value === 'otro' ? { descripcion: '', otro: true }
+      : { descripcion: c && el.value !== '' ? c.descripcion : '', otro: false };
+    guardarPronto();
+    render();
+    if (el.value === 'otro') { const inp = app.querySelector('[data-bind="maquinaHer.descripcion"]'); if (inp) inp.focus(); }
+    return;
+  }
+  // HERBICIDA: producto de la lista (u «Otro»). La dosis escrita se conserva; si no hay, la habitual de la lista.
+  if (el.matches('select[data-producto]')) {
+    const k = Number(el.dataset.producto);
+    const x = estado.parte.productos[k];
+    if (!x) return;
+    const c = herbicidaCfg().productos[Number(el.value)];
+    if (el.value === 'otro') Object.assign(x, { nombre: '', otro: true });
+    else Object.assign(x, { nombre: c && el.value !== '' ? c.nombre : '', otro: false, dosis: x.dosis || (c && c.dosis) || '' });
+    guardarPronto();
+    render();
+    if (el.value === 'otro') { const inp = app.querySelector(`[data-bind="productos.${k}.nombre"]`); if (inp) inp.focus(); }
     return;
   }
   if (el.matches('select[data-lista]')) {
@@ -473,6 +527,55 @@ export async function onClick(e) {
     case 'quitar-realizado':
       if (confirm(`¿Quitar el trabajo ${i + 1}?`)) { p.realizados.splice(i, 1); guardarPronto(); render(); }
       break;
+    case 'nueva-ocupacion': p.ocupaciones.push(nuevaOcupacion(p.ocupaciones[p.ocupaciones.length - 1])); await guardarYa(); render(); break;
+    case 'quitar-ocupacion':
+      if (confirm(`¿Quitar la ocupación ${i + 1}?`)) { p.ocupaciones.splice(i, 1); guardarPronto(); render(); }
+      break;
+    case 'nuevo-producto':
+      if (p.productos.length < MAX_PRODUCTOS) { p.productos.push(nuevoProducto()); guardarPronto(); render(); }
+      break;
+    case 'quitar-producto': p.productos.splice(i, 1); guardarPronto(); render(); break;
+    case 'elegir-caso': {
+      const t = trabajoActual();
+      const c = herbicidaCfg().casos.find((x) => String(x.caso) === el.dataset.caso);
+      if (!t || !c) break;
+      const n = String(c.caso).replace(/\D/g, '');
+      const ya = p.trabajos.findIndex((x) => x !== t && codigoSios(x) === n);
+      if (ya >= 0) { toast(`El SIOS ${c.caso} ya está en el caso ${ya + 1}.`, 4000); break; }
+      aplicarCasoLista(t, c);
+      await guardarYa();
+      render();
+      if (!c.desbroce) toast(`Ojo: en la lista al caso ${c.caso} le falta el desbroce.`, 5000);
+      break;
+    }
+    case 'abrir-casos': estado.verCasos = true; estado.buscaSios = ''; render(); window.scrollTo(0, 0); break;
+    case 'cerrar-casos': estado.verCasos = false; render(); window.scrollTo(0, 0); break;
+    case 'anadir-caso': {
+      const c = herbicidaCfg().casos.find((x) => String(x.caso) === el.dataset.caso);
+      if (!c) break;
+      const ya = p.trabajos.findIndex((x) => codigoSios(x) === String(c.caso).replace(/\D/g, ''));
+      if (ya >= 0) { toast(`El SIOS ${c.caso} ya está en la lista (caso ${ya + 1}).`, 4000); break; }
+      p.trabajos.push(aplicarCasoLista(nuevoCaso(), c));
+      estado.buscaSios = '';
+      await guardarYa();
+      render();
+      const b = app.querySelector('#buscar-sios');
+      if (b) b.focus();   // para seguir escribiendo el siguiente nº
+      toast(c.desbroce ? `SIOS ${c.caso} añadido (caso ${p.trabajos.length})` : `SIOS ${c.caso} añadido. Ojo: en la lista le falta el desbroce.`, c.desbroce ? 2500 : 5000);
+      break;
+    }
+    case 'anadir-caso-mano': {
+      // Un nº que no está en la lista de la campaña: se abre su ficha para poner línea, vía, PK y m².
+      const n = el.dataset.caso;
+      if (!n || p.trabajos.some((x) => codigoSios(x) === n)) break;
+      const t = nuevoCaso();
+      t.referencia.codigo = n;
+      p.trabajos.push(t);
+      estado.buscaSios = '';
+      estado.trabajoIdx = p.trabajos.length - 1;
+      ir('trabajo');
+      break;
+    }
     case 'nuevo-vagon': p.vagones.push({ tipo: '', uic: '', m3: '' }); await guardarYa(); render(); break;
     case 'quitar-vagon': p.vagones.splice(i, 1); guardarPronto(); render(); break;
     case 'abrir': {
@@ -501,11 +604,15 @@ export async function onClick(e) {
     case 'volver-parte': ir('parte'); break;
     case 'trabajo-listo':
       // Solo se pregunta al terminar el último; si edita uno anterior, vuelve directo al parte.
-      if (estado.trabajoIdx === p.trabajos.length - 1) { estado.preguntaOtro = true; render(); } else ir('parte');
+      // HERBICIDA vuelve siempre a su lista de casos, donde se añade el siguiente.
+      if (p.tipo !== 'HERBICIDA' && estado.trabajoIdx === p.trabajos.length - 1) { estado.preguntaOtro = true; render(); } else ir('parte');
       break;
     case 'cerrar-pregunta': estado.preguntaOtro = false; render(); break;
     case 'copiar-trabajo-anterior': copiarTrabajoAnterior(); break;
-    case 'borrar-trabajo': borrarTrabajo(); break;
+    case 'borrar-trabajo':
+      if (i != null) estado.trabajoIdx = i;   // desde la lista de casos de HERBICIDA
+      borrarTrabajo();
+      break;
     case 'anadir-aparato': filasAparato(trabajoActual()).push({ nombre: '', otro: false }); guardarPronto(); render(); break;
     case 'quitar-aparato': {
       const t = trabajoActual();
@@ -540,6 +647,7 @@ export async function onClick(e) {
       if (confirm(`¿Quitar el tajo ${i + 1}?`)) { p.tajos.splice(i, 1); guardarPronto(); render(); }
       break;
     case 'foto': {
+      if (i != null) estado.trabajoIdx = i;   // desde la lista de casos de HERBICIDA
       if (!referenciaDe(trabajoActual())) {
         toast('Pon primero la referencia: sale en el sello de la foto.', 3500);
         break;

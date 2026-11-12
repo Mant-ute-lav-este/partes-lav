@@ -148,6 +148,14 @@ prueba('peso del correo: aviso y cuántas fotos quitar', () => {
   igual(val.fotosAQuitar(Array(10).fill(MB)), 2, '10 fotos de 1 MB = 24 MB: sobran 4 MB = 2 fotos');
   igual(val.fotosAQuitar(Array(35).fill(MB)), 27, '35 fotos de 1 MB = 84 MB');
   igual(val.fotosAQuitar([]), 0);
+  // HERBICIDA no lleva anexo en el PDF: factor menor. Los demás tipos, como siempre.
+  const her = ej.parteHerbicida();
+  igual([val.factorCorreo(ej.parteInfra()), val.factorCorreo(ej.parteSuper()), val.factorCorreo(ej.parteMaqVia()), val.factorCorreo(her)], [2.4, 2.4, 2.4, 1.78]);
+  igual([modelo.llevaAnexoFotos(ej.parteInfra()), modelo.llevaAnexoFotos(her)], [true, false], 'el PDF y el aviso miran lo mismo');
+  const fotos70 = Array(70).fill(161 * 1024);   // 35 casos con fotos a 1024 px y calidad 0,75 (medido)
+  igual(val.fotosAQuitar(fotos70, val.factorCorreo(her)), 0, '35 casos de herbicida caben sin aviso');
+  cierto(val.fotosAQuitar(fotos70) > 0, 'con el factor de los partes con anexo, avisaría sin motivo');
+  igual(val.fotosAQuitar(Array(70).fill(313 * 1024), val.factorCorreo(her)), 34, 'a 1280 px y 0,82 (313 KB) sí avisaría: 38 MB, sobran 34 fotos');
 });
 
 // Aparatos de prueba (inventados), con PK en los dos sentidos como en la lista real.
@@ -514,12 +522,140 @@ prueba('modelo: repetir el parte anterior', () => {
 
 // ---------- referencia, carpeta y nombres ----------
 
+// ---------- parte HERBICIDA (campaña de herbicida, 0.30.0) ----------
+
+prueba('herbicida: cálculos, medios, búsqueda de casos y datos de la lista', () => {
+  const p = ej.parteHerbicida();
+  // 114 m² enteros con mochila + 886 de 1650 m² («solo una parte») con máquina = 1000 m² = 0,1 ha.
+  const c = modelo.calculosHerbicida(p);
+  igual([c.m2, c.ha, c.porMedio], [1000, 0.1, { mochila: 114, maquina: 886, ambas: 0 }], 'm², ha y m² por medio');
+  igual([c.caldo, c.caldoHa], [300, 3000], 'caldo y caldo por hectárea');
+  igual(c.productos.map((x) => [x.nombre, x.dosis, Number(x.total.toFixed(4)), Number(x.porHa.toFixed(4))]), [['Producto prueba A', 13, 3.9, 39]], 'producto: 300 L × 13 ml/L');
+  // Mezcla de dos productos y comas decimales.
+  p.productos.push({ nombre: 'Producto prueba B', dosis: '2,5', otro: false });
+  p.caldo = '300,0';
+  igual(modelo.calculosHerbicida(p).productos.map((x) => Number(x.total.toFixed(4))), [3.9, 0.75], 'dos productos');
+  // Con un solo medio en el parte, todos los casos van con ese (aunque el caso diga otro).
+  p.usaMaquina = false;
+  igual(p.trabajos.map((t) => modelo.medioCaso(p, t)), ['mochila', 'mochila']);
+  igual(modelo.calculosHerbicida(p).porMedio, { mochila: 1000, maquina: 0, ambas: 0 });
+  p.usaMochila = false;
+  igual(modelo.medioCaso(p, p.trabajos[0]), '', 'sin medio marcado');
+  // Sin casos no se divide entre cero.
+  igual([modelo.calculosHerbicida({ trabajos: [], productos: p.productos, caldo: '10' }).caldoHa], [0]);
+  // Búsqueda: desde 3 cifras; primero los que empiezan por lo escrito.
+  const lista = ej.configHer.herbicida.casos;
+  igual(modelo.buscarCasos(lista, '90'), [], 'con 2 cifras no propone');
+  igual(modelo.buscarCasos(lista, '900').map((x) => x.caso), ['900001', '900002', '919000'].filter((x) => x.includes('900')));
+  igual(modelo.buscarCasos(lista, '190').map((x) => x.caso), ['919000'], 'también por el medio');
+  igual(modelo.buscarCasos(lista, '0000').map((x) => x.caso), ['900001', '900002'], 'contiene');
+  // Elegir de la lista copia sus datos (y la referencia SIOS).
+  const t = modelo.aplicarCasoLista(modelo.nuevoCaso(), lista[2]);
+  igual([t.referencia.tipo, t.referencia.codigo, t.linea, t.via, t.pkInicio, t.pkFin, t.superficie, t.deLista], ['SIOS', '919000', '044', 'V1', '459+050', '459+600', '1650', true]);
+});
+
+prueba('herbicida: migrarParte, repetir el parte anterior y fotos compartidas', async () => {
+  // Esquema 3: un INFRA del esquema 2 solo cambia el número; un HERBICIDA incompleto se completa sin perder nada.
+  const infra = { ...borrador(ej.parteInfra()), esquema: 2 };
+  const antes = JSON.stringify({ ...infra, esquema: modelo.ESQUEMA });
+  igual(JSON.stringify(modelo.migrarParte(infra)), antes, 'INFRA del esquema 2');
+  const h = { ...borrador(ej.parteHerbicida()), esquema: 2 };
+  delete h.productos;
+  delete h.trabajos[0].parcial;
+  h.caldo = '250';
+  modelo.migrarParte(h);
+  igual([h.esquema, h.productos.length, h.trabajos[0].parcial, h.caldo, h.trabajos[0].fotos.length], [modelo.ESQUEMA, 1, false, '250', 2], 'HERBICIDA completado');
+  const otra = JSON.stringify(h);
+  igual(JSON.stringify(modelo.migrarParte({ ...JSON.parse(otra), esquema: 2 })), otra, 'repetirlo no cambia nada');
+  // Repetir: personal, medidas y productos; el caldo y los casos no.
+  const previo = ej.parteHerbicida();
+  const cop = modelo.apartadosCopiables(previo, 'Ana Prueba', modelo.MEDIDAS_PROVISIONALES);
+  igual(cop.map((x) => x.clave), ['personal', 'medidas', 'productos']);
+  cierto(cop[2].detalle.includes('Producto prueba A (13 ml/L)'), cop[2].detalle);
+  const nuevo = { ...borrador(ej.parteHerbicida()), personal: [], trabajos: [], ocupaciones: [], caldo: '', ...modelo.camposHerbicida() };
+  const q = modelo.repetirParte(nuevo, previo, ['personal', 'medidas', 'productos'], modelo.MEDIDAS_PROVISIONALES);
+  igual([q.productos, q.caldo, q.trabajos.length, q.ocupaciones.length, q.personal.length], [[{ nombre: 'Producto prueba A', dosis: '13', otro: false }], '', 0, 0, 2]);
+  // Las fotos compartidas desde WhatsApp pueden ir a los casos, solo a antes y después.
+  const { destinosFotos } = await import('../js/compartidas.js');
+  const d = destinosFotos([borrador(ej.parteHerbicida())]);
+  igual(d.map((x) => [x.referencia, x.fases.map((f) => f[0])]), [['SIOS 900001', ['antes', 'despues']], ['SIOS 919000', ['antes', 'despues']]]);
+});
+
+prueba('validaciones: parte HERBICIDA', () => {
+  const ok = borrador(ej.parteHerbicida());
+  igual(val.validarHer(ok), [], 'el ejemplo está completo');
+  const msgs = (p) => val.validarHer(p).map((e) => e.msg);
+  const con = (cambio) => { const p = structuredClone(ok); cambio(p); return msgs(p); };
+  const tiene = (lista, txt) => cierto(lista.some((m) => m.includes(txt)), `falta el aviso «${txt}» en: ${lista.join(' | ')}`);
+  // El capataz es el aplicador cualificado: tiene que estar en el personal (sin mirar tildes ni mayúsculas).
+  tiene(con((p) => { p.personal = p.personal.slice(1); }), 'aplicador cualificado (Ana Prueba)');
+  igual(con((p) => { p.personal[0].nombre = 'ANA  PRUEBA'; }), [], 'mismo nombre con otras mayúsculas');
+  // Ocupaciones: alguna o «no se ha ocupado» con horas.
+  tiene(con((p) => { p.ocupaciones = []; }), 'Añade al menos una ocupación de vía');
+  tiene(con((p) => { p.ocupaciones[0].telefonema = ''; p.ocupaciones[0].terminada = null; }), 'Ocupación 1: falta el nº de telefonema');
+  tiene(con((p) => { p.ocupaciones[0].terminada = null; }), 'Ocupación 1: indica si se ha terminado');
+  const sinOcup = con((p) => { p.ocupaciones = []; p.sinOcupacion = true; p.horaInicio = '08:00'; });
+  igual(sinOcup, ['Hoy no se ha ocupado la vía: falta la hora de fin.'], 'sin ocupación pide las horas');
+  // Medio y casos.
+  tiene(con((p) => { p.usaMochila = false; p.usaMaquina = false; }), 'mochila, máquina o las dos');
+  tiene(con((p) => { p.trabajos[0].medio = ''; }), 'Caso 1: elige si se ha regado con mochila, máquina o ambas');
+  igual(con((p) => { p.usaMaquina = false; p.trabajos[0].medio = ''; }), [], 'con un solo medio no se pregunta por caso');
+  tiene(con((p) => { p.trabajos = []; }), 'Añade al menos un caso SIOS');
+  tiene(con((p) => { p.trabajos[1].referencia.codigo = '900001'; }), 'Caso 2: el SIOS 900001 ya está en el caso 1');
+  tiene(con((p) => { p.trabajos[1].m2Hechos = '2000'; }), 'no pueden pasar de los m² del caso');
+  tiene(con((p) => { p.trabajos[1].m2Hechos = ''; }), '«Solo una parte»: pon los m² hechos');
+  tiene(con((p) => { p.trabajos[0].superficie = ''; }), 'Caso 1: faltan los m² del caso');
+  tiene(con((p) => { p.trabajos[0].fotos = p.trabajos[0].fotos.filter((f) => f.fase === 'antes'); }), 'Caso 1: falta al menos una foto de DESPUÉS');
+  tiene(con((p) => { p.trabajos[0].fotos = []; p.trabajos[0].sinFotos = true; }), 'Caso 1: indica por qué no se han podido hacer fotos');
+  igual(con((p) => { p.trabajos[0].fotos = []; p.trabajos[0].sinFotos = true; p.trabajos[0].motivoSinFotos = 'Sin luz suficiente'; }), [], 'sin fotos con motivo');
+  igual(val.validarHer(borrador(ej.parteHerbicida())).filter((e) => e.trabajo != null).length, 0);
+  igual(val.validarHer({ ...structuredClone(ok), trabajos: [{ ...structuredClone(ok.trabajos[0]), fotos: [] }] }).find((e) => e.trabajo != null).trabajo, 0, 'el aviso lleva al caso (botón «Ir»)');
+  // Producto y caldo.
+  tiene(con((p) => { p.productos = [modelo.nuevoProducto()]; }), 'Pon al menos un producto con su dosis');
+  tiene(con((p) => { p.productos[0].dosis = ''; }), 'Producto 1: pon la dosis');
+  tiene(con((p) => { p.productos.push({ nombre: '', dosis: '', otro: true }); }), 'Producto 2: escribe cuál es');
+  tiene(con((p) => { p.caldo = '0'; }), 'litros de caldo gastados');
+  tiene(con((p) => { p.confirmaCantidades = false; }), 'son las cantidades reales');
+  tiene(con((p) => { p.medidas = []; p.antiincendios = ''; }), 'medida antiincendios');
+  // Jornada sin trabajos: solo el motivo.
+  igual(con((p) => { p.sinTrabajos = true; p.motivoSinTrabajos = 'Lluvia / meteorología'; p.trabajos = []; p.ocupaciones = []; p.caldo = ''; }), []);
+  igual(val.faltasCaso(modelo.nuevoCaso(), ok).map((f) => f.corto), ['nº de SIOS', 'línea', 'vía', 'PK inicio', 'PK fin', 'm² del caso', 'mochila o máquina', 'foto de antes', 'foto de después'], 'caso vacío');
+});
+
 prueba('referencia del trabajo', () => {
   igual(textoReferencia({ referencia: { tipo: 'SIOS', codigo: 'S-1' } }), 'SIOS S-1');
   igual(textoReferencia({ referencia: { tipo: 'INCIDENCIA', codigo: 'I-2' } }), 'Incidencia I-2');
   igual(textoReferencia({ referencia: { tipo: 'SIN_REF', motivo: ' Limpieza ' } }), 'Limpieza');
   igual(textoReferencia({ referencia: { tipo: 'SIN_REF', motivo: '' } }), 'Sin referencia');
   igual(textoReferencia({}), '');
+});
+
+prueba('herbicida: carpeta Herbicida, fotos con el nº SIOS y a 1024 px con calidad 0,75', async () => {
+  igual(carpetaDestino(ej.parteHerbicida()), '2026-10-14/Herbicida/HER-9001_Ana_Prueba');
+  const foto = await jpeg();
+  const nombres = async (p) => (await prepararEnvio(p, ej.config, async () => foto, 'prueba')).archivos[2].text().then((t) => JSON.parse(t).fotos.map((f) => f.archivo));
+  igual(await nombres(ej.parteHerbicida()), ['T1_900001_antes_1.jpg', 'T1_900001_despues_1.jpg', 'T2_919000_antes_1.jpg', 'T2_919000_despues_1.jpg']);
+  // Rectificativo: el _v2 va al final, como siempre.
+  igual((await nombres({ ...ej.parteHerbicida(), rev: 2 }))[0], 'T1_900001_antes_1_v2.jpg');
+  // Un nº escrito a mano con letras o demasiado largo: el nombre de siempre (el servidor solo admite 1-9 cifras).
+  const raro = ej.parteHerbicida();
+  raro.trabajos[0].referencia.codigo = 'S-385.952';
+  raro.trabajos[1].referencia.codigo = '1234567890';
+  igual(await nombres(raro), ['T1_385952_antes_1.jpg', 'T1_385952_despues_1.jpg', 'T2_antes_1.jpg', 'T2_despues_1.jpg']);
+  // Los otros tipos no cambian.
+  cierto((await nombres(ej.parteInfra())).every((n) => /^T\d+_[a-z]+_\d+\.jpg$/.test(n)), 'INFRA sigue con T1_antes_1.jpg');
+  // 1024 px y calidad 0,75: anadirFotos lo pide solo en HERBICIDA.
+  const src = await (await fetch('../js/vista-trabajo.js', { cache: 'no-store' })).text();
+  cierto(/p\.tipo === 'HERBICIDA' \? \{ ladoMax: LADO_HERBICIDA, calidad: CALIDAD_HERBICIDA \}/.test(src), 'vista-trabajo pasa tamaño y calidad en HERBICIDA');
+  const u = await import('../js/util.js');
+  igual([u.LADO_HERBICIDA, u.CALIDAD_HERBICIDA], [1024, 0.75]);
+  // Y procesarFoto los respeta: una foto grande sale con el lado largo a 1024.
+  const cv = document.createElement('canvas'); cv.width = 3000; cv.height = 2000;
+  cv.getContext('2d').fillRect(0, 0, 10, 10);
+  const grande = new File([await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.9))], 'IMG_1.jpg', { type: 'image/jpeg', lastModified: Date.now() });
+  const { procesarFoto } = await import('../js/fotos.js');
+  const r = await procesarFoto(grande, { origen: 'camara', fase: 'antes', etiqueta: 'SIOS 900001', ref: 'HER-9001', ladoMax: u.LADO_HERBICIDA, calidad: u.CALIDAD_HERBICIDA });
+  igual(r.ancho, 1024, 'lado largo a 1024 px');
 });
 
 prueba('carpeta de Teams y nombre de archivos', () => {
@@ -535,8 +671,141 @@ prueba('carpeta de Teams y nombre de archivos', () => {
 
 const tipos = [
   ['INFRA', ej.parteInfra], ['SUPER', ej.parteSuper], ['MAQUINARIA de vía', ej.parteMaqVia],
-  ['locomotora', () => ej.parteLoco('locomotora')], ['dresina', () => ej.parteLoco('dresina')],
+  ['locomotora', () => ej.parteLoco('locomotora')], ['dresina', () => ej.parteLoco('dresina')], ['HERBICIDA', ej.parteHerbicida],
 ];
+
+/** Genera el PDF apuntando cada texto que se escribe (jsPDF lo comprime: así se puede comprobar qué lleva). */
+async function textosDelPdf(p, leerFoto = async () => jpeg()) {
+  const J = window.jspdf.jsPDF;
+  const textos = [];
+  let imagenes = 0;
+  let orientacion = '';
+  window.jspdf.jsPDF = function (o) {
+    orientacion = o.orientation;
+    const d = new J(o);
+    const text = d.text.bind(d);
+    const addImage = d.addImage.bind(d);
+    d.text = (t, ...r) => { textos.push(...[].concat(t).map(String)); return text(t, ...r); };
+    d.addImage = (...r) => { imagenes++; return addImage(...r); };
+    return d;
+  };
+  try {
+    const pdf = await generarPDF(p, ej.config, 'prueba', leerFoto);
+    return { pdf, texto: textos.join('\n'), imagenes, orientacion };
+  } finally {
+    window.jspdf.jsPDF = J;
+  }
+}
+
+prueba('PDF HERBICIDA: calcado del papel (vertical), con medio y m² por medio, producto, caldo y firma, sin anexo de fotos', async () => {
+  const p = ej.parteHerbicida();
+  p.personal = [{ ...p.personal[0], nombre: 'Luis Ejemplo' }, ...p.personal];   // el capataz (Ana Prueba) no va el primero
+  const { pdf, texto, imagenes, orientacion } = await textosDelPdf(p);
+  igual(await pdf.slice(0, 5).text(), '%PDF-');
+  igual(orientacion, 'portrait', 'hoja vertical, como el papel');
+  igual((await textosDelPdf(ej.parteInfra())).orientacion, 'landscape', 'los demás partes siguen apaisados');
+  // Los apartados y columnas del papel, y lo que el papel no tiene (medio, solo una parte, L/ha, fotos).
+  for (const t of ['PARTE HERBICIDA', 'MANTENIMIENTO LAV ESTE UTE', 'ENCARGADO', 'FECHA', 'Ref. HER-9001',
+    'PERSONAL', 'ET / PSH', 'CATEGORIA', 'HORAS', 'OBSERVACIONES', 'Cualificado: Ana Prueba', 'Básico: Luis Ejemplo',
+    'ACTA', 'TELEF', 'ENTRADA', 'SALIDA', 'PK INICIO', 'PK FINAL', 'SI/NO', 'DESCRIPCION TRABAJOS', '45821', 'Cuba prueba 1',
+    'Línea', 'Caso SIOS', 'Superficie m2', 'Superficie Total', '900001', '919000', '886 de 1.650', 'solo una parte', 'Mochila', 'Máquina',
+    'Mochila: 114 m²', 'Máquina: 886 m²', '1.000 m²', '0,1 ha', '4 fotos en la carpeta del parte',
+    'SE TOMAN MEDIDAS PREVENTIVAS ANTIINCENDIOS:', 'EXTINTORES', 'OTROS MEDIOS:',
+    'Producto', 'Dosis / Litro', 'Caldo / Hectárea', 'Producto Total Utilizado', 'Caldo Total Utilizado', 'Firma Aplicador',
+    'Producto prueba A', '3,9', '39', '300 L', '3.000 L/ha', 'El aplicador confirma que son las cantidades reales.']) {
+    cierto(texto.includes(t), `el PDF no lleva «${t}»`);
+  }
+  // El capataz sale el primero, como «Cualificado»; el otro, «Básico».
+  const iCual = texto.indexOf('Cualificado');
+  cierto(iCual >= 0 && texto.indexOf('Ana Prueba', iCual) < texto.indexOf('Luis Ejemplo', iCual), 'el capataz va el primero');
+  igual(imagenes, 0, 'sin anexo de fotos');
+  cierto(!texto.includes('ANEXO'), 'sin anexo de fotos');
+  // Sin ocupar la vía, sin confirmar las cantidades y un caso sin fotos: se ve (lo rojo, en texto).
+  const q = { ...ej.parteHerbicida(), sinOcupacion: true, horaInicio: '07:30', horaFin: '14:00', confirmaCantidades: false };
+  q.trabajos[1] = { ...q.trabajos[1], fotos: [], sinFotos: true, motivoSinFotos: 'Sin batería' };
+  const b = (await textosDelPdf(q)).texto;
+  for (const t of ['Hoy no se ha ocupado la vía', '07:30', '14:00', 'SIN CONFIRMAR', 'SIN FOTOS: caso 2 (SIOS 919000): Sin batería', '2 fotos en la carpeta']) {
+    cierto(b.includes(t), `sin ocupación / sin confirmar / sin fotos: falta «${t}»`);
+  }
+  // Jornada sin trabajos: personal y motivo, nada de casos ni producto.
+  const s = (await textosDelPdf({ ...ej.parteHerbicida(), sinTrabajos: true, motivoSinTrabajos: 'Lluvia / meteorología' })).texto;
+  cierto(s.includes('No se ha podido trabajar: Lluvia') && !s.includes('Caso SIOS') && !s.includes('Caldo Total'), 'jornada sin trabajos');
+  // Rectificativo.
+  const r = (await textosDelPdf({ ...ej.parteHerbicida(), rev: 2, rectificaA: { rev: 1, cierre: '2026-10-14T18:00:00+02:00' } })).texto;
+  cierto(r.includes('PARTE RECTIFICATIVO') && r.includes('Rev. 2'), 'rectificativo');
+  // Muchos casos (35): las filas siguen saliendo en varias páginas, sin perder ninguno.
+  const m = ej.parteHerbicida();
+  m.trabajos = Array.from({ length: 35 }, (_, i) => ({ ...m.trabajos[0], id: `c${i}`, referencia: { tipo: 'SIOS', codigo: String(800000 + i), motivo: '' } }));
+  const mt = (await textosDelPdf(m)).texto;
+  cierto(['800000', '800017', '800034'].every((x) => mt.includes(x)), '35 casos en el PDF');
+});
+
+prueba('envío HERBICIDA: el correo dice los casos, los m², el caldo y los casos sin fotos', async () => {
+  const p = ej.parteHerbicida();
+  p.trabajos[1] = { ...p.trabajos[1], fotos: [], sinFotos: true, motivoSinFotos: 'Sin batería' };
+  const r = await prepararEnvio(p, ej.config, async () => jpeg(), 'prueba');
+  cierto(r.asunto.startsWith('PARTE LAV · HERBICIDA · '), r.asunto);
+  for (const t of ['Encargado (aplicador cualificado): Ana Prueba', 'Casos SIOS (2, 1.000 m²): 900001, 919000 (solo una parte)',
+    'Caldo: 300 L (3.000 L/ha)', 'Producto: Producto prueba A 13 ml/L', 'AVISO: casos sin fotos: caso 2, SIOS 919000 (Sin batería)']) {
+    cierto(r.cuerpo.includes(t), `el correo no dice «${t}»: ${r.cuerpo}`);
+  }
+});
+
+prueba('herbicida: números a la española, «1.200» dudoso, nº de producto y SIOS repetidos', () => {
+  igual(['1650', '11114', 1368, '26.5', '1,5', 0.039, 3.9, '', -1234.5, 1000000, 'abc'].map(util.fmtNum),
+    ['1.650', '11.114', '1.368', '26,5', '1,5', '0,04', '3,9', '0', '-1.234,5', '1.000.000', '0'], 'siempre con punto de miles');
+  igual(['1.200', '12.345.678', '26.5', '1200', '1,200', '0.125', ' 3.000 '].map(val.pareceMiles), [true, true, false, false, false, false, true]);
+  const msgs = (p) => val.validarHer(p).map((x) => x.msg);
+  // «1.200» a mano en el caldo, en la dosis y en los m² hechos: se pide escribirlo sin dudas.
+  const p = ej.parteHerbicida();
+  p.caldo = '1.200';
+  p.trabajos[1].m2Hechos = '1.200';
+  p.productos = [{ nombre: '', dosis: '', otro: false }, { nombre: 'Producto prueba A', dosis: '', otro: false }, { nombre: 'Producto prueba B', dosis: '2.500', otro: false }];
+  const m = msgs(p);
+  cierto(m.includes('Caldo gastado «1.200»: escríbelo sin punto (1200) o, si lleva decimales, con coma.'), m.join(' | '));
+  cierto(m.some((x) => x.startsWith('Caso 2: m² hechos: «1.200»')), m.join(' | '));
+  // El número del producto es el de la pantalla aunque el primero esté vacío (y el vacío no se queja).
+  cierto(m.includes('Producto 2: pon la dosis (ml por litro).') && m.some((x) => x.startsWith('Producto 3: dosis «2.500»')), m.join(' | '));
+  cierto(!m.some((x) => x.startsWith('Producto 1')), 'el producto vacío no cuenta');
+  // m² del caso: los de la lista no se miran («1.250» puede ser 1,25 en la lista); escritos a mano, sí.
+  const q = ej.parteHerbicida();
+  q.trabajos[0].superficie = '1.250';
+  cierto(!msgs(q).some((x) => x.includes('m² del caso:')), 'de la lista, no');
+  q.trabajos[0].deLista = false;
+  cierto(msgs(q).some((x) => x.startsWith('Caso 1: m² del caso: «1.250»')), msgs(q).join(' | '));
+  // Repetidos por las cifras del nº, como el nombre de las fotos.
+  const r = ej.parteHerbicida();
+  r.trabajos[1].referencia.codigo = 'S-900.001';
+  cierto(msgs(r).includes('Caso 2: el SIOS 900001 ya está en el caso 1.'), msgs(r).join(' | '));
+  igual(modelo.codigoSios(r.trabajos[1]), '900001');
+  // quitarDatosLista vacía lo que vino de la lista y nada más.
+  const t = modelo.quitarDatosLista({ ...ej.parteHerbicida().trabajos[0] });
+  igual([t.linea, t.via, t.pkInicio, t.pkFin, t.superficie, t.ubicacion, t.desbroce, t.deLista, t.referencia.codigo, t.fotos.length, t.medio],
+    ['', '', '', '', '', '', '', false, '900001', 2, 'mochila']);
+});
+
+prueba('recorrido herbicida: cambiar a mano el nº de un caso elegido de la lista vacía sus datos y sigue escribiendo', async () => {
+  const { m } = await appEnMarco();
+  const p = borrador({ ...ej.parteHerbicida(), id: crypto.randomUUID() });
+  try {
+    await pantalla((e) => { e.vista = 'trabajo'; e.parte = p; e.trabajoIdx = 0; e.config = ej.configHer; e.perfil = perfilConToken(); });
+    const t = p.trabajos[0];
+    const teclea = (v) => { const el = m.app.querySelector('#buscar-caso'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    teclea('90000');
+    igual([t.referencia.codigo, t.deLista, t.linea, t.via, t.pkInicio, t.superficie], ['90000', false, '', '', '', ''], 'datos del caso anterior vaciados');
+    const el = m.app.querySelector('#buscar-caso');
+    igual([el.value, m.app.ownerDocument.activeElement === el, el.selectionStart], ['90000', true, 5], 'el cursor sigue al final del nº');
+    cierto(!m.app.querySelector('[data-bind="trabajos.0.linea"]') || m.app.querySelector('[data-bind="trabajos.0.linea"]').value === '', 'la pantalla ya no enseña la línea vieja');
+    // Lo siguiente que escriba ya no toca nada más (ni repinta).
+    t.linea = '044';
+    teclea('900002');
+    igual([t.referencia.codigo, t.linea], ['900002', '044']);
+  } finally {
+    m.estado.parte = null;
+    await new Promise((r) => setTimeout(r, 700));   // que el guardado diferido no caiga sobre otra prueba
+    await descartarDelMovil(p.id);
+  }
+});
 
 for (const [nombre, hacer] of tipos) {
   prueba(`PDF y envío: ${nombre}`, async () => {
@@ -1178,7 +1447,7 @@ function formaDe(valor, ruta, salida) {
 prueba('contrato: la forma del Datos_ de los 5 tipos de parte no cambia sin avisar', async () => {
   const casos = {
     INFRA: infra(), SUPER: conExtras(ej.parteSuper()), 'MAQUINARIA-via': maqVia(),
-    'MAQUINARIA-locomotora': loco(), 'MAQUINARIA-dresina': loco('dresina'),
+    'MAQUINARIA-locomotora': loco(), 'MAQUINARIA-dresina': loco('dresina'), HERBICIDA: conExtras(ej.parteHerbicida()),
   };
   const actual = {};
   for (const [nombre, p] of Object.entries(casos)) {
@@ -1626,7 +1895,8 @@ prueba('servidor: una cuenta pendiente recibe la lista vacía, y al aprobarla la
 prueba('servidor: los partes de la app (5 tipos, rev., tildes, sin trabajos) pasan la comprobación de carpeta y fotos', async () => {
   const E = await servidorListo();
   const foto = await jpeg();
-  const casos = [ej.parteInfra(), ej.parteSuper(), ej.parteMaqVia(), ej.parteLoco('locomotora'), ej.parteLoco('dresina')];
+  const casos = [ej.parteInfra(), ej.parteSuper(), ej.parteMaqVia(), ej.parteLoco('locomotora'), ej.parteLoco('dresina'), ej.parteHerbicida()];
+  const hr = ej.parteHerbicida(); hr.rev = 2; hr.rectificaA = { id: 'x', ref: hr.ref }; casos.push(hr);
   const r3 = ej.parteSuper(); r3.rev = 3; r3.rectificaA = { id: 'x', ref: r3.ref }; casos.push(r3);
   const t = ej.parteInfra(); t.capataz = "José Ñúñez O'Brien-Gil (2º)"; casos.push(t);
   const s = ej.parteInfra(); s.sinTrabajos = true; s.motivoSinTrabajos = 'Lluvia'; casos.push(s);
@@ -2370,7 +2640,7 @@ async function pantalla(preparar, ...esperados) {
     vista: 'inicio', config: ej.config, perfil: perfilEjemplo(), reg: {}, otros: [], lista: [], parte: null, trabajoIdx: null,
     busqueda: '', otroAbierto: false, errores: [], menu: false, eligeMaquina: false, fotoVista: null, procesando: '',
     envio: null, preguntaOtro: false, preguntaExtras: false, repetir: null, avisoCopia: '', nCompartidas: 0, compartidas: null,
-    origenFoto: null,
+    origenFoto: null, verCasos: false, buscaSios: '',
   });
   preparar(estado);
   render();
@@ -3188,6 +3458,153 @@ prueba('recorrido: un parte con algo sin rellenar no se cierra y dice qué falta
   }
 });
 
+prueba('pantallas: parte y caso HERBICIDA (con y sin lista de la campaña)', async () => {
+  const { m } = await appEnMarco();
+  const p = borrador(ej.parteHerbicida());
+  await pantalla((e) => { e.vista = 'parte'; e.parte = p; e.config = ej.configHer; },
+    'Ocupaciones de vía', 'Ocupación 1', '¿Cómo se ha regado?', 'Cuba prueba 1', 'Casos SIOS regados', 'SIOS 900001 · 919000',
+    'Ver y añadir casos SIOS', 'Producto y caldo', 'Producto prueba A', 'Caldo por hectárea', 'Medidas antiincendios', 'Cualificado', 'Básico');
+  cierto(!m.app.textContent.includes('¿Se ha usado maquinaria?'), 'no lleva las preguntas de maquinaria y vehículos de INFRA');
+  // Lista de casos (como la maqueta): buscador y cada caso con sus fotos, medio y «¿Solo una parte?».
+  await pantalla((e) => { e.vista = 'parte'; e.parte = p; e.config = ej.configHer; e.verCasos = true; },
+    'Escribe el nº de cada caso regado hoy', 'SIOS 900001', 'SIOS 919000', 'Antes', 'Después', '¿Solo una parte?', 'Más datos', 'Volver al parte');
+  igual(m.app.querySelectorAll('[data-action="foto"][data-i="1"]').length, 4, 'caso 2: cámara y galería para antes y después');
+  cierto(m.app.querySelector('input[name="trabajos.1.medio"]'), 'con mochila y máquina, el medio en cada caso');
+  cierto(!m.app.querySelector('[data-action="cerrar-parte"]'), 'desde la lista no se cierra el parte');
+  // «Hoy no se ha ocupado la vía»: horas de inicio y fin en vez de las fichas.
+  await pantalla((e) => { e.vista = 'parte'; e.parte = { ...p, sinOcupacion: true }; e.config = ej.configHer; }, 'Hora de inicio', 'Hora de fin');
+  cierto(!m.app.querySelector('[data-action="nueva-ocupacion"]'), 'sin el botón de añadir ocupación');
+  // Caso de la lista con mochila y máquina: pregunta el medio; fotos solo de antes y después.
+  await pantalla((e) => { e.vista = 'trabajo'; e.parte = p; e.trabajoIdx = 1; e.config = ej.configHer; },
+    'Caso SIOS', 'Datos de la lista de la campaña', '¿Con qué se ha regado este caso?', '¿Solo una parte?', 'Antes', 'Después', 'No se han podido hacer fotos');
+  cierto(!m.app.textContent.includes('Durante') && !m.app.textContent.includes('Telefonema'), 'ni «durante» ni telefonemas en el caso');
+  // Sin la lista de la campaña en el móvil: se avisa y se rellena a mano.
+  const q = { ...borrador(ej.parteHerbicida()), trabajos: [{ ...modelo.nuevoCaso(), referencia: { tipo: 'SIOS', codigo: '123', motivo: '' } }] };
+  await pantalla((e) => { e.vista = 'trabajo'; e.parte = q; e.trabajoIdx = 0; e.config = ej.config; }, 'La lista de casos de la campaña no está en este móvil');
+  // Inicio: el botón solo con la campaña visible, y nunca a una cuenta pendiente.
+  await pantalla((e) => { e.vista = 'inicio'; e.config = ej.configHer; }, 'Campaña de herbicida');
+  await pantalla((e) => { e.vista = 'inicio'; e.config = ej.config; });
+  cierto(!m.app.querySelector('[data-tipo="HERBICIDA"]'), 'sin campaña no sale el botón');
+  await pantalla((e) => { e.vista = 'inicio'; e.config = { ...ej.configHer, herbicida: { ...ej.configHer.herbicida, visible: false } }; });
+  cierto(!m.app.querySelector('[data-tipo="HERBICIDA"]'), 'campaña oculta');
+  await pantalla((e) => { e.vista = 'inicio'; e.config = ej.configHer; e.perfil = { ...perfilEjemplo(), cuenta: 'pendiente' }; });
+  cierto(!m.app.querySelector('[data-tipo="HERBICIDA"]'), 'cuenta pendiente');
+});
+
+prueba('recorrido: parte HERBICIDA con toques (ocupación, medios, casos con autocompletado, cálculos y cierre)', async () => {
+  const { f, m, errores } = await appEnMarco();
+  f.contentWindow.confirm = () => true;
+  const escribe = (sel, v) => {
+    const el = m.app.querySelector(sel);
+    if (!el) throw new Error(`no hay ningún campo «${sel}» en la pantalla «${m.estado.vista}»`);
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const elige = (sel, v) => { const el = m.app.querySelector(sel); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+  const propuestas = () => [...m.app.querySelectorAll('[data-action="anadir-caso"]')].map((b) => b.dataset.caso);
+  const sugeridos = () => m.app.querySelector('#casos-sugeridos').textContent;
+  let id = null;
+  try {
+    await pantalla((e) => { e.vista = 'inicio'; e.config = ej.configHer; e.perfil = perfilConToken(); }, 'HERBICIDA');
+    toca('[data-action="nuevo"][data-tipo="HERBICIDA"]');
+    await esperar(() => m.estado.vista === 'parte' || m.estado.repetir, 'HERBICIDA no abre el parte');
+    if (m.estado.repetir) await f.contentWindow.moduloInicio.contestarRepetir(false);
+    await esperar(() => m.estado.vista === 'parte', 'no llega al parte');
+    const p = m.estado.parte;
+    id = p.id;
+    cierto(p.ref.startsWith('HER-'), `referencia ${p.ref}`);
+    igual([p.tipo, p.personal.map((x) => x.nombre), p.ocupaciones.length, p.productos.length], ['HERBICIDA', ['Ana Prueba'], 0, 1]);
+    // Ocupación de vía y medios (casillas de verdad).
+    toca('[data-action="nueva-ocupacion"]');
+    await esperar(() => p.ocupaciones.length === 1 && m.app.querySelector('.ocupacion'), 'no aparece la ocupación');
+    toca('input[data-bind="usaMochila"]');
+    toca('input[data-bind="usaMaquina"]');
+    igual([p.usaMochila, p.usaMaquina], [true, true], 'mochila y máquina');
+    elige('select[data-maqher]', '0');
+    igual(p.maquinaHer, { descripcion: 'Cuba prueba 1', otro: false }, 'máquina de la lista');
+    // Casos, como la maqueta: una lista con un solo buscador; desde 3 cifras propone y cada toque añade un caso.
+    toca('[data-action="abrir-casos"]');
+    await esperar(() => m.app.querySelector('#buscar-sios'), 'no abre la lista de casos');
+    escribe('#buscar-sios', '90');
+    igual(propuestas(), [], 'con 2 cifras no propone');
+    escribe('#buscar-sios', '9000');
+    igual(propuestas(), ['900001', '900002', '919000'], 'propuestas: los que empiezan por lo escrito, primero');
+    escribe('#buscar-sios', '90000');
+    igual(propuestas(), ['900001', '900002'], 'propuestas');
+    cierto(sugeridos().includes('falta el desbroce'), 'avisa del desbroce que falta');
+    toca('[data-action="anadir-caso"][data-caso="900001"]');
+    await esperar(() => p.trabajos.length === 1 && m.app.querySelector('#buscar-sios').value === '', 'tocar la propuesta no añade el caso');
+    const t0 = p.trabajos[0];
+    igual([t0.referencia.codigo, t0.linea, t0.via, t0.pkInicio, t0.pkFin, t0.superficie, t0.deLista], ['900001', '040', 'V1 / V2', '286+808', '286+865', '114', true]);
+    igual([m.estado.vista, m.estado.verCasos], ['parte', true], 'sigue en la lista para escribir el siguiente');
+    // El mismo SIOS no entra dos veces.
+    escribe('#buscar-sios', '900001');
+    cierto(sugeridos().includes('Ya está en la lista (caso 1)'), 'avisa del repetido');
+    toca('[data-action="anadir-caso"][data-caso="900001"]');
+    await new Promise((r) => setTimeout(r, 100));
+    igual(p.trabajos.length, 1, 'un SIOS repetido no se añade');
+    escribe('#buscar-sios', '919');
+    toca('[data-action="anadir-caso"][data-caso="919000"]');
+    await esperar(() => p.trabajos.length === 2 && p.trabajos[1].deLista, 'no añade el caso 919000');
+    // Un nº que no está en la lista de la campaña: se añade a mano y se abre su ficha; «Listo» vuelve a la lista.
+    escribe('#buscar-sios', '777777');
+    cierto(sugeridos().includes('No está en la lista de la campaña'), 'dice que no está');
+    toca('[data-action="anadir-caso-mano"]');
+    await esperar(() => p.trabajos.length === 3 && m.estado.vista === 'trabajo' && m.estado.trabajoIdx === 2, 'a mano no abre su ficha');
+    igual([p.trabajos[2].referencia.codigo, p.trabajos[2].deLista], ['777777', false]);
+    toca('[data-action="trabajo-listo"]');
+    await esperar(() => m.estado.vista === 'parte' && m.app.querySelector('#buscar-sios'), 'la ficha no vuelve a la lista');
+    toca('[data-action="borrar-trabajo"][data-i="2"]');
+    await esperar(() => p.trabajos.length === 2 && m.app.querySelector('#buscar-sios'), 'no quita el caso desde la lista');
+    // En cada fila: medio, «¿Solo una parte?» y sus fotos (cámara o galería) sin salir de la lista.
+    toca('input[name="trabajos.0.medio"][value="ambas"]');
+    igual(t0.medio, 'ambas', 'medio del caso 1');
+    toca('input[data-bind="trabajos.0.parcial"]');
+    await esperar(() => m.app.querySelector('[data-bind="trabajos.0.m2Hechos"]'), 'no pide los m² hechos');
+    escribe('[data-bind="trabajos.0.m2Hechos"]', '50');
+    igual([t0.parcial, t0.m2Hechos], [true, '50'], 'solo una parte');
+    toca('input[name="trabajos.1.medio"][value="maquina"]');
+    let abierta = '';
+    m.app.querySelector('#in-camara').click = () => { abierta = 'camara'; };
+    toca('[data-action="foto"][data-i="1"][data-fase="despues"][data-origen="camara"]');
+    igual([abierta, m.estado.trabajoIdx, m.estado.fotoPendiente && m.estado.fotoPendiente.fase], ['camara', 1, 'despues'], 'la foto va al caso 2, después');
+    m.estado.fotoPendiente = null;
+    toca('[data-action="cerrar-casos"]');
+    await esperar(() => m.estado.vista === 'parte' && !m.estado.verCasos && m.app.querySelector('[data-action="abrir-casos"]'), 'no vuelve al parte');
+    // Producto de la lista (trae su dosis habitual), dosis del día y caldo: los cálculos cambian al escribir.
+    elige('select[data-producto="0"]', '0');
+    igual([p.productos[0].nombre, p.productos[0].dosis], ['Producto prueba A', '13'], 'dosis habitual de la lista');
+    escribe('[data-bind="productos.0.dosis"]', '10');
+    escribe('[data-bind="caldo"]', '170');
+    // 50 + 1650 m² = 0,17 ha; 170 L × 10 ml/L = 1,7 L de producto, 10 L/ha.
+    const calc = m.app.querySelector('#calc-her').textContent;
+    cierto(calc.includes('0,17 ha') && calc.includes('1,7 L') && calc.includes('10 L/ha'), `cálculos: ${calc}`);
+    // Cerrar: dice lo que falta.
+    toca('[data-action="cerrar-parte"]');
+    await esperar(() => m.estado.errores.length > 0, 'no avisa de lo que falta');
+    const faltan = m.estado.errores.map((e) => e.msg).join(' | ');
+    for (const txt of ['Ocupación 1: falta el nº de acta', 'Caso 1: falta al menos una foto de ANTES', 'son las cantidades reales', 'medida antiincendios']) {
+      cierto(faltan.includes(txt), `falta «${txt}» en: ${faltan}`);
+    }
+    toca('[data-action="cerrar-errores"]');
+    // Completo (las fotos, como si se hubieran hecho): ya se puede cerrar y pregunta por las horas extra.
+    Object.assign(p.ocupaciones[0], { acta: '1', telefonema: '2', entrada: '08:00', salida: '12:00', linea: '040', via: '1', pkInicio: '286+000', pkFin: '287+000', terminada: true });
+    p.trabajos.forEach((t, k) => { t.fotos = [{ id: `hx${k}a`, fase: 'antes' }, { id: `hx${k}d`, fase: 'despues' }]; });
+    Object.assign(p, { confirmaCantidades: true, medidas: ['Extintor en el vehículo'], antiincendios: 'Extintor en el vehículo' });
+    igual(val.validarHer(p), [], 'el parte ya está completo');
+    toca('[data-action="cerrar-parte"]');
+    await esperar(() => m.estado.preguntaExtras, 'no pregunta por las horas extra');
+    toca('[data-action="extras-volver"]');
+    igual((await db.getParte(id)).estado, 'borrador', 'sigue en borrador (el PDF y el envío llegan en el paso 3)');
+    if (errores.length) throw new Error(`errores en la app: ${errores.splice(0).join(' | ')}`);
+  } finally {
+    await new Promise((r) => setTimeout(r, 600));   // que acaben los guardados y repintados pendientes antes de limpiar
+    m.estado.vista = 'inicio';
+    m.estado.parte = null;
+    if (id) await descartarDelMovil(id);
+  }
+});
+
 prueba('recorrido: Corregir un parte enviado crea la revisión 2 en borrador, con sus fotos, y deja el original', async () => {
   const { f, m } = await appEnMarco();
   f.contentWindow.confirm = () => true;
@@ -3251,7 +3668,7 @@ const ACCIONES_LIBRES = [
   'compartidas-trabajo', 'compartidas-otro', 'compartidas-fase', 'compartidas-descartar', 'abrir', 'extras-volver',
   'abrir-otro', 'cancelar-otro', 'editar-trabajo', 'ir-trabajo', 'volver-parte', 'trabajo-listo', 'cerrar-pregunta',
   'ver-foto', 'cerrar-foto', 'borrar-borrador', 'guardar-salir', 'cerrar-errores', 'reintentar-envio', 'enviar',
-  'ver-pdf', 'corregir', 'origen-foto-volver', 'origen-foto-cerrar', 'origen-foto-hecho',
+  'ver-pdf', 'corregir', 'origen-foto-volver', 'origen-foto-cerrar', 'origen-foto-hecho', 'abrir-casos', 'cerrar-casos',
 ];
 
 prueba('eventos: cada botón está apuntado como «toca el parte» o «no lo toca»', async () => {
@@ -3282,8 +3699,11 @@ function tocarTodo(p, acciones) {
     <select data-motivo-parte data-otro="motivoSinTrabajosOtro" data-campo="motivoSinTrabajos"><option value="Lluvia" selected></option></select>
     <select data-motivo-lista="trabajos.0" data-otro="motivoNoRealizadoOtro" data-campo="motivoNoRealizado"><option value="Lluvia" selected></option></select>
     <select data-motivo="trabajos.0"><option value="Otro motivo" selected></option></select>
-    <select data-aparato="0"><option value="__otro" selected></option></select>`;
-  const escritos = `<input data-bind="observaciones" value="escrito"><input data-aparato-txt="0" value="escrito">`;
+    <select data-aparato="0"><option value="__otro" selected></option></select>
+    <select data-maqher><option value="otro" selected></option></select>
+    <select data-producto="0"><option value="otro" selected></option></select>`;
+  const escritos = `<input data-bind="observaciones" value="escrito"><input data-aparato-txt="0" value="escrito">
+    <input id="buscar-caso" data-bind="trabajos.0.referencia.codigo" value="escrito"><input id="buscar-sios" data-nombre="buscar-sios" value="9000">`;
   return { clics, cambios, escritos };
 }
 prueba('eventos: ningún botón ni campo cambia un parte enviado', async () => {
@@ -3296,7 +3716,7 @@ prueba('eventos: ningún botón ni campo cambia un parte enviado', async () => {
   f.contentWindow.confirm = () => true;
   const malos = [];
   const casos = [['INFRA', () => ej.parteInfra()], ['SUPER', () => ej.parteSuper()], ['maquinaria de vía', () => ej.parteMaqVia()],
-    ['locomotora', () => ej.parteLoco()], ['dresina', () => ej.parteLoco('dresina')]];
+    ['locomotora', () => ej.parteLoco()], ['dresina', () => ej.parteLoco('dresina')], ['HERBICIDA', () => ej.parteHerbicida()]];
   for (const [nombre, crear] of casos) {
     const p = { ...crear(), id: crypto.randomUUID(), estado: 'enviado', recibido: '2026-10-14T10:05:00+02:00' };
     for (const x of [...p.trabajos.flatMap((t) => t.fotos), ...(p.formato1 || [])]) await db.putFoto({ id: x.id, parteId: p.id, blob: await jpeg() });

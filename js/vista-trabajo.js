@@ -4,9 +4,10 @@
 import * as db from './db.js';
 import { procesarFoto } from './fotos.js';
 import { registrarFallo } from './fallos.js';
-import { esc, uuid, isoLocal, toast, FORMATO1, MAX_FORMATO1, LADO_FORMATO1 } from './util.js';
+import { esc, uuid, isoLocal, toast, FORMATO1, MAX_FORMATO1, LADO_FORMATO1, LADO_HERBICIDA, CALIDAD_HERBICIDA } from './util.js';
 import { faltasTrabajo, listaAparatos, unirAparatos, pkDeAparatos } from './validaciones.js';
-import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS, MOTIVOS_SIN_TRABAJOS } from './modelo.js';
+import { FASES, LINEAS, MOTIVOS_NO_REALIZADO, MOTIVOS_SIN_FOTOS, MOTIVOS_SIN_TRABAJOS, nuevoCaso } from './modelo.js';
+import { vCasoHer } from './vista-herbicida.js';
 import { app, estado, urls, ir, render, guardarYa, guardarPronto, motivosCfg } from './estado.js';
 import { cabeceraParte, campo, campoHora, campoPk, radio, casillasVias } from './campos.js';
 import { vOrigenFoto } from './vista-origen-foto.js';
@@ -20,6 +21,12 @@ export function trabajoActual() {
 export function nuevoTrabajo() {
   const p = estado.parte;
   const previo = p.trabajos[p.trabajos.length - 1];
+  if (p.tipo === 'HERBICIDA') {   // cada caso SIOS es un trabajo, con sus propios campos
+    p.trabajos.push(nuevoCaso());
+    estado.trabajoIdx = p.trabajos.length - 1;
+    ir('trabajo');
+    return;
+  }
   p.trabajos.push({
     id: uuid(),
     referencia: { tipo: '', codigo: '', motivo: '' },
@@ -227,6 +234,7 @@ function fotoTelefonema(t, fase, txt) {
 }
 
 export function vTrabajo() {
+  if (estado.parte.tipo === 'HERBICIDA') return vCasoHer();
   const p = estado.parte;
   const i = estado.trabajoIdx;
   const t = trabajoActual();
@@ -411,7 +419,7 @@ export async function anadirFotos(archivos, { fase, origen, formato = false, tra
       const etiqueta = formato ? FORMATO1.toUpperCase() : etiquetaFoto(t);
       const r = await procesarFoto(file, formato
         ? { origen, fase: 'formato', faseTxt: FORMATO1.toUpperCase(), etiqueta, ref: p.ref, ladoMax: LADO_FORMATO1, calidad: 0.85 }
-        : { origen, fase, etiqueta, ref: p.ref });
+        : { origen, fase, etiqueta, ref: p.ref, ...(p.tipo === 'HERBICIDA' ? { ladoMax: LADO_HERBICIDA, calidad: CALIDAD_HERBICIDA } : {}) });
       const id = uuid();
       await db.putFoto({ id, parteId: p.id, blob: r.blob });
       const meta = {
@@ -475,7 +483,8 @@ export function liberarFotos() {
 export async function borrarTrabajo() {
   const p = estado.parte;
   const t = trabajoActual();
-  if (!confirm(`¿Eliminar el trabajo ${estado.trabajoIdx + 1} y sus fotos?`)) return;
+  const que = p.tipo === 'HERBICIDA' ? `el caso ${estado.trabajoIdx + 1} (SIOS ${t.referencia.codigo || '¿?'})` : `el trabajo ${estado.trabajoIdx + 1}`;
+  if (!confirm(`¿Eliminar ${que} y sus fotos?`)) return;
   for (const f of t.fotos) await db.borrarFoto(f.id);
   p.trabajos.splice(estado.trabajoIdx, 1);
   estado.trabajoIdx = null;

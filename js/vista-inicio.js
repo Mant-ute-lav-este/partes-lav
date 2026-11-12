@@ -6,7 +6,9 @@ import { esc, uuid, fechaLocal, isoLocal, fmtFecha, fmtFechaHora } from './util.
 import { SUBTIPOS_MAQ, subtipoDe } from './validaciones.js';
 import {
   PREFIJO_REF, claveContador, nuevaMaquinaVia, nuevoTajo, nuevoRealizado, ultimoParteDe, apartadosCopiables, repetirParte, ESQUEMA,
+  camposHerbicida,
 } from './modelo.js';
+import { herbicidaCfg } from './vista-herbicida.js';
 import { estado, ir, render, guardarYa, maquinasViaCfg, capatazComoPersona, medidasCfg } from './estado.js';
 import { inputConfig } from './vista-acceso.js';
 import { APP_VERSION } from './app.js';
@@ -30,6 +32,7 @@ export function estadoTexto(p) {
 /** «3 trabajo(s)», «2 tajo(s)»… según el tipo de parte. */
 export function textoCuenta(p) {
   if (p.sinTrabajos) return 'Jornada sin trabajos';
+  if (p.tipo === 'HERBICIDA') return `${p.trabajos.length} caso(s)`;
   if (p.tipo !== 'MAQUINARIA') return `${p.trabajos.length} trabajo(s)`;
   return subtipoDe(p) === 'via' ? `${(p.tajos || []).length} tajo(s)` : `${(p.realizados || []).length} trabajo(s)`;
 }
@@ -90,11 +93,12 @@ export function vInicio() {
       <button class="btn-tipo infra" data-action="nuevo" data-tipo="INFRA"><span class="tipo-grande">INFRA</span><span>Infraestructura</span></button>
       <button class="btn-tipo super" data-action="nuevo" data-tipo="SUPER"><span class="tipo-grande">SUPER</span><span>Superestructura</span></button>
       <button class="btn-tipo maquinaria" data-action="nuevo" data-tipo="MAQUINARIA"><span class="tipo-grande">MAQUINARIA</span><span>Maquinaria de vía</span></button>
+      ${herbicidaCfg().visible ? '<button class="btn-tipo herbicida" data-action="nuevo" data-tipo="HERBICIDA"><span class="tipo-grande">HERBICIDA</span><span>Campaña de herbicida</span></button>' : ''}
     </div>`}
     ${grupo('Pendientes de enviar', sinEnviar)}
     ${grupo('Borradores', ps.filter((p) => p.estado === 'borrador'))}
     ${grupo('Enviados', ps.filter((p) => p.estado === 'enviado').slice(0, 30))}
-    ${ps.length || pendiente ? '' : '<p class="vacio">Aún no hay partes. Pulsa INFRA, SUPER o MAQUINARIA para empezar.</p>'}
+    ${ps.length || pendiente ? '' : '<p class="vacio">Aún no hay partes. Pulsa uno de los botones de arriba para empezar.</p>'}
   </main>
   ${estado.menu ? vMenu() : ''}
   ${estado.eligeMaquina ? vElegirMaquina() : ''}
@@ -145,8 +149,9 @@ export async function nuevoParte(tipo, maquina = null) {
   const sub = tipo === 'MAQUINARIA' ? (maquina && maquina.parte) || 'via' : null;
   const ahora = new Date();
   // De madrugada, la jornada de SUPER y la de MAQUINARIA empezaron ayer. En INFRA ya no hay
-  // jornada nocturna ni fecha automática. MAQUINARIA no marca «nocturna»: lleva su horario.
-  const madrugada = tipo !== 'INFRA' && ahora.getHours() < 7;
+  // jornada nocturna ni fecha automática (ni en HERBICIDA, que es de día). MAQUINARIA no marca
+  // «nocturna»: lleva su horario.
+  const madrugada = (tipo === 'SUPER' || tipo === 'MAQUINARIA') && ahora.getHours() < 7;
   const nocturna = tipo === 'SUPER' && madrugada;
   const dia = new Date(ahora);
   if (madrugada) dia.setDate(dia.getDate() - 1);
@@ -221,6 +226,7 @@ async function crearParte(tipo, maquina, sub, fecha, nocturna, copia = null) {
     envios: [],
     app: { version: APP_VERSION },
   };
+  if (tipo === 'HERBICIDA') Object.assign(estado.parte, camposHerbicida());
   if (sub === 'via') {
     const m = maquina || {};
     Object.assign(estado.parte, {
@@ -266,7 +272,8 @@ export function vRepetir() {
     ${r.apartados.map((a) => `
     <label class="check"><input type="checkbox" data-repetir="${a.clave}" checked>
       <span>${esc(a.titulo)}<br><small>${esc(a.detalle)}</small></span></label>`).join('')}
-    <p class="nota">No se copian los trabajos, las horas extra, las fotos${r.tipo === 'SUPER' ? ', el formato 1' : ''} ni las observaciones.</p>
+    <p class="nota">${r.tipo === 'HERBICIDA' ? 'No se copian las ocupaciones, los casos, el caldo, las horas extra, las fotos ni las observaciones.'
+    : `No se copian los trabajos, las horas extra, las fotos${r.tipo === 'SUPER' ? ', el formato 1' : ''} ni las observaciones.`}</p>
     <button class="btn primario grande" data-action="repetir-si">Sí, copiar lo marcado</button>
     <button class="btn secundario" data-action="repetir-no">No, empezar en blanco</button>
   </div></div>`;

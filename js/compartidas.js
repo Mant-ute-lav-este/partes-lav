@@ -3,7 +3,7 @@
 // fase van. La pantalla está en vista-compartidas.js.
 
 import * as db from './db.js';
-import { FASES } from './modelo.js';
+import { FASES, FASES_HER } from './modelo.js';
 import { isoLocal } from './util.js';
 
 export const CLAVE_COMPARTIDAS = 'compartidas';
@@ -116,20 +116,24 @@ export function referenciaDe(t) {
   return '';
 }
 
-/** Dónde pueden ir las fotos de un trabajo: antes, durante, después y, en SUPER con vía, los telefonemas. */
+/**
+ * Dónde pueden ir las fotos de un trabajo: antes, durante, después y, en SUPER con vía, los telefonemas.
+ * Un caso de HERBICIDA, solo antes y después.
+ */
 export function fasesFoto(p, t) {
+  if (p.tipo === 'HERBICIDA') return FASES_HER.slice();
   const f = FASES.slice();
   if (p.tipo === 'SUPER' && !t.sinVia) f.push(['telentrada', 'Telefonema de entrada'], ['telsalida', 'Telefonema de salida']);
   return f;
 }
 
 /**
- * Trabajos a los que se pueden mandar fotos: los de partes INFRA y SUPER en borrador (maquinaria no
- * lleva fotos), del parte tocado más recientemente al más antiguo.
+ * Trabajos a los que se pueden mandar fotos: los de partes INFRA, SUPER y HERBICIDA en borrador
+ * (maquinaria no lleva fotos), del parte tocado más recientemente al más antiguo.
  */
 export function destinosFotos(partes) {
   return partes
-    .filter((p) => p.estado === 'borrador' && (p.tipo === 'INFRA' || p.tipo === 'SUPER') && !p.sinTrabajos)
+    .filter((p) => p.estado === 'borrador' && ['INFRA', 'SUPER', 'HERBICIDA'].includes(p.tipo) && !p.sinTrabajos)
     .sort((a, b) => (b.modificado || '').localeCompare(a.modificado || ''))
     .flatMap((p) => (p.trabajos || []).map((t, ti) => ({
       parteId: p.id, trabajoId: t.id, ti, ref: p.ref, tipo: p.tipo, referencia: referenciaDe(t), fases: fasesFoto(p, t),

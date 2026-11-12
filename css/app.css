@@ -13,6 +13,7 @@
   --infra: #c2410c;
   --super: #1d4ed8;
   --maq: #4d7c0f;
+  --her: #0f766e;
   --ok: #157a3a;
   --ok-fondo: #e3f5e9;
   --pendiente-fondo: #fff4d6;
@@ -39,6 +40,7 @@
     --infra: #e0601c;
     --super: #3b6fe8;
     --maq: #65a30d;
+    --her: #0d9488;
     --ok: #4ade80;
     --ok-fondo: #12301d;
     --pendiente-fondo: #3a2c06;
@@ -61,6 +63,7 @@
   --infra: #e0601c;
   --super: #3b6fe8;
   --maq: #65a30d;
+  --her: #0d9488;
   --ok: #4ade80;
   --ok-fondo: #12301d;
   --pendiente-fondo: #3a2c06;
@@ -315,6 +318,30 @@ input.mal { border-color: var(--peligro); outline: 2px solid color-mix(in srgb, 
 .btn-tipo.maquinaria .tipo-grande { font-size: 1.5rem; }
 .barra.maquinaria { background: var(--maq); }
 .etiqueta.maquinaria { background: var(--maq); }
+
+/* Parte de herbicida (campaña) */
+.btn-tipo.herbicida { background: var(--her); grid-column: 1 / -1; min-height: 84px; }
+.btn-tipo.herbicida .tipo-grande { font-size: 1.5rem; }
+.barra.herbicida { background: var(--her); }
+.etiqueta.herbicida { background: var(--her); }
+/* Lista de casos SIOS: cada caso con sus fotos de antes y después a mano */
+.buscar-sios input { font-size: 1.35rem; letter-spacing: .06em; text-align: center; }
+.caso-her { border-left: 5px solid var(--peligro); }
+.caso-her.completo { border-left-color: var(--ok); }
+.caso-her .tajo-cab h3 { margin: 0; }
+.caso-m2 { font-weight: 700; white-space: nowrap; }
+.fotos-caso { display: flex; gap: 8px; margin-top: 10px; }
+.fase-caso { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border: 2px dashed var(--borde); border-radius: 10px; }
+.fase-caso.sin-foto { border-color: var(--peligro); }
+.fase-caso.hecha { border-style: solid; border-color: var(--ok); }
+.fase-caso-txt { flex: 1 1 100%; font-weight: 700; font-size: .92rem; text-align: center; }
+.fase-caso.sin-foto .fase-caso-txt { color: var(--peligro); }
+.fase-caso.hecha .fase-caso-txt { color: var(--ok); }
+.fase-caso .btn.mini { flex: 1 1 0; min-width: 0; padding: 4px; font-size: 1.2rem; min-height: 44px; }
+.caso-her .miniaturas { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+.calculos { background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 14px; margin: 12px 0; }
+.calculos p { margin: 4px 0; }
+.sub-tarjeta .fila-equipo h3 { margin: 0; }
 .tajo-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tajo-cab h3 { margin: 0; }
 .operacion { border-top: 1px solid var(--borde); margin-top: 12px; padding-top: 4px; }

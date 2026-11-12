@@ -17,7 +17,7 @@ Por eso los nombres de los campos son un contrato: no se renombran ni se quitan 
 
 ## La prueba que lo vigila
 
-`pruebas/contrato-datos.json` guarda la forma (campos y tipos, sin valores) del Datos_ de los 5 partes de ejemplo. La prueba «contrato: la forma del Datos_…» falla si un cambio añade, quita o cambia el tipo de un campo.
+`pruebas/contrato-datos.json` guarda la forma (campos y tipos, sin valores) del Datos_ de los 6 partes de ejemplo (INFRA, SUPER, maquinaria de vía, locomotora, dresina y HERBICIDA). La prueba «contrato: la forma del Datos_…» falla si un cambio añade, quita o cambia el tipo de un campo.
 
 Si falla, hay que decidir:
 
@@ -32,10 +32,10 @@ Limitación: la prueba solo ve los campos que tienen los partes de `pruebas/ejem
 |---|---|
 | `formato`, `version` | Ver arriba. |
 | `id` | Identificador único del parte (uuid). Una revisión (rectificativo) tiene `id` nuevo. |
-| `ref` | Referencia: `INF-0001`, `SUP-0001`, `MAQ-0001`, `LOC-0001`, `DRE-0001`. |
+| `ref` | Referencia: `INF-0001`, `SUP-0001`, `MAQ-0001`, `LOC-0001`, `DRE-0001`, `HER-0001`. |
 | `rev` | Revisión: 1 la original, 2+ los rectificativos. |
 | `rectificaA` | `null`, o `{ id, rev, cierre }` del parte al que sustituye. |
-| `tipo` | `INFRA`, `SUPER` o `MAQUINARIA`. En maquinaria, `subtipo`: `via`, `locomotora` o `dresina`. |
+| `tipo` | `INFRA`, `SUPER`, `MAQUINARIA` o `HERBICIDA`. En maquinaria, `subtipo`: `via`, `locomotora` o `dresina`. |
 | `fecha` | Fecha de la jornada, `AAAA-MM-DD`. Es la que manda para la carpeta, no la de llegada. |
 | `nocturna` | Jornada nocturna (solo tiene sentido en SUPER y maquinaria). |
 | `capataz` | Quién rellena el parte. |
@@ -60,6 +60,19 @@ Los añade el envío: `carpeta` (ruta en SharePoint), `archivos{pdf, datos, foto
 
 - Vía: `evb`, `horaInicio`, `horaFin`, `maquinasVia[]` (`descripcion`, `uic`, `trabajo`, `horas`, `otro`), `viaje{horaSalida, lugarSalida, horaLlegada, lugarLlegada}`, `tajos[]` (`id`, `llegada`, `inicio`, `fin`, `salida`, `via`, `pkInicio`, `pkFin`, `desvio`, y los bloques `nivelado`, `alineado`, `estabilizado`, `registro`, `perfilado`, cada uno con `si` y sus datos).
 - Locomotora y dresina: `acta`, `maquina{descripcion, uic, otro}`, `salida{hora, lugar}`, `apartado{hora, lugar}`, `realizados[]` (`id`, `via`, `pkInicio`, `pkFin`, `horaInicio`, `horaFin`, `trabajo`, `m3`), `combustible{salida, llegada}`, `km{salida, llegada}`. Locomotora: `vagones[]` (`tipo`, `uic`, `m3`) y `procedencia`. Dresina: `evb`, `uicPlataforma` y `telefonemas{entrada{numero, hora}, salida{numero, hora}}`.
+
+## HERBICIDA (campaña de riego de herbicida; desde la app que lo trae, con el servidor v28)
+
+Carpeta `AAAA-MM-DD/Herbicida/HER-0001_<capataz>`. El capataz es el aplicador cualificado; el resto del personal, básicos autorizados (no hay campo: se deduce de `capataz`). Lleva `usaMaquinaria`, `maquinas`, `usaVehiculos`, `vehiculos` (vacíos) por compatibilidad con INFRA.
+
+- Ocupaciones de vía: `sinOcupacion` (true = «Hoy no se ha ocupado la vía»; entonces valen `horaInicio` y `horaFin` del parte y `ocupaciones` no cuenta) y `ocupaciones[]` (`id`, `acta`, `telefonema`, `entrada`, `salida`, `linea`, `via`, `pkInicio`, `pkFin`, `terminada`).
+- Medio: `usaMochila`, `usaMaquina`, `maquinaHer{descripcion, otro}` (máquina de la lista de la oficina, o escrita a mano con `otro`).
+- Producto y caldo: `productos[]` (hasta 3: `nombre`, `dosis` en ml por litro de caldo como texto, `otro`), `caldo` (litros gastados en todo el parte, texto) y `confirmaCantidades` (el aplicador confirma que son las reales).
+- `trabajos[]` = **casos SIOS**: `id`, `referencia{tipo: "SIOS", codigo, motivo}`, `linea`, `via`, `pkInicio`, `pkFin`, `superficie` (m² del caso), `ubicacion`, `desbroce` (de la lista de la campaña), `deLista` (los datos vinieron de la lista), `medio` (`mochila`/`maquina`/`ambas`; solo se rellena si el parte marca los dos medios: si no, el medio es el del parte), `parcial` y `m2Hechos` («¿Solo una parte?»), `sinFotos`, `motivoSinFotos`, `fotos[]` (fases `antes` y `despues`).
+- Fotos: `archivo` lleva el nº SIOS delante de la fase, `T1_385208_antes_1.jpg` (si el número no son 1-9 cifras, `T1_antes_1.jpg`). Van a 1024 px con calidad 0,75 (las de los otros partes, a 1600 px), para que 35 casos quepan en un correo.
+- **No van en el Datos_ los cálculos** (m² regados, ha, caldo por hectárea, producto total y por hectárea): se calculan así (`calculosHerbicida`, `js/modelo.js`):
+  m² del caso = `m2Hechos` si `parcial`, si no `superficie`; ha = suma de m² / 10 000; caldo/ha = `caldo` / ha; producto total (L) = `caldo` × `dosis` / 1000; producto/ha = total / ha. Los números se escriben con coma o punto decimal.
+- El PDF no lleva anexo de fotos: dice «N fotos en la carpeta del parte».
 
 ## Campos opcionales (solo aparecen en casos concretos; no vigilados por la prueba)
 

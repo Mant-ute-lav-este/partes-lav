@@ -72,6 +72,44 @@ export function parteMaqVia() {
   return p;
 }
 
+/** Lista de la oficina con la campaña de herbicida visible (casos, productos y máquinas inventados). */
+export const configHer = {
+  ...config,
+  herbicida: {
+    activa: true, probador: false, visible: true,
+    casos: [
+      { caso: '900001', linea: '040', via: 'V1 / V2', pkInicio: '286+808', pkFin: '286+865', superficie: '114', ubicacion: 'DESMONTE', desbroce: 'si' },
+      { caso: '900002', linea: '040', via: 'V2', pkInicio: '286+880', pkFin: '286+915', superficie: '70', ubicacion: 'TERRAPLÉN', desbroce: '' },
+      { caso: '919000', linea: '044', via: 'V1', pkInicio: '459+050', pkFin: '459+600', superficie: '1650', ubicacion: 'ZONA DE DOMINIO PÚBLICO', desbroce: 'si' },
+    ],
+    productos: [{ nombre: 'Producto prueba A', dosis: '13' }, { nombre: 'Producto prueba B', dosis: '' }],
+    maquinas: [{ descripcion: 'Cuba prueba 1' }],
+  },
+};
+
+const caso = (codigo, extra = {}) => ({
+  id: crypto.randomUUID(), referencia: { tipo: 'SIOS', codigo, motivo: '' },
+  linea: '040', via: 'V1 / V2', pkInicio: '286+808', pkFin: '286+865', superficie: '114', ubicacion: 'DESMONTE', desbroce: 'si',
+  deLista: true, medio: 'mochila', parcial: false, m2Hechos: '', sinFotos: false, motivoSinFotos: '', fotos: [], ...extra,
+});
+
+export function parteHerbicida() {
+  const p = base('HERBICIDA', 'HER-9001');
+  Object.assign(p, {
+    usaMaquinaria: null, maquinas: [], usaVehiculos: null, vehiculos: [], usaExtras: false, extras: [],
+    ocupaciones: [{ id: 'o1', acta: '45821', telefonema: '112', entrada: '08:10', salida: '13:40', linea: '040', via: '1, 2', pkInicio: '286+000', pkFin: '290+000', terminada: true }],
+    sinOcupacion: false, horaInicio: '', horaFin: '',
+    usaMochila: true, usaMaquina: true, maquinaHer: { descripcion: 'Cuba prueba 1', otro: false },
+    productos: [{ nombre: 'Producto prueba A', dosis: '13', otro: false }],
+    caldo: '300', confirmaCantidades: true,
+    trabajos: [
+      caso('900001', { fotos: [foto('h1', 'antes'), foto('h2', 'despues')] }),
+      caso('919000', { linea: '044', via: 'V1', pkInicio: '459+050', pkFin: '459+600', superficie: '1650', medio: 'maquina', parcial: true, m2Hechos: '886', fotos: [foto('h3', 'antes'), foto('h4', 'despues')] }),
+    ],
+  });
+  return p;
+}
+
 export function parteLoco(subtipo = 'locomotora') {
   const p = base('MAQUINARIA', subtipo === 'locomotora' ? 'LOC-9001' : 'DRE-9001');
   Object.assign(p, {

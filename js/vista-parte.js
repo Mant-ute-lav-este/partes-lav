@@ -5,7 +5,7 @@ import * as db from './db.js';
 import { textoReferencia } from './pdf.js';
 import { esc, normaliza, toast, isoLocal, fmtFecha, FORMATO1, MAX_FORMATO1 } from './util.js';
 import {
-  faltasTrabajo, validar, validarMaq, validarLD, subtipoDe, fotosAQuitar, pesoCorreoMB, LIMITE_CORREO_MB,
+  faltasTrabajo, validar, validarMaq, validarLD, validarHer, subtipoDe, fotosAQuitar, pesoCorreoMB, factorCorreo, LIMITE_CORREO_MB,
 } from './validaciones.js';
 import { EQUIPOS, textoEquipo, persona, normalizarParte } from './modelo.js';
 import {
@@ -14,6 +14,7 @@ import {
 import { cabeceraParte, refParte, radio, vErrores } from './campos.js';
 import { seccionExtras, vPreguntaExtras } from './vista-extras.js';
 import { vParteMaq } from './vista-maquinaria.js';
+import { vParteHer } from './vista-herbicida.js';
 import { vFotoGrande, bloqueSinTrabajos } from './vista-trabajo.js';
 import { vOrigenFoto } from './vista-origen-foto.js';
 
@@ -38,6 +39,7 @@ export function seccionFormato1(p) {
 
 export function vParte() {
   if (estado.parte.tipo === 'MAQUINARIA') return vParteMaq();
+  if (estado.parte.tipo === 'HERBICIDA') return vParteHer();
   const p = normalizarParte(estado.parte);
   return `
   ${cabeceraParte('ir-inicio', 'Inicio', refParte(p))}
@@ -83,13 +85,7 @@ export function vParte() {
       <button class="btn anadir" data-action="nuevo-trabajo">${p.trabajos.length ? '+ Añadir otro trabajo' : '+ Añadir trabajo'}</button>
     </section>
 
-    <section class="tarjeta">
-      <h2>Medidas antiincendios <span class="oblig">obligatorio</span></h2>
-      <p class="nota">Marca todas las que se hayan tomado.</p>
-      ${medidasCfg().map((m) => `<label class="check"><input type="checkbox" data-medida="${esc(m)}" ${p.medidas.includes(m) ? 'checked' : ''}><span>${esc(m)}</span></label>`).join('')}
-      <label class="check"><input type="checkbox" data-bind="medidasOtrasSi" data-rerender ${p.medidasOtrasSi ? 'checked' : ''}><span>Otras</span></label>
-      ${p.medidasOtrasSi ? `<textarea data-bind="medidasOtras" rows="2" placeholder="Escribe las otras medidas">${esc(p.medidasOtras)}</textarea>` : ''}
-    </section>
+    ${seccionMedidas(p)}
 
     ${p.tipo === 'SUPER' ? seccionFormato1(p) : ''}`}
 
@@ -110,6 +106,18 @@ export function vParte() {
   ${estado.origenFoto ? vOrigenFoto() : ''}
   ${estado.errores.length ? vErrores() : ''}
   ${estado.preguntaExtras ? vPreguntaExtras() : ''}`;
+}
+
+/** Medidas antiincendios (INFRA, SUPER y HERBICIDA): casillas de la lista de la oficina y «Otras». */
+export function seccionMedidas(p) {
+  return `
+    <section class="tarjeta">
+      <h2>Medidas antiincendios <span class="oblig">obligatorio</span></h2>
+      <p class="nota">Marca todas las que se hayan tomado.</p>
+      ${medidasCfg().map((m) => `<label class="check"><input type="checkbox" data-medida="${esc(m)}" ${p.medidas.includes(m) ? 'checked' : ''}><span>${esc(m)}</span></label>`).join('')}
+      <label class="check"><input type="checkbox" data-bind="medidasOtrasSi" data-rerender ${p.medidasOtrasSi ? 'checked' : ''}><span>Otras</span></label>
+      ${p.medidasOtrasSi ? `<textarea data-bind="medidasOtras" rows="2" placeholder="Escribe las otras medidas">${esc(p.medidasOtras)}</textarea>` : ''}
+    </section>`;
 }
 
 export function vOtroForm() {
@@ -241,9 +249,10 @@ async function avisoPeso(p) {
       const f = await db.getFoto(id);
       if (f && f.blob) bytes.push(f.blob.size);
     }
-    const quitar = fotosAQuitar(bytes);
+    const factor = factorCorreo(p);
+    const quitar = fotosAQuitar(bytes, factor);
     if (!quitar) return null;
-    return `Este parte pesa unos ${Math.round(pesoCorreoMB(bytes))} MB y el correo admite unos ${LIMITE_CORREO_MB}. ` +
+    return `Este parte pesa unos ${Math.round(pesoCorreoMB(bytes, factor))} MB y el correo admite unos ${LIMITE_CORREO_MB}. ` +
       `Quita unas ${quitar} foto${quitar === 1 ? '' : 's'} o puede que no llegue a la oficina.\n\n` +
       'Cancelar: volver al parte para quitar fotos.\nAceptar: seguir y cerrarlo igualmente.';
   } catch (e) {
@@ -254,8 +263,9 @@ async function avisoPeso(p) {
 export async function cerrarParte() {
   await guardarYa();
   const maq = estado.parte.tipo === 'MAQUINARIA';
-  const errores = !maq ? validar(estado.parte)
-    : subtipoDe(estado.parte) === 'via' ? validarMaq(estado.parte) : validarLD(estado.parte);
+  const errores = estado.parte.tipo === 'HERBICIDA' ? validarHer(estado.parte)
+    : !maq ? validar(estado.parte)
+      : subtipoDe(estado.parte) === 'via' ? validarMaq(estado.parte) : validarLD(estado.parte);
   if (errores.length) {
     estado.errores = errores;
     render();

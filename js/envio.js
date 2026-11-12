@@ -6,17 +6,34 @@
 // a separar en .jpg. Se usa .txt y no .json porque Android no deja compartir .json.
 
 import { generarPDF, textoReferencia, sinFechaOriginal } from './pdf.js';
-import { blobABase64, fmtFecha, isoLocal, slug, FORMATO1 } from './util.js';
+import { blobABase64, fmtFecha, fmtNum, isoLocal, slug, FORMATO1 } from './util.js';
+import { calculosHerbicida, codigoSios } from './modelo.js';
 
 export function nombreBase(p) {
   return `${p.fecha}_${p.tipo}_${p.ref}${p.rev > 1 ? `_v${p.rev}` : ''}_${slug(p.capataz)}`;
 }
 
 /** Carpeta dentro de "General/Partes" donde lo guarda Power Automate. */
-const CARPETA_TIPO = { INFRA: 'Infra', SUPER: 'Super', MAQUINARIA: 'Maquinaria' };
+const CARPETA_TIPO = { INFRA: 'Infra', SUPER: 'Super', MAQUINARIA: 'Maquinaria', HERBICIDA: 'Herbicida' };
+
+/** En HERBICIDA, el nº SIOS va en el nombre de la foto (T1_385208_antes_1.jpg). Solo cifras, de 1 a 9, como admite el servidor (v28). */
+function prefijoSios(p, t) {
+  if (p.tipo !== 'HERBICIDA') return '';
+  const n = codigoSios(t);
+  return /^\d{1,9}$/.test(n) ? `${n}_` : '';
+}
 
 export function carpetaDestino(p) {
   return `${p.fecha}/${CARPETA_TIPO[p.tipo] || p.tipo}/${p.ref}_${slug(p.capataz)}`;
+}
+
+/** Línea del correo de un parte HERBICIDA: encargado, casos SIOS con sus m², caldo y productos. */
+function textoHerbicida(p) {
+  const k = calculosHerbicida(p);
+  const casos = p.trabajos.map((t) => `${(t.referencia && t.referencia.codigo) || '?'}${t.parcial ? ' (solo una parte)' : ''}`);
+  return `Encargado (aplicador cualificado): ${p.capataz}. Casos SIOS (${casos.length}, ${fmtNum(k.m2)} m²): ${casos.join(', ')}. ` +
+    `Caldo: ${fmtNum(k.caldo)} L (${fmtNum(k.caldoHa)} L/ha).` +
+    `${k.productos.length ? ` Producto: ${k.productos.map((x) => `${x.nombre} ${fmtNum(x.dosis)} ml/L`).join('; ')}.` : ''}`;
 }
 
 export async function prepararEnvio(parte, config, leerFoto, versionApp) {
@@ -32,9 +49,10 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
   const fotos = [];
   for (const [i, t] of datos.trabajos.entries()) {
     const cuenta = {};
+    const sios = prefijoSios(datos, t);
     for (const f of t.fotos) {
       cuenta[f.fase] = (cuenta[f.fase] || 0) + 1;
-      f.archivo = `T${i + 1}_${f.fase}_${cuenta[f.fase]}${sufijo}.jpg`;
+      f.archivo = `T${i + 1}_${sios}${f.fase}_${cuenta[f.fase]}${sufijo}.jpg`;
       const blob = await leerFoto(f.id);
       if (!blob) throw new Error(`Falta una foto del trabajo ${i + 1}. Ábrelo y revisa sus fotos.`);
       fotos.push({ archivo: f.archivo, trabajo: i + 1, fase: f.fase, base64: await blobABase64(blob) });
@@ -100,9 +118,13 @@ export async function prepararEnvio(parte, config, leerFoto, versionApp) {
       : parte.tipo === 'MAQUINARIA'
       ? `Lo rellena: ${parte.capataz}. Máquinas: ${(parte.maquinasVia || []).filter((m) => m.descripcion).map((m) => `${m.descripcion} (${m.horas} h)`).join('; ')}. ` +
         `Tajos: ${(parte.tajos || []).map((t) => `vía ${t.via} PK ${t.pkInicio}-${t.pkFin}`).join('; ')}.`
+      : parte.tipo === 'HERBICIDA'
+      ? textoHerbicida(parte)
       : `Capataz: ${parte.capataz}. Trabajos: ${parte.trabajos.map((t) => textoReferencia(t) + (t.tipoCoste ? ` [${t.tipoCoste}]` : '') +
         (t.noRealizado ? ` [NO REALIZADO: ${t.motivoNoRealizado || ''}]` : '')).join('; ')}.`,
-    ...(sinFotos.length ? [`AVISO: trabajos sin fotos: ${sinFotos.map(({ t, i }) => `trabajo ${i + 1} (${t.motivoSinFotos || ''})`).join(', ')}.`] : []),
+    ...(sinFotos.length ? [parte.tipo === 'HERBICIDA'
+      ? `AVISO: casos sin fotos: ${sinFotos.map(({ t, i }) => `caso ${i + 1}, SIOS ${(t.referencia && t.referencia.codigo) || '?'} (${t.motivoSinFotos || ''})`).join(', ')}.`
+      : `AVISO: trabajos sin fotos: ${sinFotos.map(({ t, i }) => `trabajo ${i + 1} (${t.motivoSinFotos || ''})`).join(', ')}.`] : []),
     ...(sinFecha.length ? [`AVISO: fotos de galería sin fecha original (se ha usado la fecha del archivo): ${
       sinFecha.map((x) => `${x.nombre} (${x.n} de ${x.de})`).join(', ')}.`] : []),
     ...((parte.formato1 || []).length ? [`${FORMATO1} adjunto: ${parte.formato1.length} foto(s).`] : []),
