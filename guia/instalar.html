@@ -934,7 +934,7 @@ const VIEWS={
     const eq=(c,tit,preg,eleg,otro,on,kSi,kNo,kSel)=>card(c,`${tit} ${OB}`,`${lab(preg)}${seg(['Sí','No'],on,[kSi,kNo])}${on===0?`<div class="a-in sel"${K(kSel)} style="margin-top:8px">${eleg}</div>${btn(otro,'sec')}`:''}`);
     return page(t,bar(t,'Inicio',`${LAB[t]} · ${REF[t]}`),`
       ${card('jornada','Jornada',`<span class="a-lab">Fecha de la jornada</span>${inp('28/10/2026','',false,'fecha')}
-        ${sup?chk('Jornada nocturna',0,'','(pon la fecha del día en que empezó)'):''}
+        ${chk('Jornada nocturna',0,'','(pon la fecha del día en que empezó)')}
         <span class="a-lab">Capataz</span><div class="a-in fixed">Juan García</div>
         ${chk('Jornada sin trabajos',0,'','(no se ha podido trabajar: lluvia, avería…)')}`)}
       ${card('personal',`Personal ${cnt(s.marta?2:1)}`,`${per('Juan García','Rover · Capataz')}${s.marta?per('Marta López','Rover · Peón'):''}
@@ -1070,7 +1070,7 @@ const mk=(t)=>{
   const T=(s,to,hit,extra={})=>({v:'trabajo',s,to,hit,...extra});
   return [
     {c:0,t:'Elige el tipo de parte',d:`Toca <b>${LAB[t]}</b>. Aquí irán saliendo todos tus partes.`,ph:[{v:'inicio',s:{vacio:1},hit:'tipo'}]},
-    {c:0,t:'Revisa la jornada',d:`Comprueba la <b>fecha</b>.${sup?' Si es de noche, marca «Jornada nocturna».':''}`,ph:[P({},'jornada','fecha')]},
+    {c:0,t:'Revisa la jornada',d:`Comprueba la <b>fecha</b>. Si es de noche, marca «Jornada nocturna».`,ph:[P({},'jornada','fecha')]},
     {c:0,t:'Añade al personal',d:'Tú ya estás. <b>Busca y toca</b> a cada persona que ha venido.',ph:[P({busca:1},'personal','res'),P({marta:1,nuevo:'Marta López'},'personal')]},
     {c:0,t:'Maquinaria y vehículos',d:'Contesta <b>Sí o No</b> a las dos. Con Sí, elige de la lista.',ph:[P({marta:1},'maq','maqsi'),P({marta:1,eq:1},'maq','maqsel'),P({marta:1,eq:1},'veh','vehno'),P({marta:1,eq:2},'veh')]},
     {c:1,t:'Añade un trabajo',d:'Baja a Trabajos y toca <b>+ Añadir trabajo</b>.',ph:[P(P0,'trabajos','add')]},

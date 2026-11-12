@@ -2,6 +2,9 @@
 
 La versión que ve el capataz está en Ajustes («Versión de la app»). Al publicar hay que subirla en `sw.js` y en `js/app.js` (lo hace `publicar.ps1`).
 
+## 0.30.1 · 2026-11-12
+- Parte INFRA: vuelve «Jornada nocturna», igual que en SUPER. Si el parte se abre entre las 00:00 y las 07:00, sale con la fecha de ayer y la casilla marcada (un parte de noche se había contado en el día siguiente). La guía de instalación la enseña también en INFRA.
+
 ## 0.30.0 · 2026-11-12 (parte HERBICIDA, oculto: solo para los probadores)
 - **Tipo de parte nuevo, HERBICIDA** (referencia `HER-`, campaña de 2º riego), plan en `DISEÑO\PLAN-HERBICIDA.md`. El botón solo sale si el servidor (v28+) dice que la campaña está activa o que el correo está en `herbicidaProbadores`; para los demás capataces no cambia nada.
 - Parte como el papel: personal (el capataz es el aplicador «Cualificado», los demás «Básicos»), ocupaciones de vía o «Hoy no se ha ocupado la vía», mochila / máquina, hasta 3 productos con su dosis, caldo gastado y confirmación de cantidades reales; la app calcula producto total, producto por hectárea y caldo por hectárea.

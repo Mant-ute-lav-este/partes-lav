@@ -148,11 +148,11 @@ export function vMenu() {
 export async function nuevoParte(tipo, maquina = null) {
   const sub = tipo === 'MAQUINARIA' ? (maquina && maquina.parte) || 'via' : null;
   const ahora = new Date();
-  // De madrugada, la jornada de SUPER y la de MAQUINARIA empezaron ayer. En INFRA ya no hay
-  // jornada nocturna ni fecha automática (ni en HERBICIDA, que es de día). MAQUINARIA no marca
-  // «nocturna»: lleva su horario.
-  const madrugada = (tipo === 'SUPER' || tipo === 'MAQUINARIA') && ahora.getHours() < 7;
-  const nocturna = tipo === 'SUPER' && madrugada;
+  // De madrugada, la jornada de INFRA, SUPER y MAQUINARIA empezó ayer (HERBICIDA es de día).
+  // MAQUINARIA no marca «nocturna»: lleva su horario. INFRA lo recuperó en 0.30.1 tras un parte
+  // de noche que se contó en el día siguiente.
+  const madrugada = (tipo === 'INFRA' || tipo === 'SUPER' || tipo === 'MAQUINARIA') && ahora.getHours() < 7;
+  const nocturna = (tipo === 'INFRA' || tipo === 'SUPER') && madrugada;
   const dia = new Date(ahora);
   if (madrugada) dia.setDate(dia.getDate() - 1);
   const fecha = fechaLocal(dia);

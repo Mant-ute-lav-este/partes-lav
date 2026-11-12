@@ -2935,6 +2935,31 @@ prueba('pantallas: parte nuevo de los 5 tipos', async () => {
   }
 });
 
+prueba('pantallas: parte nuevo de madrugada (INFRA y SUPER: noche de ayer)', async () => {
+  const { f, m, errores } = await appEnMarco();
+  const { nuevoParte } = f.contentWindow.moduloInicio;
+  f.contentWindow.confirm = () => true;
+  const DateReal = f.contentWindow.Date;
+  // Las 03:00 del 12/11/2026: la jornada empezó el 11/11.
+  f.contentWindow.Date = class extends DateReal {
+    constructor(...a) { if (a.length) super(...a); else super(2026, 10, 12, 3, 0, 0); }
+  };
+  try {
+    for (const tipo of ['INFRA', 'SUPER']) {
+      Object.assign(m.estado, { config: ej.config, perfil: perfilEjemplo(), parte: null, vista: 'inicio', errores: [] });
+      await nuevoParte(tipo);
+      if (m.estado.repetir) await f.contentWindow.moduloInicio.contestarRepetir(false);
+      await new Promise((r) => setTimeout(r, 100));
+      if (errores.length) throw new Error(`errores al crear ${tipo}: ${errores.splice(0).join(' | ')}`);
+      igual(m.estado.parte.fecha, '2026-11-11', `${tipo}: fecha de la noche de ayer`);
+      igual(m.estado.parte.nocturna, true, `${tipo}: marcado como nocturno`);
+      cierto(m.app.textContent.includes('Jornada nocturna'), `${tipo}: falta la casilla «Jornada nocturna»`);
+    }
+  } finally {
+    f.contentWindow.Date = DateReal;
+  }
+});
+
 prueba('pantallas: parte nuevo igual que el anterior', async () => {
   const { f, m, errores } = await appEnMarco();
   const { nuevoParte, contestarRepetir } = f.contentWindow.moduloInicio;

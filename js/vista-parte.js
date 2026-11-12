@@ -49,8 +49,8 @@ export function vParte() {
     <section class="tarjeta">
       <h2>Jornada</h2>
       <label class="campo"><span>Fecha de la jornada</span><input type="date" data-bind="fecha" value="${esc(p.fecha)}"></label>
-      ${p.tipo === 'INFRA' ? '' : `<label class="check"><input type="checkbox" data-bind="nocturna" ${p.nocturna ? 'checked' : ''}>
-        <span>Jornada nocturna <small>(pon la fecha del día en que empezó)</small></span></label>`}
+      <label class="check"><input type="checkbox" data-bind="nocturna" ${p.nocturna ? 'checked' : ''}>
+        <span>Jornada nocturna <small>(pon la fecha del día en que empezó)</small></span></label>
       <div class="campo"><span>Capataz</span><div class="valor-fijo">${esc(p.capataz)}</div></div>
       ${bloqueSinTrabajos(p)}
     </section>
