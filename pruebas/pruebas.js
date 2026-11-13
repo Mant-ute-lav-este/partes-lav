@@ -3756,10 +3756,16 @@ prueba('eventos: ningún botón ni campo cambia un parte enviado', async () => {
       try { hacer(caja.firstElementChild); } catch { /* un elemento de prueba incompleto puede dar error: lo que importa es el parte */ }
       await new Promise((r) => setTimeout(r, 60));
       caja.remove();
-      const ahora = m.estado.parte === p ? JSON.stringify(p) : 'el parte abierto ha cambiado por otro';
+      // Una sincronización de una prueba anterior puede acabar ahora y recargar el parte abierto desde la base
+      // de datos (refrescarVista): es otro objeto con el mismo id. Eso no es cambiarlo: se mira su contenido.
+      const abierto = m.estado.parte;
+      const recargado = abierto && abierto !== p && abierto.id === p.id;
+      const ahora = abierto === p ? JSON.stringify(p)
+        : recargado ? (JSON.stringify(abierto) === foto ? JSON.stringify(p) : 'el parte recargado no es igual que el enviado')
+          : 'el parte abierto ha cambiado por otro';
       if (ahora !== foto) {
         const antes = JSON.parse(foto);
-        const campos = m.estado.parte === p ? Object.keys({ ...antes, ...p }).filter((k) => JSON.stringify(p[k]) !== JSON.stringify(antes[k])) : [];
+        const campos = abierto === p ? Object.keys({ ...antes, ...p }).filter((k) => JSON.stringify(p[k]) !== JSON.stringify(antes[k])) : [];
         malos.push(`${nombre} · ${que}${campos.length ? ` (cambia: ${campos.join(', ')})` : ''}`);
       }
       Object.assign(p, JSON.parse(foto));
